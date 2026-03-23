@@ -1,0 +1,47 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: workflows
+    // Document ID: {workflowId}
+    // Fields:
+    //   - name: string (required)
+    //   - nodes: list (required)
+    //   - edges: list (required)
+    //   - createdAt: number (required)
+    //   - updatedAt: number (required)
+    //   - userId: string (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidWorkflow(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.nodes is list && data.nodes.size() < 100 &&
+             data.edges is list && data.edges.size() < 200 &&
+             data.createdAt is number &&
+             data.updatedAt is number &&
+             data.userId is string && data.userId == request.auth.uid;
+    }
+
+    match /workflows/{workflowId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isAuthenticated() && isValidWorkflow(request.resource.data);
+      allow update: if isOwner(resource.data.userId) && isValidWorkflow(request.resource.data);
+      allow delete: if isOwner(resource.data.userId);
+    }
+  }
+}

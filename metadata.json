@@ -1,0 +1,8 @@
+{
+  "name": "Minn Creative Studio",
+  "description": "A visual workflow builder for chaining Google AI models (Gemini, Imagen, Veo) with real-time previews and node-based canvas.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

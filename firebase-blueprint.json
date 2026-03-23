@@ -1,0 +1,42 @@
+{
+  "entities": {
+    "Workflow": {
+      "title": "Workflow",
+      "description": "A node-based creative workflow",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the workflow"
+        },
+        "nodes": {
+          "type": "array",
+          "description": "The React Flow nodes JSON"
+        },
+        "edges": {
+          "type": "array",
+          "description": "The React Flow edges JSON"
+        },
+        "createdAt": {
+          "type": "number",
+          "description": "The creation timestamp"
+        },
+        "updatedAt": {
+          "type": "number",
+          "description": "The last update timestamp"
+        },
+        "userId": {
+          "type": "string",
+          "description": "The ID of the user who owns this workflow"
+        }
+      },
+      "required": ["name", "nodes", "edges", "createdAt", "updatedAt", "userId"]
+    }
+  },
+  "firestore": {
+    "/workflows/{workflowId}": {
+      "schema": "Workflow",
+      "description": "Collection of creative workflows"
+    }
+  }
+}
