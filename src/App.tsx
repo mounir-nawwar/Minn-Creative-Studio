@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import Sidebar from './components/Sidebar';
 import ProjectSidebar from './components/ProjectSidebar';
 import Toolbar from './components/Toolbar';
 import ProjectContextBar from './components/ProjectContextBar';
@@ -13,7 +12,7 @@ import { AnimatePresence } from 'motion/react';
 import { auth, signInWithGoogle, signOut as firebaseLogOut, db } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { getDocFromServer, doc } from 'firebase/firestore';
-import { LogIn, LogOut, User as UserIcon, ShieldCheck, Loader2 } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 import { useProjectStore } from './store/useProjectStore';
 import { useStore } from './store/useStore';
 import { ReactFlowProvider } from 'reactflow';
@@ -27,7 +26,6 @@ export default function App() {
   const setNodes = useStore((state) => state.setNodes);
   const setEdges = useStore((state) => state.setEdges);
 
-  // Clear canvas when switching projects
   useEffect(() => {
     setNodes([]);
     setEdges([]);
@@ -52,7 +50,7 @@ export default function App() {
         await getDocFromServer(doc(db, 'test', 'connection'));
       } catch (error) {
         if (error instanceof Error && error.message.includes('the client is offline')) {
-          console.error("Please check your Firebase configuration. ");
+          console.error('Please check your Firebase configuration.');
         }
       }
     };
@@ -100,7 +98,6 @@ export default function App() {
             </h1>
             <p className="text-gray-500 text-sm font-medium">The Professional AI Creative Pipeline</p>
           </div>
-          
           <div className="p-8 bg-[#111111] border border-[#1a1a1a] rounded-3xl space-y-6 shadow-2xl">
             <div className="flex justify-center">
               <div className="p-4 bg-[#0097A7]/10 rounded-full">
@@ -118,14 +115,13 @@ export default function App() {
               <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
               CONTINUE WITH GOOGLE
             </button>
-            <button 
+            <button
               onClick={handleCustomLogout}
               className="w-full text-[10px] text-gray-600 hover:text-red-500 font-bold uppercase tracking-widest transition-colors"
             >
               Switch Admin Account
             </button>
           </div>
-          
           <p className="text-[10px] text-gray-700 uppercase font-bold tracking-widest">Powered by Gemini 3.1 & Veo 3</p>
         </div>
       </div>
@@ -142,10 +138,9 @@ export default function App() {
         <ProjectSidebar />
         <div className="flex-1 flex flex-col min-w-0">
           <ProjectContextBar />
-          <Toolbar />
+          <Toolbar user={user} onLogout={handleCustomLogout} />
           <Canvas />
           <ChatDrawer />
-
           <AnimatePresence>
             {isSettingsOpen && (
               <ProjectCreationOverlay
@@ -160,26 +155,6 @@ export default function App() {
               />
             )}
           </AnimatePresence>
-          
-          {/* User Profile Overlay */}
-          <div className="absolute top-16 right-4 flex items-center gap-3 bg-black/40 backdrop-blur-md p-1.5 pr-4 rounded-full border border-white/10 z-50">
-            <div className="w-8 h-8 rounded-full overflow-hidden border border-[#0097A7]">
-              {user.photoURL ? (
-                <img src={user.photoURL} alt={user.displayName || ''} className="w-full h-full object-cover" />
-              ) : (
-                <UserIcon className="w-full h-full p-1.5 text-gray-500" />
-              )}
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[10px] text-white font-bold leading-none">{user.displayName}</span>
-              <button 
-                onClick={handleCustomLogout}
-                className="text-[8px] text-gray-500 hover:text-red-500 font-bold uppercase tracking-widest text-left transition-colors"
-              >
-                Sign Out
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </ReactFlowProvider>
