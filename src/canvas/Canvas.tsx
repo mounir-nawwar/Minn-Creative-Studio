@@ -125,7 +125,6 @@ const CanvasContent = () => {
       <AnimatePresence>
         {pendingNodeType && (
           <>
-            {/* Ghost node following cursor */}
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 0.45, scale: 1 }}
@@ -150,12 +149,11 @@ const CanvasContent = () => {
               </p>
             </motion.div>
 
-            {/* Tooltip — top-36 = 144px, safely below ProjectContextBar (48px) + Toolbar (64px) = 112px */}
             <motion.div
-              initial={{ y: -10, opacity: 0 }}
+              initial={{ y: -20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              exit={{ y: -10, opacity: 0 }}
-              className="fixed top-36 left-1/2 -translate-x-1/2 z-[10000] bg-[#0097A7] text-white px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-2xl border border-white/20 flex items-center gap-2 pointer-events-none"
+              exit={{ y: -20, opacity: 0 }}
+              className="fixed top-36 left-1/2 -translate-x-1/2 z-[10000] bg-[#0097A7] text-white px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-2xl border border-white/20 flex items-center gap-2"
             >
               <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
               Click to place — Esc to cancel

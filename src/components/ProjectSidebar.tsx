@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Layout, 
-  MessageSquare, 
-  Image as ImageIcon, 
-  Plus, 
-  History, 
-  Search, 
-  Filter, 
-  Trash2, 
+import {
+  Layout,
+  MessageSquare,
+  Image as ImageIcon,
+  Plus,
+  History,
+  Search,
+  Filter,
+  Trash2,
   MoreVertical,
   ChevronRight,
   Sparkles,
@@ -29,17 +29,17 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { useProjectStore } from '../store/useProjectStore';
 import { useStore } from '../store/useStore';
-import { 
-  db, 
-  auth, 
-  collection, 
-  query, 
-  where, 
-  orderBy, 
-  onSnapshot, 
-  addDoc, 
-  deleteDoc, 
-  doc, 
+import {
+  db,
+  auth,
+  collection,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  addDoc,
+  deleteDoc,
+  doc,
   serverTimestamp,
   Timestamp
 } from '../firebase';
@@ -148,7 +148,6 @@ export default function ProjectSidebar() {
     }
   ];
 
-  // KEY FIX: only set pending type, never add node directly
   const handleAddNode = (type: string, label: string) => {
     setPendingNodeType(type, { label, type: type as any, config: {} });
   };
@@ -231,11 +230,10 @@ export default function ProjectSidebar() {
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl transition-all ${
-              activeTab === tab 
-              ? 'bg-black text-[#0097A7] shadow-xl border border-white/5' 
+            className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl transition-all ${activeTab === tab
+              ? 'bg-black text-[#0097A7] shadow-xl border border-white/5'
               : 'text-gray-600 hover:text-gray-400'
-            }`}
+              }`}
           >
             {tab === 'nodes' && <Box className="w-4 h-4" />}
             {tab === 'workflows' && <Layout className="w-4 h-4" />}
@@ -291,7 +289,7 @@ export default function ProjectSidebar() {
               className="flex-1 flex flex-col overflow-hidden"
             >
               <div className="p-4">
-                <button 
+                <button
                   onClick={createNewWorkflow}
                   className="w-full py-4 bg-[#0097A7]/10 hover:bg-[#0097A7]/20 text-[#0097A7] rounded-2xl flex items-center justify-center gap-3 transition-all border border-[#0097A7]/20 group"
                 >
@@ -310,7 +308,7 @@ export default function ProjectSidebar() {
                   </div>
                 ) : (
                   workflows.map(wf => (
-                    <div 
+                    <div
                       key={wf.id}
                       onClick={() => {
                         setNodes(wf.nodes);
@@ -337,7 +335,7 @@ export default function ProjectSidebar() {
                           </div>
                         </div>
                       </div>
-                      <button 
+                      <button
                         onClick={(e) => deleteItem(e, 'workflows', wf.id)}
                         className="absolute top-2 right-2 p-1.5 opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-500 transition-all"
                       >
@@ -359,7 +357,7 @@ export default function ProjectSidebar() {
               className="flex-1 flex flex-col overflow-hidden"
             >
               <div className="p-4">
-                <button 
+                <button
                   onClick={createNewChat}
                   className="w-full py-4 bg-[#0097A7]/10 hover:bg-[#0097A7]/20 text-[#0097A7] rounded-2xl flex items-center justify-center gap-3 transition-all border border-[#0097A7]/20 group"
                 >
@@ -378,7 +376,7 @@ export default function ProjectSidebar() {
                   </div>
                 ) : (
                   chats.map(chat => (
-                    <div 
+                    <div
                       key={chat.id}
                       onClick={() => {
                         setActiveChatId(chat.id);
@@ -395,7 +393,7 @@ export default function ProjectSidebar() {
                           <p className="text-[9px] text-gray-600 truncate mt-0.5">{chat.lastMessage || 'No messages yet'}</p>
                         </div>
                       </div>
-                      <button 
+                      <button
                         onClick={(e) => deleteItem(e, 'chats', chat.id)}
                         className="absolute top-2 right-2 p-1.5 opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-500 transition-all"
                       >
@@ -422,17 +420,19 @@ export default function ProjectSidebar() {
         </AnimatePresence>
       </div>
 
+      {/* Asset Preview Modal */}
       <AnimatePresence>
         {selectedAsset && (
-          <AssetPreviewModal 
+          <AssetPreviewModal
             asset={selectedAsset}
             onClose={() => setSelectedAsset(null)}
-            onDelete={() => {}}
-            onToggleFavorite={() => {}}
+            onDelete={() => {/* Handle Delete */ }}
+            onToggleFavorite={() => {/* Handle Favorite */ }}
           />
         )}
       </AnimatePresence>
 
+      {/* Footer Branding */}
       <div className="p-4 border-t border-white/5 bg-[#0d0d0d] flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-[#0097A7]" />
