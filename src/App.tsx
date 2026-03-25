@@ -44,40 +44,41 @@ export default function App() {
   }, [currentProject?.id, setNodes, setEdges]);
 
   useEffect(() => {
+    console.time("AppInit");
+    console.log("Initializing App...");
+    
+    // 1. Check Backend Session
     const checkAuth = async () => {
+      console.time("CheckAuth");
       try {
         const response = await fetch('/api/me');
         const data = await response.json();
         setIsAuthenticated(data.authenticated);
+        console.timeEnd("CheckAuth");
       } catch (err) {
+        console.error("CheckAuth error:", err);
         setIsAuthenticated(false);
+        console.timeEnd("CheckAuth");
       }
     };
     checkAuth();
-  }, []);
 
-  useEffect(() => {
-    const testConnection = async () => {
-      try {
-        await getDocFromServer(doc(db, 'test', 'connection'));
-      } catch (error) {
-        if (error instanceof Error && error.message.includes('the client is offline')) {
-          console.error("Please check your Firebase configuration. ");
-        }
-      }
-    };
-    testConnection();
-  }, []);
-
-  useEffect(() => {
+    // 2. Listen for Firebase Auth
+    console.time("FirebaseAuth");
     const unsubscribe = onAuthStateChanged(auth, (u) => {
+      console.log("Firebase Auth state changed:", u ? "User logged in" : "No user");
       setUser(u);
       setLoading(false);
+      console.timeEnd("FirebaseAuth");
+      console.timeEnd("AppInit");
+    }, (err) => {
+      console.error("Firebase Auth error:", err);
+      setLoading(false);
+      console.timeEnd("FirebaseAuth");
+      console.timeEnd("AppInit");
     });
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
+    
+    // 3. Check AI Studio API Key
     const checkApiKey = async () => {
       if (window.aistudio) {
         try {
@@ -85,14 +86,47 @@ export default function App() {
           setHasApiKey(hasKey);
         } catch (err) {
           console.error("Failed to check API key", err);
-          setHasApiKey(true); // Fallback
+          setHasApiKey(true);
         }
       } else {
-        setHasApiKey(true); // Local dev fallback
+        setHasApiKey(true);
       }
     };
     checkApiKey();
+
+    // Safety timeout: if auth doesn't resolve in 5s, stop loading anyway
+    const timer = setTimeout(() => {
+      if (loading) {
+        console.warn("Auth state check timed out after 5s");
+        setLoading(false);
+        setIsAuthenticated(prev => prev === null ? false : prev);
+      }
+    }, 5000);
+
+    return () => {
+      unsubscribe();
+      clearTimeout(timer);
+    };
   }, []);
+
+  useEffect(() => {
+    console.log("App State:", { isAuthenticated, loading, user: !!user, hasApiKey, currentProject: !!currentProject });
+  }, [isAuthenticated, loading, user, hasApiKey, currentProject]);
+
+  // Separate connection test to not block main initialization
+  useEffect(() => {
+    if (!user) return;
+    const testConnection = async () => {
+      try {
+        await getDocFromServer(doc(db, 'test', 'connection'));
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('the client is offline')) {
+          console.error("Firebase connection test: Client appears offline.");
+        }
+      }
+    };
+    testConnection();
+  }, [user]);
 
   const handleSelectKey = async () => {
     if (window.aistudio) {
@@ -119,7 +153,12 @@ export default function App() {
     return (
       <div className="h-screen w-screen bg-black flex flex-col items-center justify-center gap-4">
         <div className="w-12 h-12 border-4 border-[#0097A7] border-t-transparent rounded-full animate-spin shadow-[0_0_30px_rgba(0,151,167,0.2)]" />
-        <p className="text-[10px] text-gray-500 uppercase font-black tracking-[0.3em]">Initializing Minn Studio</p>
+        <div className="flex flex-col items-center gap-1">
+          <p className="text-[10px] text-gray-500 uppercase font-black tracking-[0.3em]">Initializing Minn Studio</p>
+          <p className="text-[8px] text-gray-700 uppercase font-bold tracking-widest">
+            {isAuthenticated === null ? "Verifying Session..." : "Connecting to Firebase..."}
+          </p>
+        </div>
       </div>
     );
   }
@@ -171,7 +210,48 @@ export default function App() {
   }
 
   if (hasApiKey === false) {
-    // We no longer block the app, but we'll keep the state to show a status in the toolbar
+    return (
+      <div className="h-screen w-screen bg-black flex flex-col items-center justify-center p-6">
+        <div className="max-w-md w-full space-y-8 text-center">
+          <div className="space-y-2">
+            <h1 className="text-6xl font-black text-white tracking-tighter">
+              MINN <span className="text-[#0097A7]">STUDIO</span>
+            </h1>
+            <p className="text-gray-500 text-sm font-medium">API Configuration Required</p>
+          </div>
+          
+          <div className="p-8 bg-[#111111] border border-[#1a1a1a] rounded-3xl space-y-6 shadow-2xl">
+            <div className="flex justify-center">
+              <div className="p-4 bg-[#0097A7]/10 rounded-full">
+                <Key className="w-12 h-12 text-[#0097A7]" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-xl font-bold text-white">Select Your API Key</h2>
+              <p className="text-gray-500 text-xs text-balance">
+                High-performance models like Imagen 4 and Veo 3 require a paid API key from a Google Cloud project with billing enabled.
+              </p>
+              <a 
+                href="https://ai.google.dev/gemini-api/docs/billing" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-[10px] text-[#0097A7] hover:underline uppercase font-bold tracking-widest block pt-2"
+              >
+                Learn about billing
+              </a>
+            </div>
+            <button
+              onClick={handleSelectKey}
+              className="w-full py-4 bg-[#0097A7] hover:bg-[#00838F] text-white font-black rounded-2xl flex items-center justify-center gap-3 transition-all transform hover:scale-[1.02]"
+            >
+              SELECT API KEY
+            </button>
+          </div>
+          
+          <p className="text-[10px] text-gray-700 uppercase font-bold tracking-widest">Secure Configuration</p>
+        </div>
+      </div>
+    );
   }
 
   if (!currentProject) {
@@ -184,12 +264,7 @@ export default function App() {
         <ProjectSidebar />
         <div className="flex-1 flex flex-col min-w-0">
           <ProjectContextBar />
-          <Toolbar 
-            user={user} 
-            onLogout={handleCustomLogout} 
-            hasApiKey={!!hasApiKey}
-            onSelectKey={handleSelectKey}
-          />
+          <Toolbar user={user} onLogout={handleCustomLogout} />
           <Canvas />
           <ChatDrawer />
 

@@ -23,7 +23,8 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json());
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '50mb' }));
   app.use(cookieParser());
 
   // Auth endpoints
@@ -73,17 +74,29 @@ async function startServer() {
   });
 
   // Gemini Proxy Route
-  app.post('/api/gemini/proxy', async (req, res) => {
-    const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+  app.post('/api/gemini/proxy', async (req, res, next) => {
+    const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
     if (!apiKey) return res.status(500).json({ error: 'API key not configured on server' });
+
+    const maskedKey = apiKey.length > 8 
+      ? `${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)}`
+      : '********';
+    console.log(`Gemini Proxy using key: ${maskedKey}`);
 
     try {
       const { method, params } = req.body;
+      console.log(`Gemini Proxy: ${method}`, JSON.stringify(params).substring(0, 100) + '...');
       const ai = new GoogleGenAI({ apiKey });
 
       if (method === 'generateContent') {
         const response = await ai.models.generateContent(params);
-        return res.json({ success: true, data: response });
+        return res.json({ 
+          success: true, 
+          data: {
+            ...response,
+            text: response.text // Explicitly include the text property
+          } 
+        });
       }
 
       if (method === 'generateImages') {
@@ -119,6 +132,7 @@ async function startServer() {
     }
   });
 
+  console.log(`Starting server in ${process.env.NODE_ENV || 'development'} mode...`);
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
@@ -136,6 +150,15 @@ async function startServer() {
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://localhost:${PORT}`);
+  });
+
+  // Global Error Handler
+  app.use((err: any, req: any, res: any, next: any) => {
+    console.error('Global Error Handler:', err);
+    res.status(err.status || 500).json({
+      success: false,
+      error: err.message || 'Internal Server Error'
+    });
   });
 }
 

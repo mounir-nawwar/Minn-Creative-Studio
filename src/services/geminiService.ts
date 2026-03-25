@@ -6,11 +6,19 @@ async function callBackend(method: string, params: any) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ method, params })
   });
-  const data = await response.json();
-  if (!response.ok || !data.success) {
-    throw new Error(data.error || 'Backend proxy call failed');
+
+  const contentType = response.headers.get('content-type');
+  if (contentType && contentType.includes('application/json')) {
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      throw new Error(data.error || 'Backend proxy call failed');
+    }
+    return data.data;
+  } else {
+    const text = await response.text();
+    console.error('Non-JSON response from backend:', text.substring(0, 500));
+    throw new Error(`Server returned non-JSON response (${response.status}). Check console for details.`);
   }
-  return data.data;
 }
 
 export async function urlToBase64(url: string): Promise<{ data: string; mimeType: string }> {

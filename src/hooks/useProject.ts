@@ -32,6 +32,7 @@ export function useProject() {
       return;
     }
 
+    console.time("LoadProjects");
     const q = query(
       collection(db, 'projects'),
       where('userId', '==', auth.currentUser.uid),
@@ -39,6 +40,7 @@ export function useProject() {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
+      console.timeEnd("LoadProjects");
       const projectsData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -46,6 +48,9 @@ export function useProject() {
       setProjects(projectsData);
       setLoading(false);
     }, (error) => {
+      console.timeEnd("LoadProjects");
+      console.error("Firestore error in useProject:", error);
+      setLoading(false);
       handleFirestoreError(error, OperationType.LIST, 'projects');
     });
 

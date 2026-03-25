@@ -32,12 +32,13 @@ import {
   handleFirestoreError,
   OperationType
 } from '../firebase';
-import { GoogleGenAI } from "@google/genai";
+import { 
+  generateText,
+  urlToBase64
+} from '../services/geminiService';
 import { useProjectStore } from '../store/useProjectStore';
 import { useStore } from '../store/useStore';
 import AssetGrid from './AssetGrid';
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 interface Message {
   id: string;
@@ -196,48 +197,17 @@ export default function ChatDrawer() {
         Style Keywords: ${currentProject.styleKeywords || 'N/A'}
       `;
 
-      // Prepare contents for Gemini
-      const parts: any[] = [{ text: `You are a creative assistant for MINN STUDIO. 
-      You are currently working on the following project:
-      ${projectContext}
-      
-      Your goal is to help the user with image and video generation ideas, prompt engineering, and creative direction specific to this project's goals and brand identity.
-      Be concise, professional, and inspiring.
-      
-      User request: ${userMsg}` }];
+      const imageUrls = currentAssets
+        .filter(a => a.type === 'image')
+        .map(a => a.url);
 
-      // Add images if any
-      for (const asset of currentAssets) {
-        if (asset.type === 'image') {
-          try {
-            const response = await fetch(asset.url);
-            const blob = await response.blob();
-            const base64 = await new Promise<string>((resolve) => {
-              const reader = new FileReader();
-              reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
-              reader.readAsDataURL(blob);
-            });
-            parts.push({
-              inlineData: {
-                data: base64,
-                mimeType: asset.metadata?.mimeType || 'image/png'
-              }
-            });
-          } catch (e) {
-            console.error("Failed to fetch image for Gemini:", e);
-          }
-        }
-      }
-
-      const response = await ai.models.generateContent({
+      const modelText = await generateText({
+        prompt: userMsg,
         model: "gemini-3-flash-preview",
-        contents: [{ role: 'user', parts }],
-        config: {
-          systemInstruction: "You are a creative director assistant. Help with prompts, visual ideas, and technical advice for AI video/image generation within the context of the current project."
-        }
+        systemInstruction: "You are a creative director assistant. Help with prompts, visual ideas, and technical advice for AI video/image generation within the context of the current project.",
+        imageUrls,
+        projectContext
       });
-
-      const modelText = response.text || "I'm sorry, I couldn't generate a response.";
 
       // Save Model Message
       await addDoc(collection(db, `chats/${chatId}/messages`), {

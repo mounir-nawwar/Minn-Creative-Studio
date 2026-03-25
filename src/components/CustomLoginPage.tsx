@@ -16,6 +16,7 @@ export default function CustomLoginPage({ onLoginSuccess }: CustomLoginPageProps
     setLoading(true);
     setError(null);
 
+    console.time("LoginRequest");
     try {
       const response = await fetch('/api/login', {
         method: 'POST',
@@ -24,6 +25,7 @@ export default function CustomLoginPage({ onLoginSuccess }: CustomLoginPageProps
       });
 
       const data = await response.json();
+      console.timeEnd("LoginRequest");
       if (data.success) {
         onLoginSuccess();
       } else {
