@@ -1,24 +1,17 @@
-import { GoogleGenAI, GenerateContentResponse, Modality, VideoGenerationReferenceType, Type } from "@google/genai";
+import { GenerateContentResponse, Modality, VideoGenerationReferenceType, Type } from "@google/genai";
 
-const getAI = () => {
-  // Use API_KEY if available (user selected), otherwise fallback to GEMINI_API_KEY (platform default)
-  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("No Gemini API key found. Please select an API key in the application settings.");
+async function callBackend(method: string, params: any) {
+  const response = await fetch('/api/gemini/proxy', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ method, params })
+  });
+  const data = await response.json();
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || 'Backend proxy call failed');
   }
-  return new GoogleGenAI({ apiKey });
-};
-
-const handleApiError = (err: any) => {
-  console.error('Gemini API Error:', err);
-  const errorMsg = err?.message || String(err);
-  
-  if (errorMsg.includes('Forbidden') || errorMsg.includes('Requested entity was not found')) {
-    throw new Error("API Key Error: The selected API key is either missing, invalid, or lacks permissions for this model. Please try selecting a different API key.");
-  }
-  
-  throw err;
-};
+  return data.data;
+}
 
 export async function urlToBase64(url: string): Promise<{ data: string; mimeType: string }> {
   const res = await fetch(url);
@@ -45,7 +38,6 @@ export const generateImage = async (params: {
   cfgScale?: number;
   projectContext?: string;
 }) => {
-  const ai = getAI();
   const { prompt, model, aspectRatio, imageSize, referenceImages, seed, guidanceStrength, cfgScale, projectContext } = params;
 
   const fullPrompt = projectContext 
@@ -54,7 +46,7 @@ export const generateImage = async (params: {
 
   if (model.startsWith('imagen-4')) {
     try {
-      const response = await ai.models.generateImages({
+      const response = await callBackend('generateImages', {
         model: model,
         prompt: fullPrompt,
         config: {
@@ -65,7 +57,8 @@ export const generateImage = async (params: {
       const base64Image = response.generatedImages[0].image.imageBytes;
       return `data:image/png;base64,${base64Image}`;
     } catch (err) {
-      return handleApiError(err);
+      console.error('Gemini API Error:', err);
+      throw err;
     }
   } else {
     const parts: any[] = [];
@@ -82,7 +75,7 @@ export const generateImage = async (params: {
     parts.push({ text: fullPrompt });
 
     try {
-      const response = await ai.models.generateContent({
+      const response = await callBackend('generateContent', {
         model: model,
         contents: { parts },
         config: {
@@ -103,7 +96,8 @@ export const generateImage = async (params: {
       }
       throw new Error("No image generated in response");
     } catch (err) {
-      return handleApiError(err);
+      console.error('Gemini API Error:', err);
+      throw err;
     }
   }
 };
@@ -121,7 +115,6 @@ export const generateVideo = async (params: {
   videoUrl?: string;
   projectContext?: string;
 }) => {
-  const ai = getAI();
   const { prompt, model, aspectRatio, resolution, duration, startFrameUrl, endFrameUrl, referenceImages, motionIntensity, videoUrl, projectContext } = params;
 
   const fullPrompt = projectContext 
@@ -157,18 +150,8 @@ export const generateVideo = async (params: {
     }));
   }
 
-  // Handle video extension if videoUrl is provided
-  let videoRef;
-  if (videoUrl) {
-    // Note: In a real production app, we would store the video object from the API.
-    // For this demo, we can't easily pass a blob URL back as a 'video' object to the API.
-    // However, Veo 3.1 supports extending a video by providing the video object.
-    // If we don't have the object, we can use the last frame as a start frame.
-    // For now, we'll assume the user might want to use the last frame of the input video.
-  }
-
   try {
-    let operation = await ai.models.generateVideos({
+    let operation = await callBackend('generateVideos', {
       model: model,
       prompt: fullPrompt || 'Animate this sequence',
       image: startFrameData,
@@ -177,23 +160,17 @@ export const generateVideo = async (params: {
 
     while (!operation.done) {
       await new Promise(resolve => setTimeout(resolve, 5000));
-      operation = await ai.operations.getVideosOperation({ operation: operation });
+      operation = await callBackend('getOperation', { operation: operation });
     }
 
     const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
     if (!downloadLink) throw new Error("No video generated");
 
-    const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
-    const videoRes = await fetch(downloadLink, {
-      method: 'GET',
-      headers: {
-        'x-goog-api-key': apiKey!,
-      },
-    });
-    const videoBlob = await videoRes.blob();
-    return URL.createObjectURL(videoBlob);
+    const videoData = await callBackend('fetchVideoFile', { url: downloadLink });
+    return `data:${videoData.contentType};base64,${videoData.base64}`;
   } catch (err) {
-    return handleApiError(err);
+    console.error('Gemini API Error:', err);
+    throw err;
   }
 };
 
@@ -205,7 +182,6 @@ export const generateText = async (params: {
   videoUrls?: string[];
   projectContext?: string;
 }) => {
-  const ai = getAI();
   const { prompt, model, systemInstruction, imageUrls = [], videoUrls = [], projectContext } = params;
 
   const fullPrompt = projectContext 
@@ -225,7 +201,7 @@ export const generateText = async (params: {
   }
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await callBackend('generateContent', {
       model: model,
       contents: { parts },
       config: { systemInstruction }
@@ -233,7 +209,8 @@ export const generateText = async (params: {
 
     return response.text;
   } catch (err) {
-    return handleApiError(err);
+    console.error('Gemini API Error:', err);
+    throw err;
   }
 };
 
@@ -241,11 +218,10 @@ export const generateAudio = async (params: {
   prompt: string;
   voice?: string;
 }) => {
-  const ai = getAI();
   const { prompt, voice = 'Kore' } = params;
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await callBackend('generateContent', {
       model: "gemini-2.5-flash-preview-tts",
       contents: [{ parts: [{ text: prompt }] }],
       config: {
@@ -263,7 +239,8 @@ export const generateAudio = async (params: {
     
     return `data:audio/mpeg;base64,${base64Audio}`;
   } catch (err) {
-    return handleApiError(err);
+    console.error('Gemini API Error:', err);
+    throw err;
   }
 };
 
@@ -271,13 +248,12 @@ export const generateMask = async (params: {
   prompt: string;
   imageUrl: string;
 }) => {
-  const ai = getAI();
   const { prompt, imageUrl } = params;
 
   const { data, mimeType } = await urlToBase64(imageUrl);
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await callBackend('generateContent', {
       model: "gemini-3-flash-preview",
       contents: {
         parts: [
@@ -306,7 +282,8 @@ export const generateMask = async (params: {
     const result = JSON.parse(response.text);
     return result.boxes;
   } catch (err) {
-    return handleApiError(err);
+    console.error('Gemini API Error:', err);
+    throw err;
   }
 };
 
@@ -315,13 +292,12 @@ export const upscaleImage = async (params: {
   scale: string;
   preserveStyle: boolean;
 }) => {
-  const ai = getAI();
   const { imageUrl, scale, preserveStyle } = params;
 
   const { data, mimeType } = await urlToBase64(imageUrl);
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await callBackend('generateContent', {
       model: 'gemini-3.1-flash-image-preview',
       contents: {
         parts: [
@@ -350,7 +326,8 @@ export const upscaleImage = async (params: {
 
     return upscaledImageUrl;
   } catch (err) {
-    return handleApiError(err);
+    console.error('Gemini API Error:', err);
+    throw err;
   }
 };
 
@@ -360,11 +337,10 @@ export const suggestNodeConfig = async (params: {
   currentConfig: any;
   projectContext?: string;
 }) => {
-  const ai = getAI();
   const { nodeType, userGoal, currentConfig, projectContext } = params;
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await callBackend('generateContent', {
       model: "gemini-3-flash-preview",
       contents: `As an AI creative assistant, suggest the best configuration for a ${nodeType} node based on this goal: "${userGoal}".
       
@@ -380,7 +356,8 @@ export const suggestNodeConfig = async (params: {
 
     return JSON.parse(response.text);
   } catch (err) {
-    return handleApiError(err);
+    console.error('Gemini API Error:', err);
+    throw err;
   }
 };
 
@@ -391,13 +368,12 @@ export const relightImage = async (params: {
   intensity: number;
   style: string;
 }) => {
-  const ai = getAI();
   const { imageUrl, lightDirection, lightColor, intensity, style } = params;
 
   const { data, mimeType } = await urlToBase64(imageUrl);
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await callBackend('generateContent', {
       model: 'gemini-3.1-flash-image-preview',
       contents: {
         parts: [
@@ -421,12 +397,12 @@ export const relightImage = async (params: {
 
     return relitImageUrl;
   } catch (err) {
-    return handleApiError(err);
+    console.error('Gemini API Error:', err);
+    throw err;
   }
 };
 
 export const fillProjectData = async (description: string) => {
-  const ai = getAI();
   const prompt = `
     You are a creative project setup assistant for a professional AI media studio.
     The user will describe their project in natural language.
@@ -457,7 +433,7 @@ export const fillProjectData = async (description: string) => {
   `;
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await callBackend('generateContent', {
       model: "gemini-3-flash-preview",
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: {
@@ -467,12 +443,12 @@ export const fillProjectData = async (description: string) => {
 
     return JSON.parse(response.text);
   } catch (err) {
-    return handleApiError(err);
+    console.error('Gemini API Error:', err);
+    throw err;
   }
 };
 
 export const generateAIInstructions = async (formData: any) => {
-  const ai = getAI();
   const prompt = `
     Generate a set of master AI instructions for a creative project with the following details:
     Project Type: ${formData.type} - ${formData.subtype}
@@ -490,14 +466,15 @@ export const generateAIInstructions = async (formData: any) => {
   `;
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await callBackend('generateContent', {
       model: "gemini-3-flash-preview",
       contents: [{ role: 'user', parts: [{ text: prompt }] }]
     });
 
     return response.text;
   } catch (err) {
-    return handleApiError(err);
+    console.error('Gemini API Error:', err);
+    throw err;
   }
 };
 
@@ -507,14 +484,13 @@ export const inpaintImage = async (params: {
   prompt: string;
   mode: 'mask' | 'unmask';
 }) => {
-  const ai = getAI();
   const { imageUrl, maskUrl, prompt, mode } = params;
 
   const { data: imageData, mimeType: imageMimeType } = await urlToBase64(imageUrl);
   const { data: maskData, mimeType: maskMimeType } = await urlToBase64(maskUrl);
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await callBackend('generateContent', {
       model: 'gemini-3.1-flash-image-preview',
       contents: {
         parts: [
@@ -539,7 +515,8 @@ export const inpaintImage = async (params: {
 
     return inpaintedImageUrl;
   } catch (err) {
-    return handleApiError(err);
+    console.error('Gemini API Error:', err);
+    throw err;
   }
 };
 
@@ -549,14 +526,13 @@ export const transferStyle = async (params: {
   strength: number;
   preserveStructure: boolean;
 }) => {
-  const ai = getAI();
   const { contentUrl, styleUrl, strength, preserveStructure } = params;
 
   const { data: contentData, mimeType: contentMimeType } = await urlToBase64(contentUrl);
   const { data: styleData, mimeType: styleMimeType } = await urlToBase64(styleUrl);
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await callBackend('generateContent', {
       model: 'gemini-3.1-flash-image-preview',
       contents: {
         parts: [
@@ -581,7 +557,8 @@ export const transferStyle = async (params: {
 
     return styledImageUrl;
   } catch (err) {
-    return handleApiError(err);
+    console.error('Gemini API Error:', err);
+    throw err;
   }
 };
 
@@ -590,13 +567,12 @@ export const generateVariations = async (params: {
   prompt?: string;
   count?: number;
 }) => {
-  const ai = getAI();
   const { imageUrl, prompt, count = 4 } = params;
 
   const { data, mimeType } = await urlToBase64(imageUrl);
 
   try {
-    const response = await ai.models.generateImages({
+    const response = await callBackend('generateImages', {
       model: 'imagen-4.0-generate-001',
       prompt: prompt || 'Generate variations of this image',
       config: {
@@ -606,6 +582,7 @@ export const generateVariations = async (params: {
 
     return response.generatedImages.map((img: any) => `data:image/png;base64,${img.image.imageBytes}`);
   } catch (err) {
-    return handleApiError(err);
+    console.error('Gemini API Error:', err);
+    throw err;
   }
 };

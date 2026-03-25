@@ -171,48 +171,7 @@ export default function App() {
   }
 
   if (hasApiKey === false) {
-    return (
-      <div className="h-screen w-screen bg-black flex flex-col items-center justify-center p-6">
-        <div className="max-w-md w-full space-y-8 text-center">
-          <div className="space-y-2">
-            <h1 className="text-6xl font-black text-white tracking-tighter">
-              MINN <span className="text-[#0097A7]">STUDIO</span>
-            </h1>
-            <p className="text-gray-500 text-sm font-medium">API Configuration Required</p>
-          </div>
-          
-          <div className="p-8 bg-[#111111] border border-[#1a1a1a] rounded-3xl space-y-6 shadow-2xl">
-            <div className="flex justify-center">
-              <div className="p-4 bg-[#0097A7]/10 rounded-full">
-                <Key className="w-12 h-12 text-[#0097A7]" />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <h2 className="text-xl font-bold text-white">Select Your API Key</h2>
-              <p className="text-gray-500 text-xs text-balance">
-                High-performance models like Imagen 4 and Veo 3 require a paid API key from a Google Cloud project with billing enabled.
-              </p>
-              <a 
-                href="https://ai.google.dev/gemini-api/docs/billing" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-[10px] text-[#0097A7] hover:underline uppercase font-bold tracking-widest block pt-2"
-              >
-                Learn about billing
-              </a>
-            </div>
-            <button
-              onClick={handleSelectKey}
-              className="w-full py-4 bg-[#0097A7] hover:bg-[#00838F] text-white font-black rounded-2xl flex items-center justify-center gap-3 transition-all transform hover:scale-[1.02]"
-            >
-              SELECT API KEY
-            </button>
-          </div>
-          
-          <p className="text-[10px] text-gray-700 uppercase font-bold tracking-widest">Secure Configuration</p>
-        </div>
-      </div>
-    );
+    // We no longer block the app, but we'll keep the state to show a status in the toolbar
   }
 
   if (!currentProject) {
@@ -225,7 +184,12 @@ export default function App() {
         <ProjectSidebar />
         <div className="flex-1 flex flex-col min-w-0">
           <ProjectContextBar />
-          <Toolbar user={user} onLogout={handleCustomLogout} />
+          <Toolbar 
+            user={user} 
+            onLogout={handleCustomLogout} 
+            hasApiKey={!!hasApiKey}
+            onSelectKey={handleSelectKey}
+          />
           <Canvas />
           <ChatDrawer />
 

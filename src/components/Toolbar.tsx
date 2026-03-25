@@ -122,8 +122,17 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
     
     setIsSaving(true);
     try {
+      // Sanitize nodes to prevent document size issues
+      const sanitizedNodes = nodes.map(node => {
+        const { output, isRunning, error, progress, ...restData } = node.data || {};
+        return {
+          ...node,
+          data: restData
+        };
+      });
+
       const workflowData = {
-        nodes,
+        nodes: sanitizedNodes,
         edges,
         updatedAt: serverTimestamp(),
       };

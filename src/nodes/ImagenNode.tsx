@@ -11,7 +11,7 @@ import { db, auth } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 const ImagenNode = ({ id, data }: any) => {
-  const [model, setModel] = useState(data.config?.model || 'imagen-4.0-generate-001');
+  const [model, setModel] = useState(data.config?.model || 'gemini-2.5-flash-image');
   const [aspectRatio, setAspectRatio] = useState(data.config?.aspectRatio || '1:1');
   const [imageSize, setImageSize] = useState(data.config?.imageSize || '1K');
   const [style, setStyle] = useState(data.config?.style || 'Photorealistic');

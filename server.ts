@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import cookieParser from 'cookie-parser';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
+import { GoogleGenAI } from '@google/genai';
 import upscaleRoutes from './backend/routes/upscale.ts';
 import interpolateRoutes from './backend/routes/interpolate.ts';
 import videoRoutes from './backend/routes/video.ts';
@@ -69,6 +70,53 @@ async function startServer() {
 
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok' });
+  });
+
+  // Gemini Proxy Route
+  app.post('/api/gemini/proxy', async (req, res) => {
+    const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+    if (!apiKey) return res.status(500).json({ error: 'API key not configured on server' });
+
+    try {
+      const { method, params } = req.body;
+      const ai = new GoogleGenAI({ apiKey });
+
+      if (method === 'generateContent') {
+        const response = await ai.models.generateContent(params);
+        return res.json({ success: true, data: response });
+      }
+
+      if (method === 'generateImages') {
+        const response = await ai.models.generateImages(params);
+        return res.json({ success: true, data: response });
+      }
+
+      if (method === 'generateVideos') {
+        const operation = await ai.models.generateVideos(params);
+        return res.json({ success: true, data: operation });
+      }
+
+      if (method === 'getOperation') {
+        const operation = await ai.operations.getVideosOperation(params);
+        return res.json({ success: true, data: operation });
+      }
+
+      if (method === 'fetchVideoFile') {
+        const { url } = params;
+        const videoRes = await fetch(url, {
+          headers: { 'x-goog-api-key': apiKey }
+        });
+        const arrayBuffer = await videoRes.arrayBuffer();
+        const base64 = Buffer.from(arrayBuffer).toString('base64');
+        const contentType = videoRes.headers.get('content-type') || 'video/mp4';
+        return res.json({ success: true, data: { base64, contentType } });
+      }
+
+      return res.status(400).json({ error: `Unknown method: ${method}` });
+    } catch (err: any) {
+      console.error('Gemini proxy error:', err);
+      return res.status(500).json({ error: err.message || 'Internal server error' });
+    }
   });
 
   // Vite middleware for development
