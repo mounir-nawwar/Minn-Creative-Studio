@@ -36,7 +36,7 @@ async function startServer() {
         httpOnly: true,
         secure: true,
         sameSite: 'none',
-        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+        maxAge: 30 * 24 * 60 * 60 * 1000,
       });
       return res.json({ success: true });
     }
@@ -55,12 +55,31 @@ async function startServer() {
   app.get('/api/me', (req, res) => {
     const token = req.cookies.session;
     if (!token) return res.status(401).json({ authenticated: false });
-
     try {
       const decoded = jwt.verify(token, SESSION_SECRET);
       res.json({ authenticated: true, user: decoded });
     } catch (err) {
       res.status(401).json({ authenticated: false });
+    }
+  });
+
+  // Debug endpoint — shows key status without exposing the real key
+  app.get('/api/debug/key', async (req, res) => {
+    const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+    if (!apiKey) return res.json({ status: 'missing', masked: null });
+
+    const masked = `${apiKey.substring(0, 8)}...${apiKey.substring(apiKey.length - 4)}`;
+
+    try {
+      const testRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+      const data = await testRes.json();
+      if (testRes.ok) {
+        return res.json({ status: 'valid', masked, modelCount: data.models?.length });
+      } else {
+        return res.json({ status: 'invalid', masked, error: data.error?.message, code: data.error?.code });
+      }
+    } catch (err: any) {
+      return res.json({ status: 'error', masked, error: err.message });
     }
   });
 
@@ -78,7 +97,7 @@ async function startServer() {
     const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
     if (!apiKey) return res.status(500).json({ error: 'API key not configured on server' });
 
-    const maskedKey = apiKey.length > 8 
+    const maskedKey = apiKey.length > 8
       ? `${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)}`
       : '********';
     console.log(`Gemini Proxy using key: ${maskedKey}`);
@@ -90,12 +109,9 @@ async function startServer() {
 
       if (method === 'generateContent') {
         const response = await ai.models.generateContent(params);
-        return res.json({ 
-          success: true, 
-          data: {
-            ...response,
-            text: response.text // Explicitly include the text property
-          } 
+        return res.json({
+          success: true,
+          data: { ...response, text: response.text }
         });
       }
 
@@ -116,9 +132,7 @@ async function startServer() {
 
       if (method === 'fetchVideoFile') {
         const { url } = params;
-        const videoRes = await fetch(url, {
-          headers: { 'x-goog-api-key': apiKey }
-        });
+        const videoRes = await fetch(url, { headers: { 'x-goog-api-key': apiKey } });
         const arrayBuffer = await videoRes.arrayBuffer();
         const base64 = Buffer.from(arrayBuffer).toString('base64');
         const contentType = videoRes.headers.get('content-type') || 'video/mp4';
@@ -133,7 +147,7 @@ async function startServer() {
   });
 
   console.log(`Starting server in ${process.env.NODE_ENV || 'development'} mode...`);
-  // Vite middleware for development
+
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -152,7 +166,6 @@ async function startServer() {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 
-  // Global Error Handler
   app.use((err: any, req: any, res: any, next: any) => {
     console.error('Global Error Handler:', err);
     res.status(err.status || 500).json({
