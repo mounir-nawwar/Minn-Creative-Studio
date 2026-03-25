@@ -12,7 +12,6 @@ import 'reactflow/dist/style.css';
 import { useStore } from '../store/useStore';
 import { nodeTypes } from '../utils/nodeTypes';
 import { motion, AnimatePresence } from 'motion/react';
-import { Film } from 'lucide-react';
 
 const CanvasContent = () => {
   const {
@@ -32,7 +31,6 @@ const CanvasContent = () => {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const pendingRef = useRef<string | null>(null);
 
-  // Keep a ref in sync with state so event listeners always see latest value
   useEffect(() => {
     pendingRef.current = pendingNodeType;
   }, [pendingNodeType]);
@@ -41,47 +39,36 @@ const CanvasContent = () => {
     const handleMouseMove = (e: MouseEvent) => {
       setGhostPos({ x: e.clientX, y: e.clientY });
     };
-
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && pendingRef.current) {
         setPendingNodeType(null);
       }
     };
-
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('keydown', handleKeyDown);
-
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [setPendingNodeType]);
 
-  // This is the KEY fix — listen on the wrapper div directly, not ReactFlow's onPaneClick
-  // ReactFlow consumes pointer events for panning; the wrapper div click fires reliably
   const handleWrapperClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       if (!pendingRef.current) return;
-
-      // Prevent this click from also triggering ReactFlow behaviors
       e.stopPropagation();
-
       const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
-
       const nodeType = pendingRef.current;
       const nodeData = pendingNodeData || {
         label: nodeType,
         type: nodeType as any,
         config: {},
       };
-
       addNode({
         id: `${nodeType}-${Date.now()}`,
         type: nodeType,
         position,
         data: nodeData,
       });
-
       setPendingNodeType(null);
     },
     [screenToFlowPosition, pendingNodeData, addNode, setPendingNodeType]
@@ -105,7 +92,6 @@ const CanvasContent = () => {
         fitView
         snapToGrid
         snapGrid={[15, 15]}
-        // Disable panning while in placement mode so the canvas doesn't move on click
         panOnDrag={!pendingNodeType}
         style={{ background: '#050505' }}
         defaultEdgeOptions={{
@@ -113,12 +99,7 @@ const CanvasContent = () => {
           animated: true,
         }}
       >
-        <Background
-          color="#1a1a1a"
-          gap={30}
-          size={1}
-          variant={BackgroundVariant.Dots}
-        />
+        <Background color="#1a1a1a" gap={30} size={1} variant={BackgroundVariant.Dots} />
         <Controls
           className="bg-[#111111] border border-[#1a1a1a] rounded-lg overflow-hidden fill-gray-400"
           showInteractive={false}
@@ -141,7 +122,6 @@ const CanvasContent = () => {
         </Panel>
       </ReactFlow>
 
-      {/* Ghost node that follows cursor */}
       <AnimatePresence>
         {pendingNodeType && (
           <>
@@ -169,7 +149,6 @@ const CanvasContent = () => {
               </p>
             </motion.div>
 
-            {/* Top center tooltip */}
             <motion.div
               initial={{ y: -20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
