@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
-import { GoogleGenAI } from "@google/genai";
 import { Handle, Position } from 'reactflow';
+import { generateText } from '../services/geminiService';
 
 const VideoDescriberNode = ({ id, data }: any) => {
   const [model, setModel] = useState(data.config?.model || 'gemini-3-flash-preview');
@@ -28,27 +28,13 @@ const VideoDescriberNode = ({ id, data }: any) => {
     updateNodeData(id, { isRunning: true, error: undefined });
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      
-      const videoResponse = await fetch(videoUrl);
-      const blob = await videoResponse.blob();
-      const base64Data = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
-        reader.readAsDataURL(blob);
+      const text = await generateText({
+        prompt,
+        model,
+        videoUrls: [videoUrl]
       });
 
-      const response = await ai.models.generateContent({
-        model: model,
-        contents: {
-          parts: [
-            { text: prompt },
-            { inlineData: { data: base64Data, mimeType: blob.type } }
-          ]
-        }
-      });
-
-      updateNodeData(id, { output: response.text, isRunning: false });
+      updateNodeData(id, { output: text, isRunning: false });
     } catch (err: any) {
       updateNodeData(id, { error: err.message, isRunning: false });
     }

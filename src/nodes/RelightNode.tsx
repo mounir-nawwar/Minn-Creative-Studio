@@ -3,6 +3,7 @@ import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
 import { Sun, Loader2 } from 'lucide-react';
 import ParameterSlider from '../components/ParameterSlider';
+import { relightImage } from '../services/geminiService';
 
 const RelightNode = ({ id, data }: any) => {
   const [lightDirection, setLightDirection] = useState(data.config?.lightDirection || 'top');
@@ -35,16 +36,15 @@ const RelightNode = ({ id, data }: any) => {
     updateNodeData(id, { isRunning: true, error: null, progress: 10 });
 
     try {
-      const response = await fetch('/api/relight', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageUrl, lightDirection, lightColor, intensity, style })
+      const relitUrl = await relightImage({
+        imageUrl,
+        lightDirection,
+        lightColor,
+        intensity,
+        style
       });
-
-      if (!response.ok) throw new Error('Relighting failed');
-      const result = await response.json();
       
-      updateNodeData(id, { output: result.image, isRunning: false, progress: 100 });
+      updateNodeData(id, { output: relitUrl, isRunning: false, progress: 100 });
     } catch (err: any) {
       updateNodeData(id, { error: err.message, isRunning: false });
     }

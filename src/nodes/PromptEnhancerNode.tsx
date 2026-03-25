@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
-import { GoogleGenAI } from "@google/genai";
+import { useProjectStore } from '../store/useProjectStore';
+import { generateText } from '../services/geminiService';
 
 const PromptEnhancerNode = ({ id, data }: any) => {
   const [targetModel, setTargetModel] = useState(data.config?.targetModel || 'imagen');
   const updateNodeData = useStore((state) => state.updateNodeData);
+  const { currentProject } = useProjectStore();
 
   const handleRun = async () => {
     const state = useStore.getState();
@@ -25,25 +27,35 @@ const PromptEnhancerNode = ({ id, data }: any) => {
 
     updateNodeData(id, { isRunning: true, error: undefined });
 
+    // Construct project context string
+    const projectContext = currentProject ? `
+      Project: ${currentProject.name}
+      Type: ${currentProject.type}
+      Description: ${currentProject.description}
+      Brand: ${currentProject.clientName} (${currentProject.clientIndustry})
+      AI Instructions: ${currentProject.aiInstructions}
+      Style Keywords: ${currentProject.styleKeywords}
+    `.trim() : undefined;
+
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       const systemInstruction = `You are a creative director and prompt engineer. 
 The user gives you a short creative idea. 
 Rewrite it into a detailed, technically precise generation prompt 
 optimized for ${targetModel}. 
+${projectContext ? `Project Context: ${projectContext}` : ''}
 For Veo: use cinematic language, describe camera movement, lighting, mood, duration. 
 For Imagen: describe composition, style, lighting, color palette, detail level. 
 For Nano Banana: describe precision, style consistency, subject detail. 
 Never add watermarks, blur, or text overlays to the description. 
 Return only the enhanced prompt, nothing else.`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: prompt,
-        config: { systemInstruction }
+      const enhancedPrompt = await generateText({
+        prompt,
+        model: 'gemini-3-flash-preview',
+        systemInstruction,
+        projectContext
       });
 
-      const enhancedPrompt = response.text;
       updateNodeData(id, { output: enhancedPrompt, isRunning: false });
     } catch (err: any) {
       updateNodeData(id, { error: err.message, isRunning: false });

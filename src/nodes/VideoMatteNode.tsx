@@ -26,11 +26,10 @@ const VideoMatteNode = ({ id, data }: any) => {
     updateNodeData(id, { isRunning: true, error: null, progress: 10 });
 
     try {
-      // For now, we simulate video matte adjustment on the backend
-      const response = await fetch('/api/upscale/video', { // Reusing upscale route as a proxy for dummy processing
+      const response = await fetch('/api/video/process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ videoUrl, scale: '1x' }) // No scaling, just processing
+        body: JSON.stringify({ videoUrl, type: 'matte', config: { blur, threshold } })
       });
 
       if (!response.ok) throw new Error('Matte adjustment failed');

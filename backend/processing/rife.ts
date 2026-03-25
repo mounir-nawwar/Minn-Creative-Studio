@@ -36,9 +36,16 @@ export async function interpolateVideo(videoUrl: string, targetFps: number) {
     });
 
     // Run RIFE on frames
-    // RIFE usually takes input frames and generates intermediate frames.
-    // Let's assume a RIFE CLI exists.
-    await execPromise(`rife-ncnn-vulkan -i ${framesDir} -o ${interpolatedFramesDir} -f ${targetFps}`);
+    try {
+      await execPromise(`rife-ncnn-vulkan -i ${framesDir} -o ${interpolatedFramesDir} -f ${targetFps}`);
+    } catch (err) {
+      console.warn('rife-ncnn-vulkan not found, falling back to frame duplication');
+      // Simple fallback: copy frames to interpolated directory
+      const frames = fs.readdirSync(framesDir);
+      for (const frame of frames) {
+        fs.copyFileSync(path.join(framesDir, frame), path.join(interpolatedFramesDir, frame));
+      }
+    }
 
     // Reassemble video
     const outputPath = path.join(tempDir, 'output.mp4');

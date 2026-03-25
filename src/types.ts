@@ -42,6 +42,11 @@ export type NodeType =
   | 'guidanceStrength'
   | 'motionIntensity'
   | 'cfgScale'
+  | 'directorPrompt'
+  | 'cameraControl'
+  | 'sequence'
+  | 'imageUpload'
+  | 'videoUpload'
   | 'output';
 
 export interface WorkflowNodeData {

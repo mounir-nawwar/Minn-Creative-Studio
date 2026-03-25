@@ -1,10 +1,18 @@
 import React, { useState } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
+import AskAIButton from '../components/AskAIButton';
 
 const PromptNode = ({ id, data }: any) => {
   const [prompt, setPrompt] = useState(data.config?.prompt || '');
   const updateNodeData = useStore((state) => state.updateNodeData);
+
+  const handleAISuggestion = (suggestion: any) => {
+    if (suggestion.prompt) {
+      setPrompt(suggestion.prompt);
+      updateNodeData(id, { output: suggestion.prompt, config: { ...data.config, prompt: suggestion.prompt } });
+    }
+  };
 
   const handleRun = () => {
     updateNodeData(id, { output: prompt, isRunning: false });
@@ -13,6 +21,13 @@ const PromptNode = ({ id, data }: any) => {
   return (
     <BaseNode id={id} data={data} inputs={false} onRun={handleRun}>
       <div className="space-y-3">
+        <AskAIButton 
+          nodeType="Text Prompt" 
+          currentConfig={{ prompt }}
+          onSuggestion={handleAISuggestion}
+          label="Ask AI to Write"
+        />
+
         <div className="space-y-1">
           <label className="text-[10px] text-gray-500 uppercase font-bold">Prompt Text</label>
           <textarea

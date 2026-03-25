@@ -41,11 +41,19 @@ import RelightNode from '../nodes/RelightNode';
 import GuidanceStrengthNode from '../nodes/GuidanceStrengthNode';
 import MotionIntensityNode from '../nodes/MotionIntensityNode';
 import CFGScaleNode from '../nodes/CFGScaleNode';
+import DirectorPromptNode from '../nodes/DirectorPromptNode';
+import CameraControlNode from '../nodes/CameraControlNode';
+import SequenceNode from '../nodes/SequenceNode';
+import ImageUploadNode from '../nodes/ImageUploadNode';
+import VideoUploadNode from '../nodes/VideoUploadNode';
 
 export const nodeTypes = {
   prompt: PromptNode,
   promptConcatenator: PromptConcatenatorNode,
   promptEnhancer: PromptEnhancerNode,
+  directorPrompt: DirectorPromptNode,
+  cameraControl: CameraControlNode,
+  sequence: SequenceNode,
   llm: LLMNode,
   videoDescriber: VideoDescriberNode,
   imagen: ImagenNode,
@@ -87,4 +95,6 @@ export const nodeTypes = {
   guidanceStrength: GuidanceStrengthNode,
   motionIntensity: MotionIntensityNode,
   cfgScale: CFGScaleNode,
+  imageUpload: ImageUploadNode,
+  videoUpload: VideoUploadNode,
 };

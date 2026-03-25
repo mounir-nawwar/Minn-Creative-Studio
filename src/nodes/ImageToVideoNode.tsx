@@ -5,6 +5,7 @@ import { Handle, Position } from 'reactflow';
 import ParameterSlider from '../components/ParameterSlider';
 import ReferenceStrip from '../components/ReferenceStrip';
 import { Video, Loader2, AlertCircle } from 'lucide-react';
+import { generateVideo } from '../services/geminiService';
 
 const ImageToVideoNode = ({ id, data }: any) => {
   const [model, setModel] = useState(data.config?.model || 'veo-3.1-fast-generate-preview');
@@ -84,27 +85,22 @@ const ImageToVideoNode = ({ id, data }: any) => {
     updateNodeData(id, { isRunning: true, error: undefined, progress: 10 });
 
     try {
-      const response = await fetch('/api/generate/video', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: prompt || 'Animate this image',
-          startFrameUrl: startFrame,
-          endFrameUrl: endFrame,
-          referenceImages: referenceImages.map(ref => ({
-            url: ref.url,
-            role: ref.role,
-            strength: ref.strength
-          })),
-          model,
-          config: { aspectRatio, duration },
-          parameters
-        })
+      const videoUrl = await generateVideo({
+        prompt: prompt || 'Animate this image',
+        model,
+        aspectRatio,
+        duration,
+        startFrameUrl: startFrame,
+        endFrameUrl: endFrame,
+        referenceImages: referenceImages.map(ref => ({
+          url: ref.url,
+          role: ref.role,
+          strength: ref.strength
+        })),
+        motionIntensity: parameters.motionIntensity
       });
 
-      if (!response.ok) throw new Error('Generation failed');
-      const result = await response.json();
-      updateNodeData(id, { output: result.video, isRunning: false, progress: 100 });
+      updateNodeData(id, { output: videoUrl, isRunning: false, progress: 100 });
     } catch (err: any) {
       updateNodeData(id, { error: err.message, isRunning: false });
     }

@@ -9,7 +9,10 @@ import {
   Plus,
   Pencil,
   Maximize,
-  Sun
+  Sun,
+  Clapperboard,
+  Move,
+  Film
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 
@@ -21,6 +24,8 @@ const Sidebar = () => {
       label: 'Text / Prompt',
       nodes: [
         { type: 'prompt', label: 'Prompt Node', icon: Type, color: 'text-blue-400' },
+        { type: 'directorPrompt', label: "Director's Prompt", icon: Clapperboard, color: 'text-purple-400' },
+        { type: 'cameraControl', label: 'Camera Control', icon: Move, color: 'text-blue-400' },
         { type: 'promptConcatenator', label: 'Concatenator', icon: Plus, color: 'text-blue-500' },
         { type: 'promptEnhancer', label: 'Enhancer', icon: Zap, color: 'text-blue-300' },
         { type: 'llm', label: 'Run Any LLM', icon: Zap, color: 'text-indigo-400' },
@@ -31,6 +36,8 @@ const Sidebar = () => {
     {
       label: 'Generation',
       nodes: [
+        { type: 'imageUpload', label: 'Image Upload', icon: ImageIcon, color: 'text-blue-400' },
+        { type: 'videoUpload', label: 'Video Upload', icon: Video, color: 'text-blue-500' },
         { type: 'imagen', label: 'Image Generator', icon: ImageIcon, color: 'text-purple-400' },
         { type: 'veo', label: 'Veo Video', icon: Video, color: 'text-red-400' },
         { type: 'imageToVideo', label: 'Image to Video', icon: Video, color: 'text-orange-400' },
@@ -97,6 +104,7 @@ const Sidebar = () => {
       nodes: [
         { type: 'stickyNote', label: 'Sticky Note', icon: Type, color: 'text-yellow-200' },
         { type: 'compare', label: 'Compare', icon: Eye, color: 'text-blue-200' },
+        { type: 'sequence', label: 'Video Sequence', icon: Film, color: 'text-pink-500' },
         { type: 'output', label: 'Output Collector', icon: FileDown, color: 'text-[#0097A7]' },
       ]
     }

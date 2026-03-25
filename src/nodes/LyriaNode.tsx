@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
-import { GoogleGenAI, Modality } from "@google/genai";
+import { generateAudio } from '../services/geminiService';
 import AudioPreview from '../components/AudioPreview';
 
 const LyriaNode = ({ id, data }: any) => {
@@ -29,27 +29,12 @@ const LyriaNode = ({ id, data }: any) => {
     updateNodeData(id, { isRunning: true, error: undefined });
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash-preview-tts",
-        contents: [{ parts: [{ text: `Generate ${style} music/speech for ${duration} seconds: ${prompt}` }] }],
-        config: {
-          responseModalities: [Modality.AUDIO],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: voice as any },
-            },
-          },
-        },
+      const audioUrl = await generateAudio({
+        prompt: `Generate ${style} music/speech for ${duration} seconds: ${prompt}`,
+        voice
       });
 
-      const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-      if (base64Audio) {
-        const audioUrl = `data:audio/mpeg;base64,${base64Audio}`;
-        updateNodeData(id, { output: audioUrl, isRunning: false });
-      } else {
-        throw new Error("No audio generated in response");
-      }
+      updateNodeData(id, { output: audioUrl, isRunning: false });
     } catch (err: any) {
       updateNodeData(id, { error: err.message, isRunning: false });
     }

@@ -1,12 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
-import { GoogleGenAI } from "@google/genai";
 import { Upload, Image as ImageIcon } from 'lucide-react';
+import { generateText } from '../services/geminiService';
 
 const ImageDescriberNode = ({ id, data }: any) => {
   const [imageUrl, setImageUrl] = useState(data.config?.imageUrl || '');
   const updateNodeData = useStore((state) => state.updateNodeData);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      setImageUrl(result);
+      updateNodeData(id, { config: { ...data.config, imageUrl: result } });
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleRun = async () => {
     const state = useStore.getState();
@@ -29,32 +44,12 @@ const ImageDescriberNode = ({ id, data }: any) => {
     updateNodeData(id, { isRunning: true, error: undefined });
     
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      
-      // Fetch image and convert to base64
-      const imgResponse = await fetch(finalImageUrl);
-      const blob = await imgResponse.blob();
-      const reader = new FileReader();
-      
-      const base64Data = await new Promise<string>((resolve) => {
-        reader.onloadend = () => {
-          const base64 = (reader.result as string).split(',')[1];
-          resolve(base64);
-        };
-        reader.readAsDataURL(blob);
-      });
-
-      const response = await ai.models.generateContent({
+      const description = await generateText({
+        prompt: "Describe this image in detail for a creative generation prompt. Focus on lighting, composition, and mood.",
         model: "gemini-3-flash-preview",
-        contents: {
-          parts: [
-            { text: "Describe this image in detail for a creative generation prompt. Focus on lighting, composition, and mood." },
-            { inlineData: { data: base64Data, mimeType: blob.type } }
-          ]
-        }
+        imageUrls: [finalImageUrl]
       });
 
-      const description = response.text;
       updateNodeData(id, { output: description, isRunning: false });
     } catch (err: any) {
       updateNodeData(id, { error: err.message, isRunning: false });
@@ -64,8 +59,15 @@ const ImageDescriberNode = ({ id, data }: any) => {
   return (
     <BaseNode id={id} data={data} onRun={handleRun}>
       <div className="space-y-3">
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          onChange={handleFileChange} 
+          accept="image/*" 
+          className="hidden" 
+        />
         <div className="space-y-1">
-          <label className="text-[10px] text-gray-500 uppercase font-bold">Image URL (Optional if input connected)</label>
+          <label className="text-[10px] text-gray-500 uppercase font-bold">Image Source (URL or Upload)</label>
           <div className="flex gap-2">
             <input
               type="text"
@@ -77,7 +79,11 @@ const ImageDescriberNode = ({ id, data }: any) => {
                 updateNodeData(id, { config: { ...data.config, imageUrl: e.target.value } });
               }}
             />
-            <button className="p-2 bg-[#2a2a2a] rounded-lg text-gray-400 hover:text-white transition-colors">
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              className="p-2 bg-[#2a2a2a] rounded-lg text-gray-400 hover:text-white transition-colors"
+              title="Upload Image"
+            >
               <Upload className="w-4 h-4" />
             </button>
           </div>

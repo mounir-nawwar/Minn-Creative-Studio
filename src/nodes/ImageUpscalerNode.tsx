@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
 import { Maximize, Loader2 } from 'lucide-react';
+import { upscaleImage } from '../services/geminiService';
 
 const ImageUpscalerNode = ({ id, data }: any) => {
   const [scale, setScale] = useState(data.config?.scale || '2x');
@@ -26,16 +27,13 @@ const ImageUpscalerNode = ({ id, data }: any) => {
     updateNodeData(id, { isRunning: true, error: null, progress: 10 });
 
     try {
-      const response = await fetch('/api/upscale/image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageUrl, scale, preserveStyle })
+      const upscaledUrl = await upscaleImage({
+        imageUrl,
+        scale,
+        preserveStyle
       });
-
-      if (!response.ok) throw new Error('Upscaling failed');
-      const result = await response.json();
       
-      updateNodeData(id, { output: result.image, isRunning: false, progress: 100 });
+      updateNodeData(id, { output: upscaledUrl, isRunning: false, progress: 100 });
     } catch (err: any) {
       updateNodeData(id, { error: err.message, isRunning: false });
     }

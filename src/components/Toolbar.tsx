@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Play, Save, FolderOpen, Trash2, LogOut, User as UserIcon } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { db, auth, logOut } from '../firebase';
+import { useProjectStore } from '../store/useProjectStore';
+import { db, auth, signOut as logOut } from '../firebase';
 import { collection, addDoc, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -11,6 +12,7 @@ const Toolbar = () => {
   const setNodes = useStore((state) => state.setNodes);
   const setEdges = useStore((state) => state.setEdges);
   const updateNodeData = useStore((state) => state.updateNodeData);
+  const { currentProject } = useProjectStore();
   
   const [isSaving, setIsSaving] = useState(false);
   const [showWorkflows, setShowWorkflows] = useState(false);
@@ -18,8 +20,8 @@ const Toolbar = () => {
   const [isLoadingWorkflows, setIsLoadingWorkflows] = useState(false);
 
   const handleSave = async () => {
-    if (!auth.currentUser) {
-      alert("Please sign in to save workflows");
+    if (!auth.currentUser || !currentProject) {
+      alert("Please sign in and select a project to save workflows");
       return;
     }
 
@@ -30,8 +32,16 @@ const Toolbar = () => {
         nodes,
         edges,
         userId: auth.currentUser.uid,
+        projectId: currentProject.id,
         createdAt: Timestamp.now(),
       });
+
+      // Update project updatedAt
+      const { doc, updateDoc } = await import('firebase/firestore');
+      await updateDoc(doc(db, 'projects', currentProject.id), {
+        updatedAt: Timestamp.now()
+      });
+
       alert("Workflow saved!");
     } catch (err) {
       console.error(err);
@@ -42,12 +52,13 @@ const Toolbar = () => {
   };
 
   const fetchWorkflows = async () => {
-    if (!auth.currentUser) return;
+    if (!auth.currentUser || !currentProject) return;
     setIsLoadingWorkflows(true);
     try {
       const q = query(
         collection(db, 'workflows'),
         where('userId', '==', auth.currentUser.uid),
+        where('projectId', '==', currentProject.id),
         orderBy('createdAt', 'desc')
       );
       const querySnapshot = await getDocs(q);
@@ -116,7 +127,7 @@ const Toolbar = () => {
                 className="absolute top-12 left-0 w-64 bg-[#111111] border border-[#2a2a2a] rounded-xl shadow-2xl overflow-hidden z-50"
               >
                 <div className="p-3 border-b border-[#2a2a2a] bg-[#1a1a1a]">
-                  <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Your Workflows</h3>
+                  <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Project Workflows</h3>
                 </div>
                 <div className="max-h-64 overflow-y-auto p-2 space-y-1">
                   {isLoadingWorkflows ? (
@@ -162,29 +173,6 @@ const Toolbar = () => {
         >
           <Trash2 className="w-4 h-4" />
         </button>
-
-        <div className="h-6 w-px bg-[#1a1a1a]" />
-
-        {auth.currentUser ? (
-          <div className="flex items-center gap-3">
-            <img 
-              src={auth.currentUser.photoURL || ''} 
-              alt="User" 
-              className="w-8 h-8 rounded-full border border-[#0097A7]"
-            />
-            <button 
-              onClick={logOut}
-              className="p-2 hover:bg-[#2a2a2a] rounded-lg text-gray-500 hover:text-white transition-all"
-              title="Logout"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-          </div>
-        ) : (
-          <div className="w-8 h-8 rounded-full bg-[#1a1a1a] flex items-center justify-center border border-[#2a2a2a]">
-            <UserIcon className="w-4 h-4 text-gray-600" />
-          </div>
-        )}
       </div>
     </div>
   );

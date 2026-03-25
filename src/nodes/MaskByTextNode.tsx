@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
-import { GoogleGenAI, Type } from "@google/genai";
+import { generateMask } from '../services/geminiService';
 
 const MaskByTextNode = ({ id, data }: any) => {
   const [prompt, setPrompt] = useState(data.config?.prompt || 'the main subject');
@@ -27,49 +27,10 @@ const MaskByTextNode = ({ id, data }: any) => {
     updateNodeData(id, { isRunning: true, error: undefined });
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      
-      // Fetch image and convert to base64
-      const imgResponse = await fetch(imageUrl);
-      const blob = await imgResponse.blob();
-      const reader = new FileReader();
-      
-      const base64Data = await new Promise<string>((resolve) => {
-        reader.onloadend = () => {
-          const base64 = (reader.result as string).split(',')[1];
-          resolve(base64);
-        };
-        reader.readAsDataURL(blob);
+      const boxes = await generateMask({
+        prompt,
+        imageUrl
       });
-
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: {
-          parts: [
-            { text: `Identify the bounding boxes for "${prompt}" in the image. Return the coordinates as [ymin, xmin, ymax, xmax] in normalized coordinates (0-1000).` },
-            { inlineData: { data: base64Data, mimeType: blob.type } }
-          ]
-        },
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              boxes: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.ARRAY,
-                  items: { type: Type.NUMBER }
-                }
-              }
-            },
-            required: ["boxes"]
-          }
-        }
-      });
-
-      const result = JSON.parse(response.text);
-      const boxes = result.boxes;
 
       if (!boxes || boxes.length === 0) {
         updateNodeData(id, { error: "No objects found matching the prompt", isRunning: false });

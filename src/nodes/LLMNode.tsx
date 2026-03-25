@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
-import { GoogleGenAI } from "@google/genai";
+import { useProjectStore } from '../store/useProjectStore';
 import { Handle, Position } from 'reactflow';
+import { generateText } from '../services/geminiService';
 
 const LLMNode = ({ id, data }: any) => {
   const [model, setModel] = useState(data.config?.model || 'gemini-3-flash-preview');
   const [systemInstruction, setSystemInstruction] = useState(data.config?.systemInstruction || 'You are a helpful creative assistant.');
   const updateNodeData = useStore((state) => state.updateNodeData);
+  const { currentProject } = useProjectStore();
 
   const handleRun = async () => {
     const state = useStore.getState();
@@ -32,35 +34,26 @@ const LLMNode = ({ id, data }: any) => {
 
     updateNodeData(id, { isRunning: true, error: undefined });
 
+    // Construct project context string
+    const projectContext = currentProject ? `
+      Project: ${currentProject.name}
+      Type: ${currentProject.type}
+      Description: ${currentProject.description}
+      Brand: ${currentProject.clientName} (${currentProject.clientIndustry})
+      AI Instructions: ${currentProject.aiInstructions}
+      Style Keywords: ${currentProject.styleKeywords}
+    `.trim() : undefined;
+
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      
-      let contents: any = promptText;
-
-      if (imageUrl) {
-        const imgResponse = await fetch(imageUrl);
-        const blob = await imgResponse.blob();
-        const base64Data = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
-          reader.readAsDataURL(blob);
-        });
-
-        contents = {
-          parts: [
-            { text: promptText },
-            { inlineData: { data: base64Data, mimeType: blob.type } }
-          ]
-        };
-      }
-
-      const response = await ai.models.generateContent({
-        model: model,
-        contents: contents,
-        config: { systemInstruction }
+      const text = await generateText({
+        prompt: promptText,
+        model,
+        systemInstruction,
+        imageUrls: imageUrl ? [imageUrl] : [],
+        projectContext
       });
 
-      updateNodeData(id, { output: response.text, isRunning: false });
+      updateNodeData(id, { output: text, isRunning: false });
     } catch (err: any) {
       updateNodeData(id, { error: err.message, isRunning: false });
     }

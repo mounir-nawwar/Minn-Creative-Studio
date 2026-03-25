@@ -37,7 +37,25 @@ export async function upscaleVideo(videoUrl: string, scale: string) {
 
     // Run ESRGAN on frames
     const model = scale === '4x' ? 'RealESRGAN_x4plus' : 'RealESRGAN_x2plus';
-    await execPromise(`realesrgan-ncnn-vulkan -i ${framesDir} -o ${upscaledFramesDir} -n ${model}`);
+    try {
+      await execPromise(`realesrgan-ncnn-vulkan -i ${framesDir} -o ${upscaledFramesDir} -n ${model}`);
+    } catch (err) {
+      console.warn('realesrgan-ncnn-vulkan not found, falling back to ffmpeg resize');
+      const frames = fs.readdirSync(framesDir);
+      for (const frame of frames) {
+        const inputFrame = path.join(framesDir, frame);
+        const outputFrame = path.join(upscaledFramesDir, frame);
+        const scaleFactor = parseInt(scale);
+        await new Promise((resolve, reject) => {
+          ffmpeg(inputFrame)
+            .size(`${scaleFactor * 100}%`)
+            .output(outputFrame)
+            .on('end', resolve)
+            .on('error', reject)
+            .run();
+        });
+      }
+    }
 
     // Reassemble video
     const outputPath = path.join(tempDir, 'output.mp4');

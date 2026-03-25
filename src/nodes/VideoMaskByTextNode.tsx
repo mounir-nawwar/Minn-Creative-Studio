@@ -25,11 +25,10 @@ const VideoMaskByTextNode = ({ id, data }: any) => {
     updateNodeData(id, { isRunning: true, error: null, progress: 10 });
 
     try {
-      // For now, we simulate video masking on the backend using Gemini
-      const response = await fetch('/api/upscale/video', { // Reusing upscale route as a proxy for dummy processing
+      const response = await fetch('/api/video/process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ videoUrl, scale: '1x', prompt }) // No scaling, just processing
+        body: JSON.stringify({ videoUrl, type: 'mask', config: { prompt } })
       });
 
       if (!response.ok) throw new Error('Masking failed');

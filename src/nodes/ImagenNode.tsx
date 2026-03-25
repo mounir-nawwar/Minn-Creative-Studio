@@ -1,10 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
+import { useProjectStore } from '../store/useProjectStore';
 import { Handle, Position } from 'reactflow';
 import ParameterSlider from '../components/ParameterSlider';
 import ReferenceStrip from '../components/ReferenceStrip';
 import { ImageIcon, Loader2 } from 'lucide-react';
+import { generateImage } from '../services/geminiService';
+import { db, auth } from '../firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 const ImagenNode = ({ id, data }: any) => {
   const [model, setModel] = useState(data.config?.model || 'imagen-4.0-generate-001');
@@ -17,6 +21,7 @@ const ImagenNode = ({ id, data }: any) => {
   const updateNodeData = useStore((state) => state.updateNodeData);
   const edges = useStore((state) => state.edges);
   const nodes = useStore((state) => state.nodes);
+  const { currentProject } = useProjectStore();
 
   const isNanoBanana = model.includes('flash') || model.includes('pro');
 
@@ -72,29 +77,63 @@ const ImagenNode = ({ id, data }: any) => {
 
     updateNodeData(id, { isRunning: true, error: undefined, progress: 10 });
 
+    // Construct project context string
+    const projectContext = currentProject ? `
+      Project: ${currentProject.name}
+      Type: ${currentProject.type}
+      Description: ${currentProject.description}
+      Brand: ${currentProject.clientName} (${currentProject.clientIndustry})
+      AI Instructions: ${currentProject.aiInstructions}
+      Style Keywords: ${currentProject.styleKeywords}
+    `.trim() : undefined;
+
     try {
-      const response = await fetch('/api/generate/image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: isNanoBanana ? prompt : `${prompt} in ${style} style. ${negativePrompt ? `Avoid: ${negativePrompt}` : ''}`,
-          referenceImages: referenceImages.map(ref => ({
-            url: ref.url,
-            role: ref.role,
-            strength: ref.strength
-          })),
-          model,
-          config: { 
-            aspectRatio,
-            imageSize: isNanoBanana ? imageSize : undefined
-          },
-          parameters
-        })
+      const finalPrompt = isNanoBanana ? prompt : `${prompt} in ${style} style. ${negativePrompt ? `Avoid: ${negativePrompt}` : ''}`;
+      const imageUrl = await generateImage({
+        prompt: finalPrompt,
+        model,
+        aspectRatio,
+        imageSize: isNanoBanana ? imageSize : undefined,
+        referenceImages: referenceImages.map(ref => ({
+          url: ref.url,
+          role: ref.role,
+          strength: ref.strength
+        })),
+        seed: parameters.seed,
+        guidanceStrength: parameters.guidanceStrength,
+        cfgScale: parameters.cfgScale,
+        projectContext
       });
 
-      if (!response.ok) throw new Error('Generation failed');
-      const result = await response.json();
-      updateNodeData(id, { output: result.image, isRunning: false, progress: 100 });
+      updateNodeData(id, { output: imageUrl, isRunning: false, progress: 100 });
+
+      // Save to Project Assets
+      if (currentProject && auth.currentUser) {
+        try {
+          await addDoc(collection(db, 'projects', currentProject.id, 'assets'), {
+            name: `Generated Image - ${new Date().toLocaleTimeString()}`,
+            type: 'image',
+            url: imageUrl,
+            userId: auth.currentUser.uid,
+            nodeId: id,
+            workflowId: 'current',
+            createdAt: serverTimestamp(),
+            isFavorited: false,
+            metadata: {
+              model,
+              prompt: finalPrompt,
+              rawPrompt: prompt,
+              negativePrompt,
+              aspectRatio,
+              imageSize,
+              style,
+              seed: parameters.seed,
+            }
+          });
+        } catch (assetErr) {
+          console.error("Failed to save asset to library:", assetErr);
+        }
+      }
     } catch (err: any) {
       updateNodeData(id, { error: err.message, isRunning: false });
     }
