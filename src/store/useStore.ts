@@ -17,6 +17,10 @@ import { WorkflowNodeData } from '../types';
 interface WorkflowState {
   nodes: Node<WorkflowNodeData>[];
   edges: Edge[];
+  pendingNodeType: string | null;
+  pendingNodeData: any | null;
+  isChatOpen: boolean;
+  activeChatId: string | null;
   onNodesChange: OnNodesChange;
   onEdgesChange: OnEdgesChange;
   onConnect: OnConnect;
@@ -26,11 +30,18 @@ interface WorkflowState {
   addNode: (node: Node<WorkflowNodeData>) => void;
   deleteNode: (nodeId: string) => void;
   deleteEdge: (edgeId: string) => void;
+  setPendingNodeType: (type: string | null, data?: any) => void;
+  setChatOpen: (open: boolean) => void;
+  setActiveChatId: (id: string | null) => void;
 }
 
 export const useStore = create<WorkflowState>((set, get) => ({
   nodes: [],
   edges: [],
+  pendingNodeType: null,
+  pendingNodeData: null,
+  isChatOpen: false,
+  activeChatId: null,
   onNodesChange: (changes: NodeChange[]) => {
     set({
       nodes: applyNodeChanges(changes, get().nodes),
@@ -74,4 +85,7 @@ export const useStore = create<WorkflowState>((set, get) => ({
       edges: get().edges.filter((edge) => edge.id !== edgeId),
     });
   },
+  setPendingNodeType: (type, data = null) => set({ pendingNodeType: type, pendingNodeData: data }),
+  setChatOpen: (open) => set({ isChatOpen: open }),
+  setActiveChatId: (id) => set({ activeChatId: id }),
 }));

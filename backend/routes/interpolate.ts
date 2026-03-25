@@ -1,5 +1,5 @@
 import express from 'express';
-import { interpolateVideo } from '../processing/rife.js';
+import { interpolateVideo } from '../processing/rife.ts';
 
 const router = express.Router();
 

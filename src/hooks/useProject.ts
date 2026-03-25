@@ -13,7 +13,9 @@ import {
   updateDoc, 
   deleteDoc, 
   serverTimestamp,
-  Timestamp
+  Timestamp,
+  handleFirestoreError,
+  OperationType
 } from '../firebase';
 import { Project } from '../types/project.types';
 import { useProjectStore } from '../store/useProjectStore';
@@ -43,6 +45,8 @@ export function useProject() {
       })) as Project[];
       setProjects(projectsData);
       setLoading(false);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'projects');
     });
 
     return () => unsubscribe();
@@ -74,8 +78,12 @@ export function useProject() {
       styleKeywords: projectData.styleKeywords || '',
     };
 
-    await setDoc(newProjectRef, project);
-    return project as Project;
+    try {
+      await setDoc(newProjectRef, project);
+      return project as Project;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'projects');
+    }
   };
 
   const selectProject = (project: Project) => {
@@ -87,14 +95,22 @@ export function useProject() {
     const projectRef = doc(db, 'projects', currentProject.id);
     const now = serverTimestamp();
     const fullUpdates = { ...updates, updatedAt: now };
-    await updateDoc(projectRef, fullUpdates);
-    updateProject(fullUpdates);
+    try {
+      await updateDoc(projectRef, fullUpdates);
+      updateProject(fullUpdates);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `projects/${currentProject.id}`);
+    }
   };
 
   const deleteProject = async (projectId: string) => {
-    await deleteDoc(doc(db, 'projects', projectId));
-    if (currentProject?.id === projectId) {
-      clearProject();
+    try {
+      await deleteDoc(doc(db, 'projects', projectId));
+      if (currentProject?.id === projectId) {
+        clearProject();
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `projects/${projectId}`);
     }
   };
 

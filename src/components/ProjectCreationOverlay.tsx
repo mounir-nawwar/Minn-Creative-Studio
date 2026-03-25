@@ -33,6 +33,8 @@ interface ProjectCreationOverlayProps {
   onClose: () => void;
   onCreate: (project: Partial<Project>) => Promise<void>;
   initialData?: Partial<Project>;
+  mode?: 'create' | 'edit';
+  existingProject?: Project | null;
 }
 
 const MOODS = [
@@ -64,22 +66,31 @@ const FORMATS = [
   { id: 'A4', label: 'A4 (Print)', platform: 'Print' },
 ];
 
-export default function ProjectCreationOverlay({ isOpen, onClose, onCreate, initialData }: ProjectCreationOverlayProps) {
+export default function ProjectCreationOverlay({ 
+  isOpen, 
+  onClose, 
+  onCreate, 
+  initialData,
+  mode = 'create',
+  existingProject
+}: ProjectCreationOverlayProps) {
   const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState<Partial<Project>>(initialData || {
-    type: 'marketing',
-    subtype: 'Social Media Campaign',
-    status: 'active' as ProjectStatus,
-    visualMood: [],
-    platforms: [],
-    outputFormats: [],
-    tags: [],
-    primaryColor: '#0097A7',
-    secondaryColor: '#000000',
-    accentColor: '#FFFFFF',
-    fontStyle: 'geometric' as FontStyle,
-    aiInstructions: '',
-  });
+  const [formData, setFormData] = useState<Partial<Project>>(
+    existingProject || initialData || {
+      type: 'marketing',
+      subtype: 'Social Media Campaign',
+      status: 'active' as ProjectStatus,
+      visualMood: [],
+      platforms: [],
+      outputFormats: [],
+      tags: [],
+      primaryColor: '#0097A7',
+      secondaryColor: '#000000',
+      accentColor: '#FFFFFF',
+      fontStyle: 'geometric' as FontStyle,
+      aiInstructions: '',
+    }
+  );
   const [isGenerating, setIsGenerating] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   
@@ -200,7 +211,9 @@ export default function ProjectCreationOverlay({ isOpen, onClose, onCreate, init
               <Sparkles className="w-6 h-6 text-[#0097A7]" />
             </div>
             <div>
-              <h2 className="text-2xl font-black text-white tracking-tighter uppercase">Create Project</h2>
+              <h2 className="text-2xl font-black text-white tracking-tighter uppercase">
+                {mode === 'edit' ? 'Project Settings' : 'Create Project'}
+              </h2>
               <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Step {step} of 6</p>
             </div>
           </div>
@@ -646,8 +659,12 @@ export default function ProjectCreationOverlay({ isOpen, onClose, onCreate, init
                 className="space-y-8"
               >
                 <div className="text-center space-y-2">
-                  <h3 className="text-4xl font-black text-white tracking-tighter">Your project is ready</h3>
-                  <p className="text-gray-500 text-sm">Review everything before launching.</p>
+                  <h3 className="text-4xl font-black text-white tracking-tighter">
+                    {mode === 'edit' ? 'Update your mission' : 'Your project is ready'}
+                  </h3>
+                  <p className="text-gray-500 text-sm">
+                    {mode === 'edit' ? 'Review and save your changes.' : 'Review everything before launching.'}
+                  </p>
                 </div>
 
                 <div className="max-w-2xl mx-auto bg-[#111111] border border-white/5 rounded-[40px] p-10 space-y-8 shadow-2xl">
@@ -727,7 +744,7 @@ export default function ProjectCreationOverlay({ isOpen, onClose, onCreate, init
               className="flex items-center gap-2 px-10 py-4 bg-[#0097A7] text-white rounded-2xl font-black uppercase text-[11px] tracking-[0.2em] hover:scale-105 transition-all shadow-[0_0_30px_rgba(0,151,167,0.3)]"
             >
               <CheckCircle2 className="w-4 h-4" />
-              Create Project
+              {mode === 'edit' ? 'Save Changes' : 'Create Project'}
             </button>
           ) : (
             <button

@@ -282,11 +282,11 @@ const ImagenNode = ({ id, data }: any) => {
         </button>
 
         {data.output && (
-          <div className="mt-2 rounded-lg overflow-hidden border border-[#2a2a2a] bg-[#0a0a0a]">
+          <div className="mt-2 h-[180px] rounded-lg overflow-hidden border border-[#2a2a2a] bg-[#0a0a0a]">
             <img 
               src={data.output} 
               alt="Generated" 
-              className="w-full h-auto"
+              className="w-full h-full object-cover"
               referrerPolicy="no-referrer"
             />
           </div>

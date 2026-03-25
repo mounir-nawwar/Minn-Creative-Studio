@@ -1,5 +1,5 @@
 import express from 'express';
-import { upscaleVideo } from '../processing/esrgan.js';
+import { upscaleVideo } from '../processing/esrgan.ts';
 
 const router = express.Router();
 

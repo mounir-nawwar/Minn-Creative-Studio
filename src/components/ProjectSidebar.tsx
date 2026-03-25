@@ -50,7 +50,8 @@ import { Asset } from '../types/project.types';
 type Tab = 'nodes' | 'workflows' | 'chats' | 'assets';
 
 export default function ProjectSidebar() {
-  const { currentProject } = useProjectStore();
+  const { currentProject, setActiveWorkflowId, activeWorkflowId: currentWfId } = useProjectStore();
+  const { setChatOpen, setActiveChatId, activeChatId, setNodes, setEdges } = useStore();
   const [activeTab, setActiveTab] = useState<Tab>('nodes');
   const [workflows, setWorkflows] = useState<any[]>([]);
   const [chats, setChats] = useState<any[]>([]);
@@ -201,18 +202,29 @@ export default function ProjectSidebar() {
 
   const createNewChat = async () => {
     if (!currentProject || !auth.currentUser) return;
-    await addDoc(collection(db, 'chats'), {
+    const docRef = await addDoc(collection(db, 'chats'), {
       title: 'New Creative Session',
       projectId: currentProject.id,
       userId: auth.currentUser.uid,
       createdAt: serverTimestamp(),
     });
+    setActiveChatId(docRef.id);
+    setChatOpen(true);
   };
 
   const deleteItem = async (e: React.MouseEvent, collectionName: string, id: string) => {
     e.stopPropagation();
-    if (confirm(`Delete this ${collectionName.slice(0, -1)}?`)) {
-      await deleteDoc(doc(db, collectionName, id));
+    if (window.confirm(`Delete this ${collectionName.slice(0, -1)}?`)) {
+      try {
+        await deleteDoc(doc(db, collectionName, id));
+        if (collectionName === 'workflows' && currentWfId === id) {
+          setActiveWorkflowId(null);
+          setNodes([]);
+          setEdges([]);
+        }
+      } catch (err) {
+        console.error(`Error deleting ${collectionName}:`, err);
+      }
     }
   };
 
@@ -307,7 +319,12 @@ export default function ProjectSidebar() {
                   workflows.map(wf => (
                     <div 
                       key={wf.id}
-                      className="group relative bg-[#111111] border border-white/5 hover:border-[#0097A7]/30 rounded-2xl p-4 cursor-pointer transition-all"
+                      onClick={() => {
+                        setNodes(wf.nodes);
+                        setEdges(wf.edges);
+                        setActiveWorkflowId(wf.id);
+                      }}
+                      className={`group relative bg-[#111111] border border-white/5 hover:border-[#0097A7]/30 rounded-2xl p-4 cursor-pointer transition-all ${currentWfId === wf.id ? 'border-[#0097A7]/50 bg-[#0097A7]/5' : ''}`}
                     >
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 bg-black rounded-xl border border-white/5 flex items-center justify-center overflow-hidden">
@@ -370,7 +387,11 @@ export default function ProjectSidebar() {
                   chats.map(chat => (
                     <div 
                       key={chat.id}
-                      className="group relative bg-[#111111] border border-white/5 hover:border-[#0097A7]/30 rounded-2xl p-4 cursor-pointer transition-all"
+                      onClick={() => {
+                        setActiveChatId(chat.id);
+                        setChatOpen(true);
+                      }}
+                      className={`group relative bg-[#111111] border border-white/5 hover:border-[#0097A7]/30 rounded-2xl p-4 cursor-pointer transition-all ${activeChatId === chat.id ? 'border-[#0097A7]/50 bg-[#0097A7]/5' : ''}`}
                     >
                       <div className="flex items-center gap-4">
                         <div className="w-10 h-10 bg-black rounded-xl border border-white/5 flex items-center justify-center">

@@ -49,6 +49,12 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "nawwarmounir@gmail.com" && request.auth.token.email_verified == true)); // Default admin
+    }
+
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
@@ -89,30 +95,36 @@ service cloud.firestore {
     // Rules
     // ===============================================================
 
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && isOwner(userId) && request.resource.data.role == 'user';
+      allow update: if isAuthenticated() && (isAdmin() || (isOwner(userId) && request.resource.data.role == resource.data.role));
+    }
+
     match /projects/{projectId} {
-      allow read, update, delete: if isOwner(resource.data.userId);
+      allow read, update, delete: if isOwner(resource.data.userId) || isAdmin();
       allow create: if isAuthenticated() && isValidProject(request.resource.data);
 
       match /assets/{assetId} {
-        allow read, update, delete: if isOwner(resource.data.userId);
+        allow read, update, delete: if isOwner(resource.data.userId) || isAdmin();
         allow create: if isAuthenticated() && isValidAsset(request.resource.data);
       }
     }
 
     match /chats/{chatId} {
-      allow read, update, delete: if isOwner(resource.data.userId);
+      allow read, update, delete: if isOwner(resource.data.userId) || isAdmin();
       allow create: if isAuthenticated() && isValidChat(request.resource.data);
 
       match /messages/{messageId} {
-        allow read: if isOwner(get(/databases/$(database)/documents/chats/$(chatId)).data.userId);
+        allow read: if isOwner(get(/databases/$(database)/documents/chats/$(chatId)).data.userId) || isAdmin();
         allow create: if isAuthenticated() && 
-                       isOwner(get(/databases/$(database)/documents/chats/$(chatId)).data.userId) &&
+                       (isOwner(get(/databases/$(database)/documents/chats/$(chatId)).data.userId) || isAdmin()) &&
                        isValidMessage(request.resource.data);
       }
     }
 
     match /workflows/{workflowId} {
-      allow read, update, delete: if isOwner(resource.data.userId);
+      allow read, update, delete: if isOwner(resource.data.userId) || isAdmin();
       allow create: if isAuthenticated() && isValidWorkflow(request.resource.data);
     }
   }

@@ -11,23 +11,57 @@ import {
   Download, 
   ExternalLink,
   Trash2,
-  Maximize2
+  Maximize2,
+  Upload,
+  Plus
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Asset, AssetType } from '../types/project.types';
 import { useStore } from '../store/useStore';
 import { useReactFlow } from 'reactflow';
+import { useRef } from 'react';
 
 interface AssetGridProps {
   onAssetClick?: (asset: Asset) => void;
+  isPicker?: boolean;
 }
 
-export default function AssetGrid({ onAssetClick }: AssetGridProps) {
-  const { assets, loading, deleteAsset, toggleFavorite } = useAssets();
-  const addNode = useStore((state) => state.addNode);
+export default function AssetGrid({ onAssetClick, isPicker = false }: AssetGridProps) {
+  const { assets, loading, deleteAsset, toggleFavorite, uploadAsset, uploadProgress } = useAssets();
+  const setPendingNodeType = useStore((state) => state.setPendingNodeType);
   const { project, getViewport } = useReactFlow();
   const [filter, setFilter] = useState<AssetType | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFiles = async (files: FileList | null) => {
+    if (!files) return;
+    const fileArray = Array.from(files);
+    
+    for (const file of fileArray) {
+      try {
+        await uploadAsset(file);
+      } catch (err) {
+        console.error(`Failed to upload ${file.name}:`, err);
+      }
+    }
+  };
+
+  const onDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const onDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const onDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    await handleFiles(e.dataTransfer.files);
+  };
 
   const filteredAssets = assets.filter(a => {
     const matchesFilter = filter === 'all' || a.type === filter;
@@ -49,29 +83,13 @@ export default function AssetGrid({ onAssetClick }: AssetGridProps) {
   const handleAddToCanvas = (asset: Asset) => {
     const type = asset.type === 'video' ? 'videoUpload' : 'imageUpload';
     
-    // Calculate center of the viewport
-    const { x, y, zoom } = getViewport();
-    // Assuming the sidebar is 320px wide and the canvas takes the rest
-    const canvasWidth = window.innerWidth - 320;
-    const canvasHeight = window.innerHeight - 48; // Subtracting top bar height
-    
-    const center = project({
-      x: 320 + canvasWidth / 2,
-      y: 48 + canvasHeight / 2,
-    });
-
-    addNode({
-      id: `${type}-${Date.now()}`,
+    setPendingNodeType(type, { 
       type,
-      position: center,
-      data: { 
-        type,
-        label: asset.name,
-        output: asset.url,
-        config: {
-          ...asset.metadata,
-          url: asset.url
-        }
+      label: asset.name,
+      output: asset.url,
+      config: {
+        ...asset.metadata,
+        url: asset.url
       }
     });
   };
@@ -85,9 +103,59 @@ export default function AssetGrid({ onAssetClick }: AssetGridProps) {
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div 
+      className={`flex-1 flex flex-col overflow-hidden transition-all ${isDragging ? 'bg-[#0097A7]/10' : ''}`}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
       {/* Filters & Search */}
       <div className="p-4 border-b border-white/5 space-y-4">
+        {!isPicker && (
+          <div className="flex flex-col gap-3">
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={(e) => handleFiles(e.target.files)} 
+              className="hidden" 
+              multiple
+              accept="image/*,video/*,audio/*"
+            />
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full py-3 bg-[#0097A7] hover:bg-[#00838F] text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(0,151,167,0.2)]"
+            >
+              <Upload className="w-4 h-4" />
+              Upload Asset
+            </button>
+
+            {/* Upload Progress */}
+            <AnimatePresence>
+              {Object.entries(uploadProgress).map(([fileId, progress]) => (
+                <motion.div
+                  key={fileId}
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="bg-black/40 border border-white/5 rounded-lg p-2 space-y-1.5"
+                >
+                  <div className="flex justify-between text-[8px] font-bold uppercase tracking-widest">
+                    <span className="text-gray-400 truncate max-w-[150px]">{fileId.split('-').slice(1).join('-')}</span>
+                    <span className="text-[#0097A7]">{Math.round(progress as number)}%</span>
+                  </div>
+                  <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                    <motion.div 
+                      className="h-full bg-[#0097A7]"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${progress as number}%` }}
+                    />
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        )}
+
         <div className="relative group">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-600 group-focus-within:text-[#0097A7] transition-colors" />
           <input 
@@ -162,16 +230,18 @@ export default function AssetGrid({ onAssetClick }: AssetGridProps) {
                       >
                         <Heart className={`w-3.5 h-3.5 ${asset.isFavorited ? 'fill-current' : ''}`} />
                       </button>
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAddToCanvas(asset);
-                        }}
-                        className="p-1.5 bg-black/40 backdrop-blur-md border border-white/10 rounded-lg text-gray-400 hover:text-white transition-all"
-                        title="Add to Canvas"
-                      >
-                        <Maximize2 className="w-3.5 h-3.5" />
-                      </button>
+                      {!isPicker && (
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAddToCanvas(asset);
+                          }}
+                          className="p-1.5 bg-black/40 backdrop-blur-md border border-white/10 rounded-lg text-gray-400 hover:text-white transition-all"
+                          title="Add to Canvas"
+                        >
+                          <Maximize2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                     
                     <div className="space-y-1">

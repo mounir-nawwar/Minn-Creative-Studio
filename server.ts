@@ -5,9 +5,9 @@ import { fileURLToPath } from 'url';
 import cookieParser from 'cookie-parser';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
-import upscaleRoutes from './backend/routes/upscale.js';
-import interpolateRoutes from './backend/routes/interpolate.js';
-import videoRoutes from './backend/routes/video.js';
+import upscaleRoutes from './backend/routes/upscale.ts';
+import interpolateRoutes from './backend/routes/interpolate.ts';
+import videoRoutes from './backend/routes/video.ts';
 
 dotenv.config();
 

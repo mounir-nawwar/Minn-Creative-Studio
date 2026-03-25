@@ -11,7 +11,8 @@ import {
   Loader2,
   ChevronRight,
   Trash2,
-  Layout
+  Layout,
+  Library
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -27,10 +28,14 @@ import {
   doc, 
   deleteDoc,
   updateDoc,
-  limit
+  limit,
+  handleFirestoreError,
+  OperationType
 } from '../firebase';
 import { GoogleGenAI } from "@google/genai";
 import { useProjectStore } from '../store/useProjectStore';
+import { useStore } from '../store/useStore';
+import AssetGrid from './AssetGrid';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -50,16 +55,27 @@ interface Chat {
 }
 
 export default function ChatDrawer() {
-  const [isOpen, setIsOpen] = useState(false);
+  const { isChatOpen: isOpen, setChatOpen: setIsOpen, activeChatId, setActiveChatId } = useStore();
   const [chats, setChats] = useState<Chat[]>([]);
-  const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [showAssetPicker, setShowAssetPicker] = useState(false);
+  const [selectedAssets, setSelectedAssets] = useState<any[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { currentProject } = useProjectStore();
 
   const user = auth.currentUser;
+
+  const handleAssetSelect = (asset: any) => {
+    if (selectedAssets.find(a => a.id === asset.id)) return;
+    setSelectedAssets(prev => [...prev, asset]);
+    setShowAssetPicker(false);
+  };
+
+  const removeSelectedAsset = (assetId: string) => {
+    setSelectedAssets(prev => prev.filter(a => a.id !== assetId));
+  };
 
   // Fetch Chats for current project
   useEffect(() => {
@@ -72,6 +88,8 @@ export default function ChatDrawer() {
     );
     return onSnapshot(q, (snapshot) => {
       setChats(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Chat)));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'chats');
     });
   }, [user, currentProject]);
 
@@ -87,6 +105,8 @@ export default function ChatDrawer() {
     );
     return onSnapshot(q, (snapshot) => {
       setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Message)));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, `chats/${activeChatId}/messages`);
     });
   }, [activeChatId]);
 
@@ -97,19 +117,27 @@ export default function ChatDrawer() {
 
   const createNewChat = async () => {
     if (!user || !currentProject) return;
-    const newChat = await addDoc(collection(db, 'chats'), {
-      title: 'New Creative Session',
-      projectId: currentProject.id,
-      userId: user.uid,
-      createdAt: serverTimestamp(),
-    });
-    setActiveChatId(newChat.id);
+    try {
+      const newChat = await addDoc(collection(db, 'chats'), {
+        title: 'New Creative Session',
+        projectId: currentProject.id,
+        userId: user.uid,
+        createdAt: serverTimestamp(),
+      });
+      setActiveChatId(newChat.id);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'chats');
+    }
   };
 
   const deleteChat = async (e: React.MouseEvent, chatId: string) => {
     e.stopPropagation();
     if (activeChatId === chatId) setActiveChatId(null);
-    await deleteDoc(doc(db, 'chats', chatId));
+    try {
+      await deleteDoc(doc(db, 'chats', chatId));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `chats/${chatId}`);
+    }
   };
 
   const handleSendMessage = async (e?: React.FormEvent) => {
@@ -135,13 +163,16 @@ export default function ChatDrawer() {
     }
 
     const userMsg = inputText;
+    const currentAssets = [...selectedAssets];
     setInputText('');
+    setSelectedAssets([]);
     
     // Save User Message
     await addDoc(collection(db, `chats/${chatId}/messages`), {
       chatId,
       role: 'user',
       text: userMsg,
+      assets: currentAssets.map(a => ({ id: a.id, url: a.url, name: a.name, type: a.type })),
       createdAt: serverTimestamp(),
     });
 
@@ -165,18 +196,42 @@ export default function ChatDrawer() {
         Style Keywords: ${currentProject.styleKeywords || 'N/A'}
       `;
 
+      // Prepare contents for Gemini
+      const parts: any[] = [{ text: `You are a creative assistant for MINN STUDIO. 
+      You are currently working on the following project:
+      ${projectContext}
+      
+      Your goal is to help the user with image and video generation ideas, prompt engineering, and creative direction specific to this project's goals and brand identity.
+      Be concise, professional, and inspiring.
+      
+      User request: ${userMsg}` }];
+
+      // Add images if any
+      for (const asset of currentAssets) {
+        if (asset.type === 'image') {
+          try {
+            const response = await fetch(asset.url);
+            const blob = await response.blob();
+            const base64 = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+              reader.readAsDataURL(blob);
+            });
+            parts.push({
+              inlineData: {
+                data: base64,
+                mimeType: asset.metadata?.mimeType || 'image/png'
+              }
+            });
+          } catch (e) {
+            console.error("Failed to fetch image for Gemini:", e);
+          }
+        }
+      }
+
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: [
-          { role: 'user', parts: [{ text: `You are a creative assistant for MINN STUDIO. 
-          You are currently working on the following project:
-          ${projectContext}
-          
-          Your goal is to help the user with image and video generation ideas, prompt engineering, and creative direction specific to this project's goals and brand identity.
-          Be concise, professional, and inspiring.
-          
-          User request: ${userMsg}` }] }
-        ],
+        contents: [{ role: 'user', parts }],
         config: {
           systemInstruction: "You are a creative director assistant. Help with prompts, visual ideas, and technical advice for AI video/image generation within the context of the current project."
         }
@@ -341,24 +396,102 @@ export default function ChatDrawer() {
 
                       {/* Input */}
                       <div className="p-6 bg-[#111111] border-t border-white/5">
-                        <form onSubmit={handleSendMessage} className="relative">
-                          <input
-                            type="text"
-                            value={inputText}
-                            onChange={(e) => setInputText(e.target.value)}
-                            placeholder="Describe your creative vision..."
-                            className="w-full bg-black border border-white/10 rounded-2xl py-4 pl-5 pr-14 text-[13px] text-white focus:outline-none focus:border-[#0097A7] transition-all placeholder:text-gray-700"
-                          />
-                          <button
-                            type="submit"
-                            disabled={!inputText.trim() || isTyping}
-                            className="absolute right-2 top-2 bottom-2 w-10 bg-[#0097A7] text-white rounded-xl flex items-center justify-center disabled:opacity-50 hover:scale-105 transition-all"
-                          >
-                            <Send className="w-4 h-4" />
-                          </button>
+                        {/* Selected Assets Thumbnails */}
+                        <AnimatePresence>
+                          {selectedAssets.length > 0 && (
+                            <motion.div 
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: 10 }}
+                              className="flex flex-wrap gap-2 mb-4"
+                            >
+                              {selectedAssets.map(asset => (
+                                <div key={asset.id} className="relative group/asset">
+                                  <div className="w-12 h-12 rounded-lg overflow-hidden border border-white/10 bg-black">
+                                    {asset.type === 'image' ? (
+                                      <img src={asset.thumbnailUrl || asset.url} className="w-full h-full object-cover" />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center">
+                                        <Library className="w-4 h-4 text-gray-500" />
+                                      </div>
+                                    )}
+                                  </div>
+                                  <button 
+                                    onClick={() => removeSelectedAsset(asset.id)}
+                                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover/asset:opacity-100 transition-opacity"
+                                  >
+                                    <X className="w-2 h-2" />
+                                  </button>
+                                </div>
+                              ))}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+
+                        <form onSubmit={handleSendMessage} className="relative flex gap-2">
+                          <div className="relative flex-1">
+                            <input
+                              type="text"
+                              value={inputText}
+                              onChange={(e) => setInputText(e.target.value)}
+                              placeholder="Describe your creative vision..."
+                              className="w-full bg-black border border-white/10 rounded-2xl py-4 pl-5 pr-14 text-[13px] text-white focus:outline-none focus:border-[#0097A7] transition-all placeholder:text-gray-700"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowAssetPicker(true)}
+                              className="absolute right-14 top-1/2 -translate-y-1/2 p-2 text-gray-600 hover:text-[#0097A7] transition-colors"
+                              title="Add Asset"
+                            >
+                              <Library className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="submit"
+                              disabled={!inputText.trim() || isTyping}
+                              className="absolute right-2 top-2 bottom-2 w-10 bg-[#0097A7] text-white rounded-xl flex items-center justify-center disabled:opacity-50 hover:scale-105 transition-all"
+                            >
+                              <Send className="w-4 h-4" />
+                            </button>
+                          </div>
                         </form>
                         <p className="text-[9px] text-gray-600 text-center mt-3 uppercase font-bold tracking-widest">Gemini can make mistakes. Verify important info.</p>
                       </div>
+
+                      <AnimatePresence>
+                        {showAssetPicker && (
+                          <div className="fixed inset-0 z-[100] flex items-center justify-center p-8">
+                            <motion.div
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              onClick={() => setShowAssetPicker(false)}
+                              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+                            />
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                              className="relative w-full max-w-2xl h-[600px] bg-[#0a0a0a] border border-white/10 rounded-3xl shadow-2xl flex flex-col overflow-hidden"
+                            >
+                              <div className="p-6 border-b border-white/5 flex items-center justify-between bg-[#111111]">
+                                <div className="flex items-center gap-3">
+                                  <Library className="w-5 h-5 text-[#0097A7]" />
+                                  <h3 className="text-sm font-black text-white uppercase tracking-widest">Link Asset to Chat</h3>
+                                </div>
+                                <button 
+                                  onClick={() => setShowAssetPicker(false)}
+                                  className="p-2 hover:bg-white/5 rounded-full text-gray-500 hover:text-white transition-colors"
+                                >
+                                  <X className="w-5 h-5" />
+                                </button>
+                              </div>
+                              <div className="flex-1 overflow-hidden flex flex-col">
+                                <AssetGrid isPicker onAssetClick={handleAssetSelect} />
+                              </div>
+                            </motion.div>
+                          </div>
+                        )}
+                      </AnimatePresence>
                     </>
                   )}
                 </div>

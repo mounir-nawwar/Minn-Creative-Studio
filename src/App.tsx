@@ -7,8 +7,12 @@ import Canvas from './canvas/Canvas';
 import CustomLoginPage from './components/CustomLoginPage';
 import ChatDrawer from './components/ChatDrawer';
 import ProjectPicker from './pages/ProjectPicker';
-import { auth, signInWithGoogle, signOut as firebaseLogOut } from './firebase';
+import ProjectCreationOverlay from './components/ProjectCreationOverlay';
+import { useProject } from './hooks/useProject';
+import { AnimatePresence } from 'motion/react';
+import { auth, signInWithGoogle, signOut as firebaseLogOut, db } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
+import { getDocFromServer, doc } from 'firebase/firestore';
 import { LogIn, LogOut, User as UserIcon, ShieldCheck, Loader2 } from 'lucide-react';
 import { useProjectStore } from './store/useProjectStore';
 import { useStore } from './store/useStore';
@@ -18,7 +22,8 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-  const { currentProject } = useProjectStore();
+  const { currentProject, isSettingsOpen, closeSettings, settingsMode } = useProjectStore();
+  const { updateCurrentProject } = useProject();
   const setNodes = useStore((state) => state.setNodes);
   const setEdges = useStore((state) => state.setEdges);
 
@@ -39,6 +44,19 @@ export default function App() {
       }
     };
     checkAuth();
+  }, []);
+
+  useEffect(() => {
+    const testConnection = async () => {
+      try {
+        await getDocFromServer(doc(db, 'test', 'connection'));
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('the client is offline')) {
+          console.error("Please check your Firebase configuration. ");
+        }
+      }
+    };
+    testConnection();
   }, []);
 
   useEffect(() => {
@@ -127,6 +145,21 @@ export default function App() {
           <Toolbar />
           <Canvas />
           <ChatDrawer />
+
+          <AnimatePresence>
+            {isSettingsOpen && (
+              <ProjectCreationOverlay
+                isOpen={isSettingsOpen}
+                onClose={closeSettings}
+                mode={settingsMode}
+                existingProject={currentProject}
+                onCreate={async (data) => {
+                  await updateCurrentProject(data);
+                  closeSettings();
+                }}
+              />
+            )}
+          </AnimatePresence>
           
           {/* User Profile Overlay */}
           <div className="absolute top-16 right-4 flex items-center gap-3 bg-black/40 backdrop-blur-md p-1.5 pr-4 rounded-full border border-white/10 z-50">

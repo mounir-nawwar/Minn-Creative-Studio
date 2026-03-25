@@ -5,7 +5,7 @@ import { Settings, ArrowLeftRight, Briefcase, Calendar, ChevronRight } from 'luc
 import { motion } from 'motion/react';
 
 export default function ProjectContextBar() {
-  const { currentProject, clearProject } = useProjectStore();
+  const { currentProject, clearProject, openSettings } = useProjectStore();
   
   if (!currentProject) return null;
 
@@ -68,7 +68,7 @@ export default function ProjectContextBar() {
 
       <div className="flex items-center gap-3">
         <button 
-          onClick={() => {/* Open Edit Overlay */}}
+          onClick={() => openSettings('edit')}
           className="flex items-center gap-2 px-4 py-1.5 bg-[#111111] hover:bg-white/5 border border-white/5 rounded-full text-[9px] font-black text-gray-400 hover:text-white uppercase tracking-widest transition-all"
         >
           <Settings className="w-3 h-3" />

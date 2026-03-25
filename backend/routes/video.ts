@@ -1,5 +1,5 @@
 import express from 'express';
-import { processVideo } from '../processing/video.js';
+import { processVideo } from '../processing/video.ts';
 
 const router = express.Router();
 

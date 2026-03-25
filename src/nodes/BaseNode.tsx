@@ -44,7 +44,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
       initial={{ scale: 0.9, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       className={cn(
-        "min-w-[280px] bg-[#111111] border border-[#1a1a1a] rounded-xl overflow-hidden shadow-2xl transition-all duration-300",
+        "w-[320px] bg-[#111111] border border-[#1a1a1a] rounded-xl overflow-hidden shadow-2xl transition-all duration-300",
         data.isRunning && "border-[#0097A7] shadow-[0_0_15px_rgba(0,151,167,0.3)]",
         data.error && "border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)]",
         className

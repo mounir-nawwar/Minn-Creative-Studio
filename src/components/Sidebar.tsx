@@ -17,7 +17,7 @@ import {
 import { useStore } from '../store/useStore';
 
 const Sidebar = () => {
-  const addNode = useStore((state) => state.addNode);
+  const setPendingNodeType = useStore((state) => state.setPendingNodeType);
 
   const nodeCategories = [
     {
@@ -110,14 +110,8 @@ const Sidebar = () => {
     }
   ];
 
-  const handleAddNode = (type: string, label: string) => {
-    const id = `${type}-${Date.now()}`;
-    addNode({
-      id,
-      type,
-      position: { x: 100, y: 100 },
-      data: { label, type: type as any, config: {} },
-    });
+  const handleAddNode = (type: string) => {
+    setPendingNodeType(type);
   };
 
   return (
@@ -137,7 +131,7 @@ const Sidebar = () => {
               {category.nodes.map((item) => (
                 <button
                   key={item.type}
-                  onClick={() => handleAddNode(item.type, item.label)}
+                  onClick={() => handleAddNode(item.type)}
                   className="w-full flex items-center gap-3 p-2 bg-[#1a1a1a] hover:bg-[#222222] border border-[#2a2a2a] rounded-xl transition-all group"
                 >
                   <div className={`p-1.5 bg-black rounded-lg ${item.color} group-hover:scale-110 transition-transform`}>

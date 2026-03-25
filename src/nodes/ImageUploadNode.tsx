@@ -1,11 +1,14 @@
 import React, { useState, useRef } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
-import { Upload, X, ImageIcon, Loader2 } from 'lucide-react';
+import { Upload, X, ImageIcon, Loader2, Library } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import AssetGrid from '../components/AssetGrid';
 
 const ImageUploadNode = ({ id, data }: any) => {
   const [imageUrl, setImageUrl] = useState<string | null>(data.output || null);
   const [isUploading, setIsUploading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'upload' | 'assets'>('upload');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const updateNodeData = useStore((state) => state.updateNodeData);
 
@@ -26,6 +29,11 @@ const ImageUploadNode = ({ id, data }: any) => {
       setIsUploading(false);
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleAssetSelect = (asset: any) => {
+    setImageUrl(asset.url);
+    updateNodeData(id, { output: asset.url, isRunning: false });
   };
 
   const handleClear = () => {
@@ -49,55 +57,76 @@ const ImageUploadNode = ({ id, data }: any) => {
           className="hidden" 
         />
         
-        {!imageUrl ? (
+        {/* Tabs */}
+        <div className="flex bg-black/40 p-1 rounded-xl border border-white/5">
           <button
-            onClick={triggerUpload}
-            disabled={isUploading}
-            className="w-full aspect-video bg-[#0a0a0a] border-2 border-dashed border-[#2a2a2a] hover:border-[#0097A7] rounded-xl flex flex-col items-center justify-center gap-2 text-gray-500 hover:text-[#0097A7] transition-all group"
+            onClick={() => setActiveTab('upload')}
+            className={`flex-1 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${activeTab === 'upload' ? 'bg-[#0097A7] text-white' : 'text-gray-500 hover:text-gray-300'}`}
           >
-            {isUploading ? (
-              <Loader2 className="w-6 h-6 animate-spin" />
-            ) : (
-              <>
-                <Upload className="w-6 h-6 group-hover:scale-110 transition-transform" />
-                <span className="text-[10px] font-bold uppercase tracking-wider">Upload Image</span>
-              </>
-            )}
+            Upload
           </button>
-        ) : (
-          <div className="relative group/image">
-            <div className="aspect-video bg-[#0a0a0a] border border-[#2a2a2a] rounded-xl overflow-hidden shadow-lg">
-              <img 
-                src={imageUrl} 
-                alt="Uploaded" 
-                className="w-full h-full object-cover"
-                referrerPolicy="no-referrer"
-              />
-            </div>
-            <button 
-              onClick={handleClear}
-              className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 rounded-lg text-white opacity-0 group-hover/image:opacity-100 transition-opacity"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-            <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 rounded text-[8px] text-gray-400 font-bold uppercase tracking-widest">
-              Uploaded Image
-            </div>
-          </div>
-        )}
-
-        <div className="flex gap-2">
           <button
-            onClick={triggerUpload}
-            className="flex-1 py-2 bg-[#1a1a1a] hover:bg-[#222222] border border-[#2a2a2a] rounded-lg text-[10px] font-bold text-gray-400 hover:text-white transition-all flex items-center justify-center gap-2"
+            onClick={() => setActiveTab('assets')}
+            className={`flex-1 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${activeTab === 'assets' ? 'bg-[#0097A7] text-white' : 'text-gray-500 hover:text-gray-300'}`}
           >
-            <ImageIcon className="w-3 h-3" />
-            {imageUrl ? 'REPLACE' : 'BROWSE'}
+            From Assets
           </button>
         </div>
 
+        <div className="h-[180px] bg-[#0a0a0a] border border-[#2a2a2a] rounded-xl overflow-hidden relative group/image">
+          {activeTab === 'upload' ? (
+            <>
+              {!imageUrl ? (
+                <button
+                  onClick={triggerUpload}
+                  disabled={isUploading}
+                  className="w-full h-full flex flex-col items-center justify-center gap-2 text-gray-500 hover:text-[#0097A7] transition-all group"
+                >
+                  {isUploading ? (
+                    <Loader2 className="w-6 h-6 animate-spin text-[#0097A7]" />
+                  ) : (
+                    <>
+                      <Upload className="w-6 h-6 group-hover:scale-110 transition-transform" />
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Drop or Click to Upload</span>
+                    </>
+                  )}
+                </button>
+              ) : (
+                <>
+                  <img 
+                    src={imageUrl} 
+                    alt="Uploaded" 
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                  <button 
+                    onClick={handleClear}
+                    className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 rounded-lg text-white opacity-0 group-hover/image:opacity-100 transition-opacity"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </>
+              )}
+            </>
+          ) : (
+            <div className="w-full h-full overflow-hidden flex flex-col">
+              <AssetGrid isPicker onAssetClick={handleAssetSelect} />
+            </div>
+          )}
+        </div>
+
+        {imageUrl && activeTab === 'upload' && (
+          <button
+            onClick={triggerUpload}
+            className="w-full py-2 bg-[#1a1a1a] hover:bg-[#222222] border border-[#2a2a2a] rounded-lg text-[10px] font-bold text-gray-400 hover:text-white transition-all flex items-center justify-center gap-2"
+          >
+            <ImageIcon className="w-3 h-3" />
+            REPLACE IMAGE
+          </button>
+        )}
+
         <p className="text-[9px] text-gray-600 text-center italic">
-          Upload a local image to use as input for other nodes.
+          {activeTab === 'upload' ? 'Supports JPG, PNG, WEBP' : 'Select an image from your project assets'}
         </p>
       </div>
     </BaseNode>
