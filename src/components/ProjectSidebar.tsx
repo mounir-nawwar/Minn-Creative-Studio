@@ -51,13 +51,11 @@ type Tab = 'nodes' | 'workflows' | 'chats' | 'assets';
 
 export default function ProjectSidebar() {
   const { currentProject, setActiveWorkflowId, activeWorkflowId: currentWfId } = useProjectStore();
-  const { setChatOpen, setActiveChatId, activeChatId, setNodes, setEdges } = useStore();
+  const { setChatOpen, setActiveChatId, activeChatId, setNodes, setEdges, setPendingNodeType } = useStore();
   const [activeTab, setActiveTab] = useState<Tab>('nodes');
   const [workflows, setWorkflows] = useState<any[]>([]);
   const [chats, setChats] = useState<any[]>([]);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
-
-  const addNode = useStore((state) => state.addNode);
 
   const nodeCategories = [
     {
@@ -150,14 +148,9 @@ export default function ProjectSidebar() {
     }
   ];
 
+  // KEY FIX: only set pending type, never add node directly
   const handleAddNode = (type: string, label: string) => {
-    const id = `${type}-${Date.now()}`;
-    addNode({
-      id,
-      type,
-      position: { x: 100, y: 100 },
-      data: { label, type: type as any, config: {} },
-    });
+    setPendingNodeType(type, { label, type: type as any, config: {} });
   };
 
   // Fetch Workflows
@@ -429,19 +422,17 @@ export default function ProjectSidebar() {
         </AnimatePresence>
       </div>
 
-      {/* Asset Preview Modal */}
       <AnimatePresence>
         {selectedAsset && (
           <AssetPreviewModal 
             asset={selectedAsset}
             onClose={() => setSelectedAsset(null)}
-            onDelete={() => {/* Handle Delete */}}
-            onToggleFavorite={() => {/* Handle Favorite */}}
+            onDelete={() => {}}
+            onToggleFavorite={() => {}}
           />
         )}
       </AnimatePresence>
 
-      {/* Footer Branding */}
       <div className="p-4 border-t border-white/5 bg-[#0d0d0d] flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-[#0097A7]" />
