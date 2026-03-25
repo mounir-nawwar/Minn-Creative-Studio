@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Handle, Position } from 'reactflow';
 import { Copy, Loader2, Sparkles, Sliders, Grid } from 'lucide-react';
+import { generateVariations } from '../services/geminiService';
 
 const VariationNode = ({ data, id }: any) => {
   const [prompt, setPrompt] = useState(data.prompt || '');
@@ -13,22 +14,16 @@ const VariationNode = ({ data, id }: any) => {
     if (!data.imageUrl) return;
     setIsGenerating(true);
     try {
-      const response = await fetch('/api/variations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imageUrl: data.imageUrl,
-          prompt,
-          count,
-          strength
-        })
+      const images = await generateVariations({
+        imageUrl: data.imageUrl,
+        prompt,
+        count
       });
-      const result = await response.json();
-      setVariations(result.images);
+      setVariations(images);
     } catch (err) {
       console.error('Variation Generation Error:', err);
+      alert(err instanceof Error ? err.message : 'Failed to generate variations');
     } finally {
-      setIsGenerating(true);
       setIsGenerating(false);
     }
   };

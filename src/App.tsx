@@ -13,15 +13,25 @@ import { AnimatePresence } from 'motion/react';
 import { auth, signInWithGoogle, signOut as firebaseLogOut, db } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { getDocFromServer, doc } from 'firebase/firestore';
-import { ShieldCheck, Loader2 } from 'lucide-react';
+import { ShieldCheck, Loader2, Key } from 'lucide-react';
 import { useProjectStore } from './store/useProjectStore';
 import { useStore } from './store/useStore';
 import { ReactFlowProvider } from 'reactflow';
+
+declare global {
+  interface Window {
+    aistudio: {
+      hasSelectedApiKey: () => Promise<boolean>;
+      openSelectKey: () => Promise<void>;
+    };
+  }
+}
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
   const { currentProject, isSettingsOpen, closeSettings, settingsMode } = useProjectStore();
   const { updateCurrentProject } = useProject();
   const setNodes = useStore((state) => state.setNodes);
@@ -66,6 +76,34 @@ export default function App() {
     });
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    const checkApiKey = async () => {
+      if (window.aistudio) {
+        try {
+          const hasKey = await window.aistudio.hasSelectedApiKey();
+          setHasApiKey(hasKey);
+        } catch (err) {
+          console.error("Failed to check API key", err);
+          setHasApiKey(true); // Fallback
+        }
+      } else {
+        setHasApiKey(true); // Local dev fallback
+      }
+    };
+    checkApiKey();
+  }, []);
+
+  const handleSelectKey = async () => {
+    if (window.aistudio) {
+      try {
+        await window.aistudio.openSelectKey();
+        setHasApiKey(true);
+      } catch (err) {
+        console.error("Failed to open key selector", err);
+      }
+    }
+  };
 
   const handleCustomLogout = async () => {
     try {
@@ -127,6 +165,51 @@ export default function App() {
           </div>
           
           <p className="text-[10px] text-gray-700 uppercase font-bold tracking-widest">Powered by Gemini 3.1 & Veo 3</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (hasApiKey === false) {
+    return (
+      <div className="h-screen w-screen bg-black flex flex-col items-center justify-center p-6">
+        <div className="max-w-md w-full space-y-8 text-center">
+          <div className="space-y-2">
+            <h1 className="text-6xl font-black text-white tracking-tighter">
+              MINN <span className="text-[#0097A7]">STUDIO</span>
+            </h1>
+            <p className="text-gray-500 text-sm font-medium">API Configuration Required</p>
+          </div>
+          
+          <div className="p-8 bg-[#111111] border border-[#1a1a1a] rounded-3xl space-y-6 shadow-2xl">
+            <div className="flex justify-center">
+              <div className="p-4 bg-[#0097A7]/10 rounded-full">
+                <Key className="w-12 h-12 text-[#0097A7]" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-xl font-bold text-white">Select Your API Key</h2>
+              <p className="text-gray-500 text-xs text-balance">
+                High-performance models like Imagen 4 and Veo 3 require a paid API key from a Google Cloud project with billing enabled.
+              </p>
+              <a 
+                href="https://ai.google.dev/gemini-api/docs/billing" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-[10px] text-[#0097A7] hover:underline uppercase font-bold tracking-widest block pt-2"
+              >
+                Learn about billing
+              </a>
+            </div>
+            <button
+              onClick={handleSelectKey}
+              className="w-full py-4 bg-[#0097A7] hover:bg-[#00838F] text-white font-black rounded-2xl flex items-center justify-center gap-3 transition-all transform hover:scale-[1.02]"
+            >
+              SELECT API KEY
+            </button>
+          </div>
+          
+          <p className="text-[10px] text-gray-700 uppercase font-bold tracking-widest">Secure Configuration</p>
         </div>
       </div>
     );
