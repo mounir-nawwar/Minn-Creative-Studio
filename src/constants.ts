@@ -1,5 +1,5 @@
-export const APP_BASE = '/studio';
-export const API_BASE = `${APP_BASE}/api`;
+export const APP_BASE = '';
+export const API_BASE = '/api';
 
 export const AUTHORIZED_EMAILS = [
   "nawwarmounir@gmail.com",

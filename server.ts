@@ -299,7 +299,7 @@ async function startServer() {
     }
   });
 
-  app.use('/studio/api', apiRouter);
+  app.use('/api', apiRouter);
 
   console.log(`Starting server in ${process.env.NODE_ENV || 'development'} mode...`);
   // Vite middleware for development
@@ -307,13 +307,13 @@ async function startServer() {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
-      base: '/studio/',
+      base: '/',
     });
-    app.use('/studio', vite.middlewares);
+    app.use('/', vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use('/studio', express.static(distPath));
-    app.get('/studio/*', (req, res) => {
+    app.use('/', express.static(distPath));
+    app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }

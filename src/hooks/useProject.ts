@@ -47,8 +47,6 @@ export function useProject() {
         ...doc.data()
       })) as Project[];
       
-      console.log('All projects loaded:', snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-      
       setProjects(projectsData);
       setLoading(false);
     }, (error) => {
