@@ -10,7 +10,7 @@ import ProjectPicker from './pages/ProjectPicker';
 import ProjectCreationOverlay from './components/ProjectCreationOverlay';
 import { useProject } from './hooks/useProject';
 import { AnimatePresence } from 'motion/react';
-import { auth, signInWithGoogle, signOut as firebaseLogOut, db } from './firebase';
+import { auth, signInWithGoogle, signOut as firebaseLogOut, db, getGoogleRedirectResult } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { getDocFromServer, doc } from 'firebase/firestore';
 import { ShieldCheck, Loader2, Key } from 'lucide-react';
@@ -66,6 +66,15 @@ export default function App() {
 
     // 2. Listen for Firebase Auth
     console.time("FirebaseAuth");
+    
+    // Check for redirect result on page load
+    getGoogleRedirectResult().then((result) => {
+      if (result?.user) {
+        // User came back from Google redirect, session already set by Firebase
+        setUser(result.user);
+      }
+    }).catch(console.error);
+
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       console.log("Firebase Auth state changed:", u ? "User logged in" : "No user");
       setUser(u);

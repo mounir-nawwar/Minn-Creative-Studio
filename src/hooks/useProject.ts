@@ -37,7 +37,7 @@ export function useProject() {
     // Otherwise, they only see their own (though security rules will restrict this anyway)
     const q = query(
       collection(db, 'projects'),
-      orderBy('updatedAt', 'desc')
+      orderBy('createdAt', 'desc')
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -46,6 +46,9 @@ export function useProject() {
         id: doc.id,
         ...doc.data()
       })) as Project[];
+      
+      console.log('All projects loaded:', snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      
       setProjects(projectsData);
       setLoading(false);
     }, (error) => {

@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, User } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, User } from 'firebase/auth';
 import { getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, or, orderBy, serverTimestamp, Timestamp, limit } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 
@@ -14,7 +14,13 @@ export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();
 
 // Auth Helpers
-export const signInWithGoogle = () => signInWithPopup(auth, googleProvider);
+export const signInWithGoogle = () => {
+  // Use redirect instead of popup to avoid COOP header issues
+  return signInWithRedirect(auth, googleProvider);
+};
+
+export const getGoogleRedirectResult = () => getRedirectResult(auth);
+
 export const signOut = () => auth.signOut();
 
 // Firestore Error Handling
