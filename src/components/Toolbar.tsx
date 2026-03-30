@@ -32,6 +32,7 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
+import { API_BASE } from '../constants';
 
 interface ToolbarProps { user: User | null; onLogout: () => void; }
 const Toolbar = ({ user, onLogout }: ToolbarProps) => {
@@ -119,23 +120,45 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
 
   const confirmSave = async (isAuto = false) => {
     if (!currentProject || !auth.currentUser) return;
-    
     setIsSaving(true);
-    try {
-      // Sanitize nodes to prevent document size issues
-      const sanitizedNodes = nodes.map(node => {
-        const { output, isRunning, error, progress, ...restData } = node.data || {};
-        return {
-          ...node,
-          data: restData
-        };
-      });
 
-      const workflowData = {
-        nodes: sanitizedNodes,
-        edges,
-        updatedAt: serverTimestamp(),
-      };
+    try {
+      const sanitizedNodes = await Promise.all(nodes.map(async (node) => {
+        const data = { ...node.data };
+
+        // Upload base64 outputs to backend at save time
+        if (data.output && typeof data.output === 'string' && data.output.startsWith('data:')) {
+          try {
+            const fetchRes = await fetch(data.output);
+            const blob = await fetchRes.blob();
+            const ext = blob.type.includes('video') ? 'mp4' : blob.type.includes('audio') ? 'mp3' : 'png';
+            const file = new File([blob], `output-${node.id}.${ext}`, { type: blob.type });
+
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('projectId', currentProject.id);
+
+            const response = await fetch(`${API_BASE}/upload`, { method: 'POST', body: formData });
+            if (response.ok) {
+              const { url } = await response.json();
+              data.output = url;
+            } else {
+              data.output = null;
+            }
+          } catch {
+            data.output = null;
+          }
+        }
+
+        // Reset runtime state only — preserve all user inputs and config
+        data.isRunning = false;
+        data.error = undefined;
+        data.progress = 0;
+
+        return { ...node, data };
+      }));
+
+      const workflowData = { nodes: sanitizedNodes, edges, updatedAt: serverTimestamp() };
 
       if (activeWorkflowId) {
         await updateDoc(doc(db, 'workflows', activeWorkflowId), workflowData);
@@ -149,12 +172,12 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
         });
         setActiveWorkflowId(newDoc.id);
       }
-      
+
       setLastSaved(new Date());
       setHasUnsavedChanges(false);
       setShowSaveModal(false);
     } catch (err) {
-      console.error("Save failed:", err);
+      console.error('Save failed:', err);
     } finally {
       setIsSaving(false);
     }

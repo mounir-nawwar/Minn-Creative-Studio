@@ -48,6 +48,9 @@ export interface Project {
   
   // Tags
   tags: string[];
+  
+  // Sharing
+  collaborators: string[];
 }
 
 export interface Asset {

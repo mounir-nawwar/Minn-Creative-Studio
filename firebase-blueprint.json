@@ -20,7 +20,8 @@
         "fontStyle": { "type": "string" },
         "visualMood": { "type": "array", "items": { "type": "string" } },
         "platforms": { "type": "array", "items": { "type": "string" } },
-        "outputFormats": { "type": "array", "items": { "type": "string" } }
+        "outputFormats": { "type": "array", "items": { "type": "string" } },
+        "collaborators": { "type": "array", "items": { "type": "string" }, "description": "Emails of users who can view this project" }
       },
       "required": ["name", "type", "userId", "createdAt", "updatedAt"]
     },

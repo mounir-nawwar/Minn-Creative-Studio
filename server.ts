@@ -5,12 +5,16 @@ import { fileURLToPath } from 'url';
 import cookieParser from 'cookie-parser';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
+import multer from 'multer';
+import { initializeApp, cert, getApps } from 'firebase-admin/app';
+import { getStorage as getAdminStorage } from 'firebase-admin/storage';
 import { GoogleGenAI } from '@google/genai';
+import firebaseConfig from './firebase-applet-config.json';
 import upscaleRoutes from './backend/routes/upscale.ts';
 import interpolateRoutes from './backend/routes/interpolate.ts';
 import videoRoutes from './backend/routes/video.ts';
 
-dotenv.config();
+dotenv.config({ override: false });
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,8 +31,171 @@ async function startServer() {
   app.use(express.urlencoded({ extended: true, limit: '50mb' }));
   app.use(cookieParser());
 
+  // Check for required Firebase environment variables
+  let bucketName = process.env.FIREBASE_STORAGE_BUCKET || firebaseConfig.storageBucket;
+  if (bucketName && bucketName.startsWith('gs://')) {
+    bucketName = bucketName.replace('gs://', '');
+  }
+  // Ensure bucketName is not the string "undefined" or "null"
+  if (bucketName === 'undefined' || bucketName === 'null') {
+    bucketName = firebaseConfig.storageBucket;
+  }
+
+  const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
+
+  console.log('--- Firebase Configuration Check ---');
+  console.log(`Config Project ID: ${firebaseConfig.projectId}`);
+  console.log(`Config Storage Bucket: ${firebaseConfig.storageBucket}`);
+  console.log(`Resolved Bucket Name: ${bucketName}`);
+  console.log(`Service Account Present: ${!!serviceAccount}`);
+  if (serviceAccount) {
+    try {
+      const sa = JSON.parse(serviceAccount);
+      console.log(`Service Account Project ID: ${sa.project_id}`);
+      if (sa.project_id !== firebaseConfig.projectId) {
+        console.warn('⚠️  PROJECT ID MISMATCH detected on startup!');
+      }
+    } catch (e) {
+      console.error('❌ Failed to parse Service Account JSON on startup');
+    }
+  }
+  console.log('------------------------------------');
+
+  if (!bucketName || !serviceAccount) {
+    console.warn('\n⚠️  MISSING FIREBASE CONFIGURATION');
+    if (!bucketName) console.warn('   - FIREBASE_STORAGE_BUCKET is not set');
+    if (!serviceAccount) console.warn('   - FIREBASE_SERVICE_ACCOUNT is not set');
+    console.warn('   Please add these to your environment variables in AI Studio Settings.\n');
+  }
+
+  const upload = multer({ 
+    storage: multer.memoryStorage(), 
+    limits: { fileSize: 100 * 1024 * 1024 } // 100MB limit
+  });
+
+  const apiRouter = express.Router();
+
+  apiRouter.post('/upload', upload.single('file'), async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'No file provided' });
+
+    try {
+      if (!bucketName || !serviceAccount) {
+        throw new Error('Firebase Storage is not configured on the server. Please add FIREBASE_STORAGE_BUCKET and FIREBASE_SERVICE_ACCOUNT.');
+      }
+
+      // Initialize Firebase Admin if not already done
+      if (!getApps().length) {
+        console.log(`Initializing Firebase Admin with bucket: ${bucketName}`);
+        try {
+          const sa = JSON.parse(serviceAccount);
+          console.log(`Service Account Project ID: ${sa.project_id}`);
+          
+          if (sa.project_id !== firebaseConfig.projectId) {
+            console.warn(`⚠️  PROJECT ID MISMATCH: Service account project ID (${sa.project_id}) does not match config project ID (${firebaseConfig.projectId}). This may cause authentication errors.`);
+          }
+
+          initializeApp({ 
+            credential: cert(sa), 
+            storageBucket: bucketName 
+          });
+        } catch (parseErr: any) {
+          throw new Error(`Failed to parse FIREBASE_SERVICE_ACCOUNT: ${parseErr.message}`);
+        }
+      }
+
+      const sa = JSON.parse(serviceAccount);
+      const saProjectId = sa.project_id;
+
+      const projectId = req.body.projectId || 'default';
+      const fileName = `projects/${projectId}/assets/${Date.now()}-${req.file.originalname}`;
+
+      const trySave = async (targetBucketName: string) => {
+        console.log(`Attempting to upload to bucket: ${targetBucketName}`);
+        const currentBucket = getAdminStorage().bucket(targetBucketName);
+        const currentFile = currentBucket.file(fileName);
+        await currentFile.save(req.file.buffer, {
+          metadata: { contentType: req.file.mimetype },
+          public: true,
+        });
+        return targetBucketName;
+      };
+
+      let finalBucketName = bucketName;
+      const triedBuckets: string[] = [];
+
+      try {
+        triedBuckets.push(bucketName);
+        finalBucketName = await trySave(bucketName);
+      } catch (saveErr: any) {
+        if (saveErr.code === 404) {
+          console.warn(`Primary bucket ${bucketName} not found. Trying fallbacks...`);
+          
+          const fallbacks = new Set<string>();
+          
+          // Pattern 1: .appspot.com
+          if (bucketName.endsWith('.firebasestorage.app')) {
+            fallbacks.add(bucketName.replace('.firebasestorage.app', '.appspot.com'));
+          } else if (bucketName.endsWith('.appspot.com')) {
+            fallbacks.add(bucketName.replace('.appspot.com', '.firebasestorage.app'));
+          }
+
+          // Pattern 2: Project IDs
+          const projectIds = new Set([firebaseConfig.projectId, saProjectId]);
+          for (const pid of projectIds) {
+            fallbacks.add(pid);
+            fallbacks.add(`${pid}.appspot.com`);
+            fallbacks.add(`${pid}.firebasestorage.app`);
+          }
+
+          let success = false;
+          for (const fallback of fallbacks) {
+            if (triedBuckets.includes(fallback)) continue;
+            triedBuckets.push(fallback);
+            try {
+              finalBucketName = await trySave(fallback);
+              success = true;
+              bucketName = fallback; // Update for future uploads
+              console.log(`Successfully uploaded to fallback bucket: ${fallback}`);
+              break;
+            } catch (fallbackErr: any) {
+              console.warn(`Fallback bucket ${fallback} failed: ${fallbackErr.message}`);
+            }
+          }
+          
+          if (!success) {
+            const errorWithContext = new Error(`All storage buckets failed. Tried: ${triedBuckets.join(', ')}. Original error: ${saveErr.message}`);
+            (errorWithContext as any).triedBuckets = triedBuckets;
+            (errorWithContext as any).response = saveErr.response;
+            throw errorWithContext;
+          }
+        } else {
+          throw saveErr;
+        }
+      }
+
+      const publicUrl = `https://storage.googleapis.com/${finalBucketName}/${fileName}`;
+      return res.json({ success: true, url: publicUrl, fileName });
+    } catch (err: any) {
+      console.error('Upload error:', err);
+      
+      let errorMessage = err.message;
+      let errorDetails = err.response?.data || undefined;
+
+      // Handle GaxiosError specifically if it has a response
+      if (err.response && err.response.data && err.response.data.error) {
+        errorMessage = err.response.data.error.message || errorMessage;
+      }
+
+      return res.status(500).json({ 
+        error: errorMessage,
+        details: errorDetails,
+        triedBuckets: (err as any).triedBuckets || [bucketName]
+      });
+    }
+  });
+
   // Auth endpoints
-  app.post('/api/login', (req, res) => {
+  apiRouter.post('/login', (req, res) => {
     const { username, password } = req.body;
     if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
       const token = jwt.sign({ username }, SESSION_SECRET, { expiresIn: '30d' });
@@ -36,14 +203,14 @@ async function startServer() {
         httpOnly: true,
         secure: true,
         sameSite: 'none',
-        maxAge: 30 * 24 * 60 * 60 * 1000,
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
       });
       return res.json({ success: true });
     }
     res.status(401).json({ success: false, message: 'Invalid credentials' });
   });
 
-  app.post('/api/logout', (req, res) => {
+  apiRouter.post('/logout', (req, res) => {
     res.clearCookie('session', {
       httpOnly: true,
       secure: true,
@@ -52,9 +219,10 @@ async function startServer() {
     res.json({ success: true });
   });
 
-  app.get('/api/me', (req, res) => {
+  apiRouter.get('/me', (req, res) => {
     const token = req.cookies.session;
     if (!token) return res.status(401).json({ authenticated: false });
+
     try {
       const decoded = jwt.verify(token, SESSION_SECRET);
       res.json({ authenticated: true, user: decoded });
@@ -63,41 +231,21 @@ async function startServer() {
     }
   });
 
-  // Debug endpoint — shows key status without exposing the real key
-  app.get('/api/debug/key', async (req, res) => {
-    const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
-    if (!apiKey) return res.json({ status: 'missing', masked: null });
-
-    const masked = `${apiKey.substring(0, 8)}...${apiKey.substring(apiKey.length - 4)}`;
-
-    try {
-      const testRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-      const data = await testRes.json();
-      if (testRes.ok) {
-        return res.json({ status: 'valid', masked, modelCount: data.models?.length });
-      } else {
-        return res.json({ status: 'invalid', masked, error: data.error?.message, code: data.error?.code });
-      }
-    } catch (err: any) {
-      return res.json({ status: 'error', masked, error: err.message });
-    }
-  });
-
   // API routes
-  app.use('/api/upscale', upscaleRoutes);
-  app.use('/api/interpolate', interpolateRoutes);
-  app.use('/api/video', videoRoutes);
+  apiRouter.use('/upscale', upscaleRoutes);
+  apiRouter.use('/interpolate', interpolateRoutes);
+  apiRouter.use('/video', videoRoutes);
 
-  app.get('/api/health', (req, res) => {
+  apiRouter.get('/health', (req, res) => {
     res.json({ status: 'ok' });
   });
 
   // Gemini Proxy Route
-  app.post('/api/gemini/proxy', async (req, res, next) => {
+  apiRouter.post('/gemini/proxy', async (req, res, next) => {
     const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
     if (!apiKey) return res.status(500).json({ error: 'API key not configured on server' });
 
-    const maskedKey = apiKey.length > 8
+    const maskedKey = apiKey.length > 8 
       ? `${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)}`
       : '********';
     console.log(`Gemini Proxy using key: ${maskedKey}`);
@@ -109,9 +257,12 @@ async function startServer() {
 
       if (method === 'generateContent') {
         const response = await ai.models.generateContent(params);
-        return res.json({
-          success: true,
-          data: { ...response, text: response.text }
+        return res.json({ 
+          success: true, 
+          data: {
+            ...response,
+            text: response.text // Explicitly include the text property
+          } 
         });
       }
 
@@ -132,7 +283,9 @@ async function startServer() {
 
       if (method === 'fetchVideoFile') {
         const { url } = params;
-        const videoRes = await fetch(url, { headers: { 'x-goog-api-key': apiKey } });
+        const videoRes = await fetch(url, {
+          headers: { 'x-goog-api-key': apiKey }
+        });
         const arrayBuffer = await videoRes.arrayBuffer();
         const base64 = Buffer.from(arrayBuffer).toString('base64');
         const contentType = videoRes.headers.get('content-type') || 'video/mp4';
@@ -146,18 +299,21 @@ async function startServer() {
     }
   });
 
-  console.log(`Starting server in ${process.env.NODE_ENV || 'development'} mode...`);
+  app.use('/studio/api', apiRouter);
 
+  console.log(`Starting server in ${process.env.NODE_ENV || 'development'} mode...`);
+  // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
+      base: '/studio/',
     });
-    app.use(vite.middlewares);
+    app.use('/studio', vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
+    app.use('/studio', express.static(distPath));
+    app.get('/studio/*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
@@ -166,6 +322,7 @@ async function startServer() {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 
+  // Global Error Handler
   app.use((err: any, req: any, res: any, next: any) => {
     console.error('Global Error Handler:', err);
     res.status(err.status || 500).json({

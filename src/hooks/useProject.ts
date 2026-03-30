@@ -33,9 +33,10 @@ export function useProject() {
     }
 
     console.time("LoadProjects");
+    // If the user is authorized, they see all projects. 
+    // Otherwise, they only see their own (though security rules will restrict this anyway)
     const q = query(
       collection(db, 'projects'),
-      where('userId', '==', auth.currentUser.uid),
       orderBy('updatedAt', 'desc')
     );
 

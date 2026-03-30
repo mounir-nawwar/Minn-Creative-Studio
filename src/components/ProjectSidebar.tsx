@@ -24,7 +24,8 @@ import {
   Sun,
   Clapperboard,
   Move,
-  Film
+  Film,
+  PanelLeftClose
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useProjectStore } from '../store/useProjectStore';
@@ -50,7 +51,7 @@ import { Asset } from '../types/project.types';
 type Tab = 'nodes' | 'workflows' | 'chats' | 'assets';
 
 export default function ProjectSidebar() {
-  const { currentProject, setActiveWorkflowId, activeWorkflowId: currentWfId } = useProjectStore();
+  const { currentProject, setActiveWorkflowId, activeWorkflowId: currentWfId, toggleSidebar, isSidebarOpen } = useProjectStore();
   const { setChatOpen, setActiveChatId, activeChatId, setNodes, setEdges, setPendingNodeType } = useStore();
   const [activeTab, setActiveTab] = useState<Tab>('nodes');
   const [workflows, setWorkflows] = useState<any[]>([]);
@@ -157,7 +158,6 @@ export default function ProjectSidebar() {
     if (!currentProject || !auth.currentUser) return;
     const q = query(
       collection(db, 'workflows'),
-      where('userId', '==', auth.currentUser.uid),
       where('projectId', '==', currentProject.id),
       orderBy('createdAt', 'desc')
     );
@@ -171,7 +171,6 @@ export default function ProjectSidebar() {
     if (!currentProject || !auth.currentUser) return;
     const q = query(
       collection(db, 'chats'),
-      where('userId', '==', auth.currentUser.uid),
       where('projectId', '==', currentProject.id),
       orderBy('createdAt', 'desc')
     );
@@ -223,25 +222,39 @@ export default function ProjectSidebar() {
   if (!currentProject) return null;
 
   return (
-    <div className="w-80 h-full bg-[#0a0a0a] border-r border-white/5 flex flex-col relative z-50">
+    <motion.div 
+      initial={false}
+      animate={{ width: isSidebarOpen ? 320 : 0, opacity: isSidebarOpen ? 1 : 0 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+      className="h-full bg-[#0a0a0a] border-r border-white/5 flex flex-col relative z-50 overflow-hidden"
+    >
       {/* Tabs Header */}
-      <div className="flex p-2 bg-[#111111] border-b border-white/5">
-        {(['nodes', 'workflows', 'chats', 'assets'] as Tab[]).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl transition-all ${activeTab === tab
-              ? 'bg-black text-[#0097A7] shadow-xl border border-white/5'
-              : 'text-gray-600 hover:text-gray-400'
-              }`}
-          >
-            {tab === 'nodes' && <Box className="w-4 h-4" />}
-            {tab === 'workflows' && <Layout className="w-4 h-4" />}
-            {tab === 'chats' && <MessageSquare className="w-4 h-4" />}
-            {tab === 'assets' && <ImageIcon className="w-4 h-4" />}
-            <span className="text-[8px] font-black uppercase tracking-widest">{tab}</span>
-          </button>
-        ))}
+      <div className="flex p-2 bg-[#111111] border-b border-white/5 items-center">
+        <div className="flex-1 flex gap-1">
+          {(['nodes', 'workflows', 'chats', 'assets'] as Tab[]).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl transition-all ${activeTab === tab
+                ? 'bg-black text-[#0097A7] shadow-xl border border-white/5'
+                : 'text-gray-600 hover:text-gray-400'
+                }`}
+            >
+              {tab === 'nodes' && <Box className="w-4 h-4" />}
+              {tab === 'workflows' && <Layout className="w-4 h-4" />}
+              {tab === 'chats' && <MessageSquare className="w-4 h-4" />}
+              {tab === 'assets' && <ImageIcon className="w-4 h-4" />}
+              <span className="text-[8px] font-black uppercase tracking-widest">{tab}</span>
+            </button>
+          ))}
+        </div>
+        <button 
+          onClick={toggleSidebar}
+          className="p-2 ml-1 text-gray-600 hover:text-white transition-colors rounded-lg hover:bg-white/5"
+          title="Close Sidebar"
+        >
+          <PanelLeftClose className="w-4 h-4" />
+        </button>
       </div>
 
       {/* Content Area */}
@@ -440,6 +453,6 @@ export default function ProjectSidebar() {
         </div>
         <span className="text-[8px] font-bold text-gray-700 uppercase tracking-widest">v1.0.4</span>
       </div>
-    </div>
+    </motion.div>
   );
 }

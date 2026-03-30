@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
 import { Maximize, Loader2, Video } from 'lucide-react';
+import { API_BASE } from '../constants';
 
 const VideoUpscalerNode = ({ id, data }: any) => {
   const [scale, setScale] = useState(data.config?.scale || '2x');
@@ -25,7 +26,7 @@ const VideoUpscalerNode = ({ id, data }: any) => {
     updateNodeData(id, { isRunning: true, error: null, progress: 10 });
 
     try {
-      const response = await fetch('/api/upscale/video', {
+      const response = await fetch(`${API_BASE}/upscale/video`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ videoUrl, scale })

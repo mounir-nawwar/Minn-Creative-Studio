@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Handle, Position } from 'reactflow';
 import { Maximize, Layout, Check, Loader2, Download, ExternalLink } from 'lucide-react';
+import { API_BASE } from '../constants';
 
 const SIZES = [
   { id: '1:1', label: '1:1 (Instagram Post)', aspect: 1 },
@@ -26,7 +27,7 @@ const BatchOutputSizerNode = ({ data, id }: any) => {
     if (!data.imageUrl) return;
     setIsProcessing(true);
     try {
-      const response = await fetch('/api/batchsize', {
+      const response = await fetch(`${API_BASE}/batchsize`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

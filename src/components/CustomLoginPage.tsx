@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ShieldCheck, Loader2, AlertCircle } from 'lucide-react';
+import { API_BASE } from '../constants';
 
 interface CustomLoginPageProps {
   onLoginSuccess: () => void;
@@ -18,7 +19,7 @@ export default function CustomLoginPage({ onLoginSuccess }: CustomLoginPageProps
 
     console.time("LoginRequest");
     try {
-      const response = await fetch('/api/login', {
+      const response = await fetch(`${API_BASE}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),

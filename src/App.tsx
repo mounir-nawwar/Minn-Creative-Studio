@@ -17,6 +17,7 @@ import { ShieldCheck, Loader2, Key } from 'lucide-react';
 import { useProjectStore } from './store/useProjectStore';
 import { useStore } from './store/useStore';
 import { ReactFlowProvider } from 'reactflow';
+import { AUTHORIZED_EMAILS, isAuthorized, API_BASE } from './constants';
 
 declare global {
   interface Window {
@@ -51,7 +52,7 @@ export default function App() {
     const checkAuth = async () => {
       console.time("CheckAuth");
       try {
-        const response = await fetch('/api/me');
+        const response = await fetch(`${API_BASE}/me`);
         const data = await response.json();
         setIsAuthenticated(data.authenticated);
         console.timeEnd("CheckAuth");
@@ -141,7 +142,7 @@ export default function App() {
 
   const handleCustomLogout = async () => {
     try {
-      await fetch('/api/logout', { method: 'POST' });
+      await fetch(`${API_BASE}/logout`, { method: 'POST' });
       setIsAuthenticated(false);
       firebaseLogOut();
     } catch (err) {
@@ -204,6 +205,34 @@ export default function App() {
           </div>
           
           <p className="text-[10px] text-gray-700 uppercase font-bold tracking-widest">Powered by Gemini 3.1 & Veo 3</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (user && !isAuthorized(user.email)) {
+    return (
+      <div className="h-screen w-screen bg-black flex flex-col items-center justify-center p-6 text-center">
+        <div className="max-w-md w-full space-y-8">
+          <div className="p-8 bg-[#111111] border border-[#1a1a1a] rounded-3xl space-y-6 shadow-2xl">
+            <div className="flex justify-center">
+              <div className="p-4 bg-red-500/10 rounded-full">
+                <ShieldCheck className="w-12 h-12 text-red-500" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-xl font-bold text-white uppercase tracking-tighter">Unauthorized Account</h2>
+              <p className="text-gray-500 text-xs">
+                The account <span className="text-white font-bold">{user.email}</span> is not authorized to access this studio.
+              </p>
+            </div>
+            <button
+              onClick={handleCustomLogout}
+              className="w-full py-4 bg-white hover:bg-gray-100 text-black font-black rounded-2xl transition-all uppercase text-[11px] tracking-widest"
+            >
+              Sign Out & Try Another
+            </button>
+          </div>
         </div>
       </div>
     );

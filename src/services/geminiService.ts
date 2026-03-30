@@ -1,7 +1,8 @@
 import { GenerateContentResponse, Modality, VideoGenerationReferenceType, Type } from "@google/genai";
+import { API_BASE } from "../constants";
 
 async function callBackend(method: string, params: any) {
-  const response = await fetch('/api/gemini/proxy', {
+  const response = await fetch(`${API_BASE}/gemini/proxy`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ method, params })
@@ -122,8 +123,9 @@ export const generateVideo = async (params: {
   motionIntensity?: number;
   videoUrl?: string;
   projectContext?: string;
+  onProgress?: (progress: number) => void;
 }) => {
-  const { prompt, model, aspectRatio, resolution, duration, startFrameUrl, endFrameUrl, referenceImages, motionIntensity, videoUrl, projectContext } = params;
+  const { prompt, model, aspectRatio, resolution, duration, startFrameUrl, endFrameUrl, referenceImages, motionIntensity, videoUrl, projectContext, onProgress } = params;
 
   const fullPrompt = projectContext 
     ? `Project Context: ${projectContext}\n\nTask: Generate a video based on this prompt: ${prompt}`
@@ -139,16 +141,19 @@ export const generateVideo = async (params: {
 
   let startFrameData;
   if (startFrameUrl) {
+    onProgress?.(5);
     const { data, mimeType } = await urlToBase64(startFrameUrl);
     startFrameData = { imageBytes: data, mimeType };
   }
 
   if (endFrameUrl) {
+    onProgress?.(10);
     const { data, mimeType } = await urlToBase64(endFrameUrl);
     videoConfig.lastFrame = { imageBytes: data, mimeType };
   }
 
   if (referenceImages && referenceImages.length > 0) {
+    onProgress?.(15);
     videoConfig.referenceImages = await Promise.all(referenceImages.map(async (ref: any) => {
       const { data, mimeType } = await urlToBase64(ref.url);
       return {
@@ -159,6 +164,7 @@ export const generateVideo = async (params: {
   }
 
   try {
+    onProgress?.(20);
     let operation = await callBackend('generateVideos', {
       model: model,
       prompt: fullPrompt || 'Animate this sequence',
@@ -166,15 +172,23 @@ export const generateVideo = async (params: {
       config: videoConfig
     });
 
+    let pollCount = 0;
     while (!operation.done) {
+      pollCount++;
+      // Simulate progress during polling
+      const simulatedProgress = Math.min(20 + (pollCount * 5), 90);
+      onProgress?.(simulatedProgress);
+      
       await new Promise(resolve => setTimeout(resolve, 5000));
       operation = await callBackend('getOperation', { operation: operation });
     }
 
+    onProgress?.(95);
     const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
     if (!downloadLink) throw new Error("No video generated");
 
     const videoData = await callBackend('fetchVideoFile', { url: downloadLink });
+    onProgress?.(100);
     return `data:${videoData.contentType};base64,${videoData.base64}`;
   } catch (err) {
     console.error('Gemini API Error:', err);

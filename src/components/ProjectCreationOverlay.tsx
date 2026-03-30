@@ -84,6 +84,7 @@ export default function ProjectCreationOverlay({
       platforms: [],
       outputFormats: [],
       tags: [],
+      collaborators: [],
       primaryColor: '#0097A7',
       secondaryColor: '#000000',
       accentColor: '#FFFFFF',
@@ -94,13 +95,16 @@ export default function ProjectCreationOverlay({
   const [isGenerating, setIsGenerating] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   
+  // Collaborator State
+  const [newCollaborator, setNewCollaborator] = useState('');
+
   // AI Assistant State
   const [isAiAssistantExpanded, setIsAiAssistantExpanded] = useState(false);
   const [aiProjectDescription, setAiProjectDescription] = useState('');
   const [isAiFilling, setIsAiFilling] = useState(false);
   const [aiFillSuccess, setAiFillSuccess] = useState(false);
 
-  const handleNext = () => setStep(s => Math.min(s + 1, 6));
+  const handleNext = () => setStep(s => Math.min(s + 1, 7));
   const handleBack = () => setStep(s => Math.max(s - 1, 1));
 
   const updateFormData = (updates: Partial<Project>) => {
@@ -214,7 +218,7 @@ export default function ProjectCreationOverlay({
               <h2 className="text-2xl font-black text-white tracking-tighter uppercase">
                 {mode === 'edit' ? 'Project Settings' : 'Create Project'}
               </h2>
-              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Step {step} of 6</p>
+              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Step {step} of 7</p>
             </div>
           </div>
           <button 
@@ -285,7 +289,7 @@ export default function ProjectCreationOverlay({
         <div className="h-1 bg-white/5 w-full">
           <motion.div 
             className="h-full bg-[#0097A7]"
-            animate={{ width: `${(step / 6) * 100}%` }}
+            animate={{ width: `${(step / 7) * 100}%` }}
           />
         </div>
 
@@ -659,6 +663,89 @@ export default function ProjectCreationOverlay({
                 className="space-y-8"
               >
                 <div className="text-center space-y-2">
+                  <h3 className="text-4xl font-black text-white tracking-tighter">Sharing & Collaborators</h3>
+                  <p className="text-gray-500 text-sm">Add people who can view and work on this project.</p>
+                </div>
+
+                <div className="max-w-xl mx-auto space-y-8">
+                  <div className="space-y-4">
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Add Collaborator by Email</label>
+                    <div className="flex gap-2">
+                      <input 
+                        type="email"
+                        value={newCollaborator}
+                        onChange={(e) => setNewCollaborator(e.target.value)}
+                        placeholder="e.g. colleague@example.com"
+                        className="flex-1 bg-[#111111] border border-white/5 rounded-2xl p-4 text-white text-xs focus:outline-none focus:border-[#0097A7]"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (newCollaborator.trim()) {
+                              updateFormData({ collaborators: [...(formData.collaborators || []), newCollaborator.trim()] });
+                              setNewCollaborator('');
+                            }
+                          }
+                        }}
+                      />
+                      <button
+                        onClick={() => {
+                          if (newCollaborator.trim()) {
+                            updateFormData({ collaborators: [...(formData.collaborators || []), newCollaborator.trim()] });
+                            setNewCollaborator('');
+                          }
+                        }}
+                        className="px-6 py-4 bg-white text-black rounded-2xl font-black uppercase text-[10px] tracking-widest hover:scale-105 transition-all"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Current Collaborators</label>
+                    <div className="space-y-2">
+                      {formData.collaborators?.length === 0 ? (
+                        <p className="text-xs text-gray-600 italic">No collaborators added yet.</p>
+                      ) : (
+                        formData.collaborators?.map((email, i) => (
+                          <div key={i} className="flex items-center justify-between p-4 bg-[#111111] border border-white/5 rounded-2xl group">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-[#0097A7]/10 rounded-full flex items-center justify-center text-[#0097A7] text-[10px] font-bold">
+                                {email[0].toUpperCase()}
+                              </div>
+                              <span className="text-xs text-gray-300">{email}</span>
+                            </div>
+                            <button
+                              onClick={() => updateFormData({ collaborators: formData.collaborators?.filter((_, idx) => idx !== i) })}
+                              className="p-2 text-gray-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="p-6 bg-[#0097A7]/5 border border-[#0097A7]/20 rounded-3xl">
+                    <p className="text-[10px] text-gray-500 leading-relaxed">
+                      <span className="text-[#0097A7] font-black uppercase tracking-widest block mb-1">How it works:</span>
+                      Collaborators can view your project, assets, and workflows when they sign in with their own Google account. They cannot delete the project or change its settings.
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {step === 7 && (
+              <motion.div
+                key="step7"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-8"
+              >
+                <div className="text-center space-y-2">
                   <h3 className="text-4xl font-black text-white tracking-tighter">
                     {mode === 'edit' ? 'Update your mission' : 'Your project is ready'}
                   </h3>
@@ -705,6 +792,19 @@ export default function ProjectCreationOverlay({
                   </div>
 
                   <div className="space-y-4">
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Collaborators</label>
+                    <div className="flex flex-wrap gap-2">
+                      {formData.collaborators?.length === 0 ? (
+                        <span className="text-xs text-gray-600 italic">No collaborators</span>
+                      ) : (
+                        formData.collaborators?.map(email => (
+                          <span key={email} className="px-3 py-1 bg-[#0097A7]/10 text-[#0097A7] rounded-lg text-[9px] font-bold">{email}</span>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
                     <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">AI Instructions Preview</label>
                     <p className="text-xs text-gray-400 leading-relaxed italic line-clamp-3">
                       "{formData.aiInstructions || 'No instructions generated yet.'}"
@@ -729,7 +829,7 @@ export default function ProjectCreationOverlay({
 
           <div className="flex items-center gap-4">
             <div className="flex gap-1.5">
-              {Array.from({ length: 6 }).map((_, i) => (
+              {Array.from({ length: 7 }).map((_, i) => (
                 <div 
                   key={i} 
                   className={`w-1.5 h-1.5 rounded-full transition-all ${step === i + 1 ? 'w-6 bg-[#0097A7]' : 'bg-white/10'}`} 
@@ -738,7 +838,7 @@ export default function ProjectCreationOverlay({
             </div>
           </div>
 
-          {step === 6 ? (
+          {step === 7 ? (
             <button
               onClick={handleSubmit}
               className="flex items-center gap-2 px-10 py-4 bg-[#0097A7] text-white rounded-2xl font-black uppercase text-[11px] tracking-[0.2em] hover:scale-105 transition-all shadow-[0_0_30px_rgba(0,151,167,0.3)]"

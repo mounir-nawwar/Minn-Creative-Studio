@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Handle, Position } from 'reactflow';
 import { Library, Search, Tag, Plus, Save, Loader2, Trash2 } from 'lucide-react';
+import { API_BASE } from '../constants';
 
 const PromptLibraryNode = ({ data, id }: any) => {
   const [prompts, setPrompts] = useState<any[]>([]);
@@ -15,7 +16,7 @@ const PromptLibraryNode = ({ data, id }: any) => {
   const fetchPrompts = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('/api/prompts');
+      const response = await fetch(`${API_BASE}/prompts`);
       const result = await response.json();
       setPrompts(result);
     } catch (err) {

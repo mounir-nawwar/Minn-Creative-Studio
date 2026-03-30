@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
 import { Video, Loader2 } from 'lucide-react';
+import { API_BASE } from '../constants';
 
 const VideoMatteNode = ({ id, data }: any) => {
   const [blur, setBlur] = useState(data.config?.blur || 0);
@@ -26,7 +27,7 @@ const VideoMatteNode = ({ id, data }: any) => {
     updateNodeData(id, { isRunning: true, error: null, progress: 10 });
 
     try {
-      const response = await fetch('/api/video/process', {
+      const response = await fetch(`${API_BASE}/video/process`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ videoUrl, type: 'matte', config: { blur, threshold } })

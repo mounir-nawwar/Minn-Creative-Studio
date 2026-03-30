@@ -83,7 +83,6 @@ export default function ChatDrawer() {
     if (!user || !currentProject) return;
     const q = query(
       collection(db, 'chats'),
-      where('userId', '==', user.uid),
       where('projectId', '==', currentProject.id),
       orderBy('createdAt', 'desc')
     );

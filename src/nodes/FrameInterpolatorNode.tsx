@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
 import { Zap, Loader2, Video } from 'lucide-react';
+import { API_BASE } from '../constants';
 
 const FrameInterpolatorNode = ({ id, data }: any) => {
   const [targetFps, setTargetFps] = useState(data.config?.targetFps || 24);
@@ -25,7 +26,7 @@ const FrameInterpolatorNode = ({ id, data }: any) => {
     updateNodeData(id, { isRunning: true, error: null, progress: 10 });
 
     try {
-      const response = await fetch('/api/interpolate', {
+      const response = await fetch(`${API_BASE}/interpolate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ videoUrl, targetFps })

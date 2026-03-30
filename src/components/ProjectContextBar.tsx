@@ -1,11 +1,11 @@
 import React from 'react';
 import { useProjectStore } from '../store/useProjectStore';
 import { PROJECT_TYPES } from '../types/project.types';
-import { Settings, ArrowLeftRight, Briefcase, Calendar, ChevronRight } from 'lucide-react';
-import { motion } from 'motion/react';
+import { Settings, ArrowLeftRight, Briefcase, Calendar, ChevronRight, PanelLeftOpen } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 
 export default function ProjectContextBar() {
-  const { currentProject, clearProject, openSettings } = useProjectStore();
+  const { currentProject, clearProject, openSettings, isSidebarOpen, toggleSidebar } = useProjectStore();
   
   if (!currentProject) return null;
 
@@ -14,6 +14,21 @@ export default function ProjectContextBar() {
   return (
     <div className="h-12 bg-black border-b border-white/5 flex items-center justify-between px-6 relative z-50">
       <div className="flex items-center gap-6">
+        <AnimatePresence>
+          {!isSidebarOpen && (
+            <motion.button
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              onClick={toggleSidebar}
+              className="p-2 -ml-2 text-gray-400 hover:text-[#0097A7] transition-colors rounded-lg hover:bg-white/5"
+              title="Open Sidebar"
+            >
+              <PanelLeftOpen className="w-4 h-4" />
+            </motion.button>
+          )}
+        </AnimatePresence>
+
         {/* Project Info */}
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-[#111111] border border-white/5 rounded-lg flex items-center justify-center text-lg grayscale group-hover:grayscale-0 transition-all">

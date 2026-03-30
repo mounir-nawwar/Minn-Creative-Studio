@@ -38,7 +38,6 @@ export function useAssets() {
 
     const q = query(
       collection(db, `projects/${currentProject.id}/assets`),
-      where('userId', '==', auth.currentUser.uid),
       orderBy('createdAt', 'desc')
     );
 
@@ -56,7 +55,7 @@ export function useAssets() {
     return () => unsubscribe();
   }, [currentProject, auth.currentUser]);
 
-  const uploadAsset = async (file: File) => {
+  const uploadAsset = async (file: File, onProgress?: (progress: number) => void) => {
     if (!currentProject || !auth.currentUser) throw new Error('No project selected');
 
     const fileId = `${Date.now()}-${file.name}`;
@@ -69,6 +68,7 @@ export function useAssets() {
         (snapshot) => {
           const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
           setUploadProgress(prev => ({ ...prev, [fileId]: progress }));
+          if (onProgress) onProgress(progress);
         },
         (error) => {
           console.error("Upload error:", error);
@@ -112,6 +112,15 @@ export function useAssets() {
         }
       );
     });
+  };
+
+  const uploadBase64 = async (base64: string, fileName: string, type: AssetType) => {
+    if (!currentProject || !auth.currentUser) throw new Error('No project selected');
+
+    const res = await fetch(base64);
+    const blob = await res.blob();
+    const file = new File([blob], fileName, { type: blob.type });
+    return uploadAsset(file);
   };
 
   const addAsset = async (assetData: Partial<Asset>) => {
@@ -162,6 +171,7 @@ export function useAssets() {
     loading,
     uploadProgress,
     uploadAsset,
+    uploadBase64,
     addAsset,
     updateAsset,
     deleteAsset,

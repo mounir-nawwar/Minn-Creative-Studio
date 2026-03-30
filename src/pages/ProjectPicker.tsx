@@ -148,6 +148,7 @@ export default function ProjectPicker() {
                 <ProjectCard
                   key={project.id}
                   project={project}
+                  isShared={project.userId !== auth.currentUser?.uid}
                   onClick={() => selectProject(project)}
                   onDelete={() => deleteProject(project.id)}
                 />

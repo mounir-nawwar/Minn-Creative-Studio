@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, User } from 'firebase/auth';
-import { getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, serverTimestamp, Timestamp, limit } from 'firebase/firestore';
+import { getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, or, orderBy, serverTimestamp, Timestamp, limit } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 
 // Import the Firebase configuration
@@ -82,6 +82,7 @@ export {
   onSnapshot, 
   query, 
   where, 
+  or,
   orderBy, 
   serverTimestamp, 
   Timestamp,

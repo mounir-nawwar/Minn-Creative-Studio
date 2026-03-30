@@ -3,38 +3,32 @@ import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
 import { Video, Upload, X, Loader2 } from 'lucide-react';
 
+import { useAssets } from '../hooks/useAssets';
+
 const VideoUploadNode = ({ id, data }: any) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const updateNodeData = useStore((state) => state.updateNodeData);
+  const { uploadAsset } = useAssets();
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Check file size (limit to 20MB for browser-side base64)
-    if (file.size > 20 * 1024 * 1024) {
-      updateNodeData(id, { error: 'Video file too large (max 20MB)' });
-      return;
-    }
-
-    setIsUploading(true);
-    updateNodeData(id, { error: null });
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const videoUrl = e.target?.result as string;
+    updateNodeData(id, { isRunning: true, error: null, progress: 0 });
+    try {
+      const asset = await uploadAsset(file, (p) => updateNodeData(id, { progress: p }));
       updateNodeData(id, { 
-        output: videoUrl, 
+        output: asset.url, 
+        isRunning: false,
+        progress: 100,
         config: { ...data.config, fileName: file.name } 
       });
+    } catch (error) {
+      updateNodeData(id, { error: 'Failed to upload video file', isRunning: false, progress: 0 });
+    } finally {
       setIsUploading(false);
-    };
-    reader.onerror = () => {
-      updateNodeData(id, { error: 'Failed to read video file' });
-      setIsUploading(false);
-    };
-    reader.readAsDataURL(file);
+    }
   };
 
   const triggerUpload = () => {

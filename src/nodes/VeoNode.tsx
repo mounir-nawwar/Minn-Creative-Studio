@@ -8,7 +8,7 @@ import ReferenceStrip from '../components/ReferenceStrip';
 import { Video, Loader2, AlertCircle } from 'lucide-react';
 import { generateVideo } from '../services/geminiService';
 import { db, auth } from '../firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { useAssets } from '../hooks/useAssets';
 
 const VeoNode = ({ id, data }: any) => {
   const [model, setModel] = useState(data.config?.model || 'veo-3.1-fast-generate-preview');
@@ -22,6 +22,7 @@ const VeoNode = ({ id, data }: any) => {
   const edges = useStore((state) => state.edges);
   const nodes = useStore((state) => state.nodes);
   const { currentProject } = useProjectStore();
+  const { uploadBase64 } = useAssets();
 
   const referenceImages = useMemo(() => {
     const refEdges = edges.filter(e => e.target === id && e.targetHandle === 'reference');
@@ -123,38 +124,24 @@ const VeoNode = ({ id, data }: any) => {
         })),
         motionIntensity: parameters.motionIntensity,
         videoUrl: inputVideo,
-        projectContext
+        projectContext,
+        onProgress: (p) => updateNodeData(id, { progress: p })
       });
 
-      updateNodeData(id, { output: videoUrl, isRunning: false, progress: 100 });
+      // Show immediately to the user
+      updateNodeData(id, { output: videoUrl, progress: 95 });
 
-      // Save to Project Assets
-      if (currentProject && auth.currentUser) {
-        try {
-          await addDoc(collection(db, 'projects', currentProject.id, 'assets'), {
-            name: `Generated Video - ${new Date().toLocaleTimeString()}`,
-            type: 'video',
-            url: videoUrl,
-            userId: auth.currentUser.uid,
-            nodeId: id,
-            workflowId: 'current',
-            createdAt: serverTimestamp(),
-            isFavorited: false,
-            metadata: {
-              model,
-              prompt: finalPrompt,
-              rawPrompt: prompt,
-              aspectRatio,
-              resolution,
-              duration,
-              style,
-              motionIntensity: parameters.motionIntensity,
-            }
-          });
-        } catch (assetErr) {
-          console.error("Failed to save asset to library:", assetErr);
-        }
-      }
+      // Upload to Storage in the background to get a permanent URL and avoid Firestore size limits
+      const fileName = `Generated Video - ${new Date().toLocaleTimeString()}.mp4`;
+      uploadBase64(videoUrl, fileName, 'video')
+        .then(asset => {
+          updateNodeData(id, { output: asset.url, isRunning: false, progress: 100 });
+        })
+        .catch(err => {
+          console.error("Background upload failed:", err);
+          updateNodeData(id, { isRunning: false, progress: 100 });
+        });
+
     } catch (err: any) {
       updateNodeData(id, { error: err.message, isRunning: false });
     }

@@ -5,6 +5,7 @@ interface ProjectStore {
   currentProject: Project | null;
   activeWorkflowId: string | null;
   isSettingsOpen: boolean;
+  isSidebarOpen: boolean;
   settingsMode: 'create' | 'edit';
   setCurrentProject: (project: Project | null) => void;
   setActiveWorkflowId: (id: string | null) => void;
@@ -12,12 +13,15 @@ interface ProjectStore {
   updateProject: (updates: Partial<Project>) => void;
   openSettings: (mode?: 'create' | 'edit') => void;
   closeSettings: () => void;
+  toggleSidebar: () => void;
+  setSidebarOpen: (open: boolean) => void;
 }
 
 export const useProjectStore = create<ProjectStore>((set) => ({
   currentProject: null,
   activeWorkflowId: null,
   isSettingsOpen: false,
+  isSidebarOpen: true,
   settingsMode: 'create',
   setCurrentProject: (project) => set({ currentProject: project }),
   setActiveWorkflowId: (id) => set({ activeWorkflowId: id }),
@@ -27,4 +31,6 @@ export const useProjectStore = create<ProjectStore>((set) => ({
   })),
   openSettings: (mode = 'create') => set({ isSettingsOpen: true, settingsMode: mode }),
   closeSettings: () => set({ isSettingsOpen: false }),
+  toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
+  setSidebarOpen: (open) => set({ isSidebarOpen: open }),
 }));

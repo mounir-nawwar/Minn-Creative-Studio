@@ -5,12 +5,13 @@ import { motion } from 'motion/react';
 
 interface ProjectCardProps {
   project: Project;
+  isShared?: boolean;
   onClick: () => void;
   onDelete: () => void;
   key?: string | number;
 }
 
-export default function ProjectCard({ project, onClick, onDelete }: ProjectCardProps) {
+export default function ProjectCard({ project, isShared, onClick, onDelete }: ProjectCardProps) {
   const projectType = PROJECT_TYPES[project.type as keyof typeof PROJECT_TYPES] || PROJECT_TYPES.personal;
   
   const formatDate = (timestamp: any) => {
@@ -43,23 +44,35 @@ export default function ProjectCard({ project, onClick, onDelete }: ProjectCardP
         )}
         
         {/* Status Badge */}
-        <div className="absolute top-4 left-4 px-3 py-1 bg-black/60 backdrop-blur-md rounded-full border border-white/10">
-          <div className="flex items-center gap-2">
-            <div className={`w-1.5 h-1.5 rounded-full ${project.status === 'active' ? 'bg-[#0097A7] animate-pulse' : 'bg-gray-500'}`} />
-            <span className="text-[9px] font-black text-white uppercase tracking-widest">{project.status}</span>
+        <div className="absolute top-4 left-4 flex flex-col gap-2">
+          <div className="px-3 py-1 bg-black/60 backdrop-blur-md rounded-full border border-white/10">
+            <div className="flex items-center gap-2">
+              <div className={`w-1.5 h-1.5 rounded-full ${project.status === 'active' ? 'bg-[#0097A7] animate-pulse' : 'bg-gray-500'}`} />
+              <span className="text-[9px] font-black text-white uppercase tracking-widest">{project.status}</span>
+            </div>
           </div>
+          {isShared && (
+            <div className="px-3 py-1 bg-[#0097A7]/20 backdrop-blur-md rounded-full border border-[#0097A7]/30">
+              <div className="flex items-center gap-2">
+                <User className="w-2.5 h-2.5 text-[#0097A7]" />
+                <span className="text-[9px] font-black text-[#0097A7] uppercase tracking-widest">Shared</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Delete Button */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
-          className="absolute top-4 right-4 p-2 bg-black/60 backdrop-blur-md rounded-full border border-white/10 text-gray-500 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
+        {!isShared && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            className="absolute top-4 right-4 p-2 bg-black/60 backdrop-blur-md rounded-full border border-white/10 text-gray-500 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* Content */}

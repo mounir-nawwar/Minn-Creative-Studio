@@ -3,12 +3,14 @@ import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
 import { generateAudio } from '../services/geminiService';
 import AudioPreview from '../components/AudioPreview';
+import { useAssets } from '../hooks/useAssets';
 
 const LyriaNode = ({ id, data }: any) => {
   const [duration, setDuration] = useState(data.config?.duration || 10);
   const [style, setStyle] = useState(data.config?.style || 'Cinematic');
   const [voice, setVoice] = useState(data.config?.voice || 'Kore');
   const updateNodeData = useStore((state) => state.updateNodeData);
+  const { uploadBase64 } = useAssets();
 
   const handleRun = async () => {
     const state = useStore.getState();
@@ -26,15 +28,31 @@ const LyriaNode = ({ id, data }: any) => {
       return;
     }
 
-    updateNodeData(id, { isRunning: true, error: undefined });
+    updateNodeData(id, { isRunning: true, error: undefined, progress: 10 });
 
     try {
+      updateNodeData(id, { progress: 30 });
       const audioUrl = await generateAudio({
         prompt: `Generate ${style} music/speech for ${duration} seconds: ${prompt}`,
         voice
       });
 
-      updateNodeData(id, { output: audioUrl, isRunning: false });
+      updateNodeData(id, { progress: 80 });
+
+      // Show immediately to the user
+      updateNodeData(id, { output: audioUrl, progress: 90 });
+
+      // Upload to Storage in the background to get a permanent URL and avoid Firestore size limits
+      const fileName = `Generated Audio - ${new Date().toLocaleTimeString()}.wav`;
+      uploadBase64(audioUrl, fileName, 'audio')
+        .then(asset => {
+          updateNodeData(id, { output: asset.url, isRunning: false, progress: 100 });
+        })
+        .catch(err => {
+          console.error("Background upload failed:", err);
+          updateNodeData(id, { isRunning: false, progress: 100 });
+        });
+
     } catch (err: any) {
       updateNodeData(id, { error: err.message, isRunning: false });
     }

@@ -8,7 +8,7 @@ import ReferenceStrip from '../components/ReferenceStrip';
 import { ImageIcon, Loader2 } from 'lucide-react';
 import { generateImage } from '../services/geminiService';
 import { db, auth } from '../firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { useAssets } from '../hooks/useAssets';
 
 const ImagenNode = ({ id, data }: any) => {
   const [model, setModel] = useState(data.config?.model || 'gemini-2.5-flash-image');
@@ -22,6 +22,7 @@ const ImagenNode = ({ id, data }: any) => {
   const edges = useStore((state) => state.edges);
   const nodes = useStore((state) => state.nodes);
   const { currentProject } = useProjectStore();
+  const { uploadBase64 } = useAssets();
 
   const isNanoBanana = model.includes('flash') || model.includes('pro');
 
@@ -75,7 +76,7 @@ const ImagenNode = ({ id, data }: any) => {
       return;
     }
 
-    updateNodeData(id, { isRunning: true, error: undefined, progress: 10 });
+    updateNodeData(id, { isRunning: true, error: undefined, progress: 5 });
 
     // Construct project context string
     const projectContext = currentProject ? `
@@ -89,6 +90,9 @@ const ImagenNode = ({ id, data }: any) => {
 
     try {
       const finalPrompt = isNanoBanana ? prompt : `${prompt} in ${style} style. ${negativePrompt ? `Avoid: ${negativePrompt}` : ''}`;
+      
+      updateNodeData(id, { progress: 20 });
+      
       const imageUrl = await generateImage({
         prompt: finalPrompt,
         model,
@@ -105,35 +109,22 @@ const ImagenNode = ({ id, data }: any) => {
         projectContext
       });
 
-      updateNodeData(id, { output: imageUrl, isRunning: false, progress: 100 });
+      updateNodeData(id, { progress: 80 });
 
-      // Save to Project Assets
-      if (currentProject && auth.currentUser) {
-        try {
-          await addDoc(collection(db, 'projects', currentProject.id, 'assets'), {
-            name: `Generated Image - ${new Date().toLocaleTimeString()}`,
-            type: 'image',
-            url: imageUrl,
-            userId: auth.currentUser.uid,
-            nodeId: id,
-            workflowId: 'current',
-            createdAt: serverTimestamp(),
-            isFavorited: false,
-            metadata: {
-              model,
-              prompt: finalPrompt,
-              rawPrompt: prompt,
-              negativePrompt,
-              aspectRatio,
-              imageSize,
-              style,
-              seed: parameters.seed,
-            }
-          });
-        } catch (assetErr) {
-          console.error("Failed to save asset to library:", assetErr);
-        }
-      }
+      // Show immediately to the user
+      updateNodeData(id, { output: imageUrl, progress: 90 });
+
+      // Upload to Storage in the background to get a permanent URL and avoid Firestore size limits
+      const fileName = `Generated Image - ${new Date().toLocaleTimeString()}.png`;
+      uploadBase64(imageUrl, fileName, 'image')
+        .then(asset => {
+          updateNodeData(id, { output: asset.url, isRunning: false, progress: 100 });
+        })
+        .catch(err => {
+          console.error("Background upload failed:", err);
+          updateNodeData(id, { isRunning: false, progress: 100 }); // Still stop running even if upload fails
+        });
+
     } catch (err: any) {
       updateNodeData(id, { error: err.message, isRunning: false });
     }

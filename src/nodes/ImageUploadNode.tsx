@@ -1,9 +1,11 @@
 import React, { useState, useRef } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
+import { useProjectStore } from '../store/useProjectStore';
 import { Upload, X, ImageIcon, Loader2, Library } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import AssetGrid from '../components/AssetGrid';
+import { API_BASE } from '../constants';
 
 const ImageUploadNode = ({ id, data }: any) => {
   const [imageUrl, setImageUrl] = useState<string | null>(data.output || null);
@@ -11,24 +13,45 @@ const ImageUploadNode = ({ id, data }: any) => {
   const [activeTab, setActiveTab] = useState<'upload' | 'assets'>('upload');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const updateNodeData = useStore((state) => state.updateNodeData);
+  const { currentProject } = useProjectStore();
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !currentProject) return;
 
     setIsUploading(true);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result as string;
-      setImageUrl(result);
-      updateNodeData(id, { output: result, isRunning: false });
+    updateNodeData(id, { isRunning: true });
+    
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('projectId', currentProject.id);
+
+      const response = await fetch(`${API_BASE}/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Upload failed');
+      }
+      
+      const { url } = await response.json();
+
+      // Store the Firebase Storage URL — short string, safe to save in Firestore
+      setImageUrl(url);
+      updateNodeData(id, { 
+        output: url, 
+        isRunning: false, 
+        config: { ...data.config, url } 
+      });
       setIsUploading(false);
-    };
-    reader.onerror = () => {
-      updateNodeData(id, { error: "Failed to read file", isRunning: false });
+    } catch (err: any) {
+      console.error('Upload error:', err);
+      updateNodeData(id, { error: err.message, isRunning: false });
       setIsUploading(false);
-    };
-    reader.readAsDataURL(file);
+    }
   };
 
   const handleAssetSelect = (asset: any) => {

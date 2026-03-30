@@ -46,6 +46,11 @@ export default function AssetGrid({ onAssetClick, isPicker = false }: AssetGridP
         console.error(`Failed to upload ${file.name}:`, err);
       }
     }
+
+    // Reset input value to allow re-uploading same file
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const onDragOver = (e: React.DragEvent) => {
