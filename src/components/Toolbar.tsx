@@ -1,20 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User } from 'firebase/auth';
-import { 
-  Play, 
-  Save, 
-  FolderOpen, 
-  Trash2, 
-  X, 
-  Clock, 
-  Loader2, 
+import {
+  Play,
+  Save,
+  Trash2,
+  X,
+  Clock,
+  Loader2,
   ChevronDown,
   Zap,
-  Settings,
-  Share2,
   User as UserIcon,
   LogOut
 } from 'lucide-react';
+import ToggleSwitch from './ToggleSwitch';
 import { useStore } from '../store/useStore';
 import { useProjectStore } from '../store/useProjectStore';
 import { db, auth } from '../firebase';
@@ -41,7 +39,7 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
   const setNodes = useStore((state) => state.setNodes);
   const setEdges = useStore((state) => state.setEdges);
   const updateNodeData = useStore((state) => state.updateNodeData);
-  const { currentProject, activeWorkflowId, setActiveWorkflowId } = useProjectStore();
+  const { currentProject, activeWorkflowId, setActiveWorkflowId, uploadEnabled, setUploadEnabled } = useProjectStore();
   
   const [isSaving, setIsSaving] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -197,6 +195,10 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
     setHasUnsavedChanges(false);
   };
 
+  const handleUploadToggle = (checked: boolean) => {
+    setUploadEnabled(checked);
+  };
+
   const handleRunAll = () => {
     const nodesToRun = nodes.filter(n => 
       ['prompt', 'vision', 'imagen', 'nanoBanana', 'veo', 'imageToVideo', 'lyria'].includes(n.data.type)
@@ -279,15 +281,13 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
       </div>
 
       <div className="flex items-center gap-3">
-        <button className="flex items-center gap-2 px-4 py-2 bg-[#111111] border border-[#1a1a1a] rounded-xl text-[10px] font-black text-gray-400 hover:text-white hover:border-[#0097A7]/50 transition-all uppercase tracking-widest">
-          <Settings className="w-3.5 h-3.5" />
-          Settings
-        </button>
-        <button className="flex items-center gap-2 px-4 py-2 bg-[#111111] border border-[#1a1a1a] rounded-xl text-[10px] font-black text-gray-400 hover:text-white hover:border-[#0097A7]/50 transition-all uppercase tracking-widest">
-          <Share2 className="w-3.5 h-3.5" />
-          Share
-        </button>
-        <button 
+        {/* Global Upload Toggle */}
+        <div className="flex items-center gap-2">
+          <span className="text-[9px] font-black uppercase tracking-widest text-gray-500">Upload</span>
+          <ToggleSwitch checked={uploadEnabled} onChange={handleUploadToggle} size="navbar" />
+        </div>
+
+        <button
           onClick={handleRunAll}
           className="flex items-center gap-2 px-6 py-2 bg-[#0097A7] hover:bg-[#00838F] text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-[0_0_20px_rgba(0,151,167,0.3)] hover:scale-105"
         >

@@ -115,18 +115,18 @@ export default function AssetGrid({ onAssetClick, isPicker = false }: AssetGridP
       onDrop={onDrop}
     >
       {/* Filters & Search */}
-      <div className="p-4 border-b border-white/5 space-y-4">
+      <div className={`border-b border-white/5 space-y-2 ${isPicker ? 'p-2' : 'p-4 space-y-4'}`}>
         {!isPicker && (
           <div className="flex flex-col gap-3">
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              onChange={(e) => handleFiles(e.target.files)} 
-              className="hidden" 
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={(e) => handleFiles(e.target.files)}
+              className="hidden"
               multiple
               accept="image/*,video/*,audio/*"
             />
-            <button 
+            <button
               onClick={() => fileInputRef.current?.click()}
               className="w-full py-3 bg-[#0097A7] hover:bg-[#00838F] text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(0,151,167,0.2)]"
             >
@@ -149,7 +149,7 @@ export default function AssetGrid({ onAssetClick, isPicker = false }: AssetGridP
                     <span className="text-[#0097A7]">{Math.round(progress as number)}%</span>
                   </div>
                   <div className="h-1 bg-white/5 rounded-full overflow-hidden">
-                    <motion.div 
+                    <motion.div
                       className="h-full bg-[#0097A7]"
                       initial={{ width: 0 }}
                       animate={{ width: `${progress as number}%` }}
@@ -162,25 +162,25 @@ export default function AssetGrid({ onAssetClick, isPicker = false }: AssetGridP
         )}
 
         <div className="relative group">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-600 group-focus-within:text-[#0097A7] transition-colors" />
-          <input 
+          <Search className={`absolute top-1/2 -translate-y-1/2 text-gray-600 group-focus-within:text-[#0097A7] transition-colors ${isPicker ? 'left-2 w-3 h-3' : 'left-3 w-3.5 h-3.5'}`} />
+          <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search assets..."
-            className="w-full bg-black border border-white/5 rounded-xl py-2.5 pl-10 pr-4 text-[11px] font-bold text-white focus:outline-none focus:border-[#0097A7] transition-all"
+            className={`w-full bg-black/60 border border-white/5 rounded-lg text-white focus:outline-none focus:border-[#0097A7]/50 transition-all ${isPicker ? 'py-1.5 pl-7 pr-3 text-[10px]' : 'py-2.5 pl-10 pr-4 text-[11px] font-bold rounded-xl border'}`}
           />
         </div>
-        
-        <div className="flex flex-wrap gap-2">
+
+        <div className={`flex gap-1.5 ${isPicker ? 'overflow-x-auto pb-0.5 scrollbar-none' : 'flex-wrap gap-2'}`}>
           {['all', 'image', 'video', 'audio', 'reference'].map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f as any)}
-              className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border ${
-                filter === f 
-                ? 'bg-[#0097A7] text-white border-[#0097A7]' 
-                : 'bg-white/5 text-gray-500 border-white/5 hover:border-white/10'
+              className={`shrink-0 uppercase tracking-widest font-black transition-all border ${
+                isPicker
+                  ? `px-2 py-1 rounded-md text-[8px] ${filter === f ? 'bg-[#0097A7] text-white border-[#0097A7]' : 'bg-white/5 text-gray-500 border-white/5 hover:border-white/10'}`
+                  : `px-3 py-1.5 rounded-lg text-[9px] ${filter === f ? 'bg-[#0097A7] text-white border-[#0097A7]' : 'bg-white/5 text-gray-500 border-white/5 hover:border-white/10'}`
               }`}
             >
               {f}
@@ -190,7 +190,7 @@ export default function AssetGrid({ onAssetClick, isPicker = false }: AssetGridP
       </div>
 
       {/* Grid */}
-      <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+      <div className={`flex-1 overflow-y-auto custom-scrollbar ${isPicker ? 'p-2' : 'p-4'}`}>
         {filteredAssets.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-4">
             <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center">
@@ -199,7 +199,7 @@ export default function AssetGrid({ onAssetClick, isPicker = false }: AssetGridP
             <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">No assets found</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-4">
+          <div className={`grid grid-cols-2 ${isPicker ? 'gap-2' : 'gap-4'}`}>
             {filteredAssets.map((asset) => {
               const Icon = getIcon(asset.type);
               return (
@@ -208,7 +208,7 @@ export default function AssetGrid({ onAssetClick, isPicker = false }: AssetGridP
                   key={asset.id}
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="group relative aspect-square bg-[#111111] border border-white/5 rounded-2xl overflow-hidden cursor-pointer hover:border-[#0097A7]/50 transition-all"
+                  className={`group relative aspect-square bg-[#111111] border border-white/5 overflow-hidden cursor-pointer hover:border-[#0097A7]/50 transition-all ${isPicker ? 'rounded-xl' : 'rounded-2xl'}`}
                   onClick={() => onAssetClick?.(asset)}
                 >
                   {asset.type === 'image' || asset.type === 'video' ? (

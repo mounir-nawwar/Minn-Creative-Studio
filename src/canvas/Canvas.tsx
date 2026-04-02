@@ -29,7 +29,7 @@ const CanvasContent = () => {
     addNode,
   } = useStore();
 
-  const { activeWorkflowId } = useProjectStore();
+  const { activeWorkflowId, uploadEnabled } = useProjectStore();
   const { screenToFlowPosition } = useReactFlow();
   const [ghostPos, setGhostPos] = useState({ x: 0, y: 0 });
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -104,6 +104,9 @@ const CanvasContent = () => {
         type: nodeType as any,
         config: {},
       };
+      if (nodeType === 'imageUpload' || nodeType === 'videoUpload') {
+        nodeData.uploadEnabled = uploadEnabled;
+      }
       addNode({
         id: `${nodeType}-${Date.now()}`,
         type: nodeType,

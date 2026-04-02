@@ -54,7 +54,7 @@ export function useAssets() {
   /**
    * Primary Upload Method - Uses Backend API for maximum reliability (bypasses CORS)
    */
-  const uploadAsset = async (file: File, onProgress?: (progress: number) => void) => {
+  const uploadAsset = async (file: File, onProgress?: (progress: number) => void, signal?: AbortSignal) => {
     if (!currentProject || !auth.currentUser) throw new Error('No project selected');
 
     console.log(`[useAssets] Starting robust upload for: ${file.name}`);
@@ -97,6 +97,8 @@ export function useAssets() {
         };
 
         xhr.onerror = () => reject(new Error('Network error during upload'));
+        xhr.onabort = () => reject(new Error('Upload cancelled'));
+        signal?.addEventListener('abort', () => xhr.abort());
         xhr.send(formData);
       });
 

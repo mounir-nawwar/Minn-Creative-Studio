@@ -7,6 +7,7 @@ interface ProjectStore {
   isSettingsOpen: boolean;
   isSidebarOpen: boolean;
   settingsMode: 'create' | 'edit';
+  uploadEnabled: boolean;
   setCurrentProject: (project: Project | null) => void;
   setActiveWorkflowId: (id: string | null) => void;
   clearProject: () => void;
@@ -15,6 +16,7 @@ interface ProjectStore {
   closeSettings: () => void;
   toggleSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
+  setUploadEnabled: (v: boolean) => void;
 }
 
 export const useProjectStore = create<ProjectStore>((set) => ({
@@ -23,6 +25,7 @@ export const useProjectStore = create<ProjectStore>((set) => ({
   isSettingsOpen: false,
   isSidebarOpen: true,
   settingsMode: 'create',
+  uploadEnabled: true,
   setCurrentProject: (project) => set({ currentProject: project }),
   setActiveWorkflowId: (id) => set({ activeWorkflowId: id }),
   clearProject: () => set({ currentProject: null, activeWorkflowId: null }),
@@ -33,4 +36,5 @@ export const useProjectStore = create<ProjectStore>((set) => ({
   closeSettings: () => set({ isSettingsOpen: false }),
   toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
   setSidebarOpen: (open) => set({ isSidebarOpen: open }),
+  setUploadEnabled: (v) => set({ uploadEnabled: v }),
 }));
