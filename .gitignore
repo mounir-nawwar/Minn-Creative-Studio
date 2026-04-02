@@ -6,3 +6,11 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Scripts with embedded service account keys
+migrate.mjs
+fix-uids.mjs
+
+# Temp deploy files
+*.yaml
+key.json

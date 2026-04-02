@@ -31,6 +31,9 @@ gcloud run deploy minn-studio `
   --region us-west1 `
   --project gen-lang-client-0639313445 `
   --allow-unauthenticated `
+  --clear-base-image `
+  --memory 2Gi `
+  --cpu 2 `
   --set-env-vars "$envString"
 
 Write-Host "Done!"
