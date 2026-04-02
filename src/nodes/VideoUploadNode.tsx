@@ -15,17 +15,37 @@ const VideoUploadNode = ({ id, data }: any) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    updateNodeData(id, { isRunning: true, error: null, progress: 0 });
+    // 1. Instant Preview logic
+    const localUrl = URL.createObjectURL(file);
+    
+    updateNodeData(id, { 
+      output: localUrl, 
+      isRunning: true, 
+      error: null, 
+      progress: 1,
+      config: { ...data.config, fileName: file.name }
+    });
+
+    setIsUploading(true);
+    
     try {
-      const asset = await uploadAsset(file, (p) => updateNodeData(id, { progress: p }));
+      // 2. Background Upload
+      const asset = await uploadAsset(file, (p) => updateNodeData(id, { progress: Math.max(p, 1) }));
+      
+      // Update with permanent URL
       updateNodeData(id, { 
         output: asset.url, 
         isRunning: false,
         progress: 100,
         config: { ...data.config, fileName: file.name } 
       });
-    } catch (error) {
-      updateNodeData(id, { error: 'Failed to upload video file', isRunning: false, progress: 0 });
+      
+      // Cleanup local URL (delayed slightly to avoid flicker if video is playing)
+      setTimeout(() => URL.revokeObjectURL(localUrl), 1000);
+    } catch (error: any) {
+      console.error('Video upload error:', error);
+      // Keep local copy usable
+      updateNodeData(id, { error: `Upload failed (Using local copy): ${error.message}`, isRunning: false });
     } finally {
       setIsUploading(false);
     }

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ShieldCheck, Loader2, AlertCircle } from 'lucide-react';
 import { API_BASE } from '../constants';
+import MinnLogo from '../assets/Minn.svg';
 
 interface CustomLoginPageProps {
   onLoginSuccess: () => void;
@@ -42,10 +43,8 @@ export default function CustomLoginPage({ onLoginSuccess }: CustomLoginPageProps
   return (
     <div className="h-screen w-screen bg-black flex flex-col items-center justify-center p-6">
       <div className="max-w-md w-full space-y-8 text-center">
-        <div className="space-y-2">
-          <h1 className="text-6xl font-black text-white tracking-tighter">
-            MINN <span className="text-[#0097A7]">STUDIO</span>
-          </h1>
+        <div className="space-y-4 flex flex-col items-center">
+          <img src={MinnLogo} alt="MINN STUDIO" className="h-16 w-auto" />
           <p className="text-gray-500 text-sm font-medium">Restricted Access</p>
         </div>
         

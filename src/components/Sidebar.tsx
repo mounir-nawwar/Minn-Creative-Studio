@@ -15,6 +15,7 @@ import {
   Film
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import MinnLogo from '../assets/Minn.svg';
 
 const Sidebar = () => {
   const setPendingNodeType = useStore((state) => state.setPendingNodeType);
@@ -117,10 +118,8 @@ const Sidebar = () => {
   return (
     <div className="w-64 bg-[#111111] border-r border-[#1a1a1a] flex flex-col h-full">
       <div className="p-6 border-b border-[#1a1a1a]">
-        <h1 className="text-xl font-black text-white tracking-tighter flex items-center gap-2">
-          MINN <span className="text-[#0097A7]">STUDIO</span>
-        </h1>
-        <p className="text-[10px] text-gray-500 uppercase font-bold mt-1 tracking-widest">AI Workflow Builder</p>
+        <img src={MinnLogo} alt="MINN STUDIO" className="h-8 w-auto mb-2" />
+        <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">AI Workflow Builder</p>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-8">

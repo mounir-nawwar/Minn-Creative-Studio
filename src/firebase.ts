@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, User } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, User, browserLocalPersistence, setPersistence } from 'firebase/auth';
 import { getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, or, orderBy, serverTimestamp, Timestamp, limit } from 'firebase/firestore';
-import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
+import { getStorage, ref, uploadBytesResumable, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 // Import the Firebase configuration
 import firebaseConfig from '../firebase-applet-config.json';
@@ -9,17 +9,14 @@ import firebaseConfig from '../firebase-applet-config.json';
 // Initialize Firebase SDK
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-export const auth = getAuth();
-export const storage = getStorage(app);
+export const auth = getAuth(app);
+auth.useDeviceLanguage();
+
+export const storage = getStorage(app, firebaseConfig.storageBucket);
 export const googleProvider = new GoogleAuthProvider();
 
 // Auth Helpers
-export const signInWithGoogle = () => {
-  // Use redirect instead of popup to avoid COOP header issues
-  return signInWithRedirect(auth, googleProvider);
-};
-
-export const getGoogleRedirectResult = () => getRedirectResult(auth);
+export const signInWithGoogle = () => signInWithPopup(auth, googleProvider);
 
 export const signOut = () => auth.signOut();
 
@@ -98,6 +95,7 @@ export {
 export {
   ref,
   uploadBytesResumable,
+  uploadBytes,
   getDownloadURL,
   deleteObject
 };

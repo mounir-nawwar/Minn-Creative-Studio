@@ -10,7 +10,7 @@ import ProjectPicker from './pages/ProjectPicker';
 import ProjectCreationOverlay from './components/ProjectCreationOverlay';
 import { useProject } from './hooks/useProject';
 import { AnimatePresence } from 'motion/react';
-import { auth, signInWithGoogle, signOut as firebaseLogOut, db, getGoogleRedirectResult } from './firebase';
+import { auth, signInWithGoogle, signOut as firebaseLogOut, db } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { getDocFromServer, doc } from 'firebase/firestore';
 import { ShieldCheck, Loader2, Key } from 'lucide-react';
@@ -18,6 +18,7 @@ import { useProjectStore } from './store/useProjectStore';
 import { useStore } from './store/useStore';
 import { ReactFlowProvider } from 'reactflow';
 import { AUTHORIZED_EMAILS, isAuthorized, API_BASE } from './constants';
+import MinnLogo from './assets/Minn.svg';
 
 declare global {
   interface Window {
@@ -67,14 +68,6 @@ export default function App() {
     // 2. Listen for Firebase Auth
     console.time("FirebaseAuth");
     
-    // Check for redirect result on page load
-    getGoogleRedirectResult().then((result) => {
-      if (result?.user) {
-        // User came back from Google redirect, session already set by Firebase
-        setUser(result.user);
-      }
-    }).catch(console.error);
-
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       console.log("Firebase Auth state changed:", u ? "User logged in" : "No user");
       setUser(u);
@@ -181,10 +174,8 @@ export default function App() {
     return (
       <div className="h-screen w-screen bg-black flex flex-col items-center justify-center p-6">
         <div className="max-w-md w-full space-y-8 text-center">
-          <div className="space-y-2">
-            <h1 className="text-6xl font-black text-white tracking-tighter">
-              MINN <span className="text-[#0097A7]">STUDIO</span>
-            </h1>
+          <div className="space-y-4 flex flex-col items-center">
+            <img src={MinnLogo} alt="MINN STUDIO" className="h-16 w-auto" />
             <p className="text-gray-500 text-sm font-medium">The Professional AI Creative Pipeline</p>
           </div>
           
@@ -222,8 +213,9 @@ export default function App() {
   if (user && !isAuthorized(user.email)) {
     return (
       <div className="h-screen w-screen bg-black flex flex-col items-center justify-center p-6 text-center">
-        <div className="max-w-md w-full space-y-8">
-          <div className="p-8 bg-[#111111] border border-[#1a1a1a] rounded-3xl space-y-6 shadow-2xl">
+        <div className="max-w-md w-full space-y-8 flex flex-col items-center">
+          <img src={MinnLogo} alt="MINN STUDIO" className="h-12 w-auto mb-4" />
+          <div className="p-8 bg-[#111111] border border-[#1a1a1a] rounded-3xl space-y-6 shadow-2xl w-full">
             <div className="flex justify-center">
               <div className="p-4 bg-red-500/10 rounded-full">
                 <ShieldCheck className="w-12 h-12 text-red-500" />

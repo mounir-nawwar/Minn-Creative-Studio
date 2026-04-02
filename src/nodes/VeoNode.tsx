@@ -1,13 +1,12 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
 import { useProjectStore } from '../store/useProjectStore';
 import { Handle, Position } from 'reactflow';
 import ParameterSlider from '../components/ParameterSlider';
 import ReferenceStrip from '../components/ReferenceStrip';
-import { Video, Loader2, AlertCircle } from 'lucide-react';
+import { Video, Loader2, AlertCircle, XCircle, Download } from 'lucide-react';
 import { generateVideo } from '../services/geminiService';
-import { db, auth } from '../firebase';
 import { useAssets } from '../hooks/useAssets';
 
 const VeoNode = ({ id, data }: any) => {
@@ -23,6 +22,8 @@ const VeoNode = ({ id, data }: any) => {
   const nodes = useStore((state) => state.nodes);
   const { currentProject } = useProjectStore();
   const { uploadBase64 } = useAssets();
+  
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const referenceImages = useMemo(() => {
     const refEdges = edges.filter(e => e.target === id && e.targetHandle === 'reference');
@@ -72,6 +73,24 @@ const VeoNode = ({ id, data }: any) => {
     return duration <= max;
   }, [model, duration]);
 
+  const handleCancel = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      updateNodeData(id, { isRunning: false, progress: 0, error: 'Generation cancelled' });
+    }
+  };
+
+  const handleDownload = () => {
+    if (!data.output) return;
+    const link = document.createElement('a');
+    link.href = data.output;
+    link.download = `generated-video-${Date.now()}.mp4`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleRun = async () => {
     const state = useStore.getState();
     const nodeEdges = state.edges.filter(e => e.target === id);
@@ -95,6 +114,7 @@ const VeoNode = ({ id, data }: any) => {
       return;
     }
 
+    abortControllerRef.current = new AbortController();
     updateNodeData(id, { isRunning: true, error: undefined, progress: 10 });
 
     // Construct project context string
@@ -126,7 +146,7 @@ const VeoNode = ({ id, data }: any) => {
         videoUrl: inputVideo,
         projectContext,
         onProgress: (p) => updateNodeData(id, { progress: p })
-      });
+      }, abortControllerRef.current.signal);
 
       // Show immediately to the user
       updateNodeData(id, { output: videoUrl, progress: 95 });
@@ -143,7 +163,13 @@ const VeoNode = ({ id, data }: any) => {
         });
 
     } catch (err: any) {
-      updateNodeData(id, { error: err.message, isRunning: false });
+      if (err.name === 'AbortError') {
+        console.log('Video generation aborted');
+      } else {
+        updateNodeData(id, { error: err.message, isRunning: false });
+      }
+    } finally {
+      abortControllerRef.current = null;
     }
   };
 
@@ -210,6 +236,9 @@ const VeoNode = ({ id, data }: any) => {
             >
               <option value="16:9">16:9 Wide</option>
               <option value="9:16">9:16 Tall</option>
+              <option value="1:1">1:1 Square</option>
+              <option value="4:3">4:3 Photo</option>
+              <option value="21:9">21:9 Cinema</option>
             </select>
           </div>
           
@@ -225,6 +254,7 @@ const VeoNode = ({ id, data }: any) => {
             >
               <option value="720p">720p</option>
               <option value="1080p">1080p</option>
+              <option value="4K">4K (Ultra)</option>
             </select>
           </div>
 
@@ -314,25 +344,48 @@ const VeoNode = ({ id, data }: any) => {
           color="#FF5722"
         />
 
-        <button
-          onClick={handleRun}
-          disabled={data.isRunning}
-          className="w-full py-2 bg-[#FF5722] hover:bg-[#E64A19] text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-        >
-          {data.isRunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Video className="w-3 h-3" />}
-          {data.isRunning ? "GENERATING..." : "GENERATE VIDEO"}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleRun}
+            disabled={data.isRunning}
+            className="flex-1 py-2 bg-[#FF5722] hover:bg-[#E64A19] text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {data.isRunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Video className="w-3 h-3" />}
+            {data.isRunning ? "GENERATING..." : "GENERATE VIDEO"}
+          </button>
+          
+          {data.isRunning && (
+            <button
+              onClick={handleCancel}
+              className="px-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 rounded-lg transition-all flex items-center justify-center"
+              title="Cancel Generation"
+            >
+              <XCircle className="w-4 h-4" />
+            </button>
+          )}
+        </div>
 
         {data.output && (
-          <div className="mt-2 rounded-lg overflow-hidden border border-[#2a2a2a] bg-[#0a0a0a]">
-            <video 
-              src={data.output} 
-              className="w-full h-auto"
-              controls
-              loop
-              autoPlay
-              muted
-            />
+          <div className="mt-2 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Result Video</span>
+              <button 
+                onClick={handleDownload}
+                className="p-1.5 bg-[#1a1a1a] hover:bg-[#FF5722] text-gray-400 hover:text-white rounded-lg transition-all border border-[#2a2a2a]"
+              >
+                <Download className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="rounded-xl overflow-hidden border border-[#2a2a2a] bg-[#0a0a0a]">
+              <video 
+                src={data.output} 
+                className="w-full h-auto"
+                controls
+                loop
+                autoPlay
+                muted
+              />
+            </div>
           </div>
         )}
       </div>

@@ -12,16 +12,12 @@ import {
   updateDoc, 
   deleteDoc, 
   serverTimestamp,
-  storage,
-  ref,
-  uploadBytesResumable,
-  getDownloadURL,
-  deleteObject,
   handleFirestoreError,
   OperationType
 } from '../firebase';
 import { Asset, AssetType } from '../types/project.types';
 import { useProjectStore } from '../store/useProjectStore';
+import { API_BASE } from '../constants';
 
 export function useAssets() {
   const { currentProject } = useProjectStore();
@@ -55,72 +51,104 @@ export function useAssets() {
     return () => unsubscribe();
   }, [currentProject, auth.currentUser]);
 
+  /**
+   * Primary Upload Method - Uses Backend API for maximum reliability (bypasses CORS)
+   */
   const uploadAsset = async (file: File, onProgress?: (progress: number) => void) => {
     if (!currentProject || !auth.currentUser) throw new Error('No project selected');
 
+    console.log(`[useAssets] Starting robust upload for: ${file.name}`);
     const fileId = `${Date.now()}-${file.name}`;
-    const storageRef = ref(storage, `projects/${currentProject.id}/assets/${fileId}`);
-    const uploadTask = uploadBytesResumable(storageRef, file);
+    
+    // Set initial progress
+    setUploadProgress(prev => ({ ...prev, [fileId]: 1 }));
+    if (onProgress) onProgress(1);
 
-    return new Promise<Asset>((resolve, reject) => {
-      uploadTask.on(
-        'state_changed',
-        (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          setUploadProgress(prev => ({ ...prev, [fileId]: progress }));
-          if (onProgress) onProgress(progress);
-        },
-        (error) => {
-          console.error("Upload error:", error);
-          reject(error);
-        },
-        async () => {
-          try {
-            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-            const type = file.type.startsWith('image') ? 'image' : 
-                         file.type.startsWith('video') ? 'video' : 
-                         file.type.startsWith('audio') ? 'audio' : 'document';
-            
-            const assetData: any = {
-              name: file.name,
-              type,
-              url: downloadURL,
-              thumbnailUrl: downloadURL, // For now use same URL, maybe generate thumb later
-              userId: auth.currentUser!.uid,
-              createdAt: serverTimestamp(),
-              isFavorited: false,
-              tags: [type, 'upload'],
-              metadata: {
-                size: file.size,
-                mimeType: file.type,
-                lastModified: file.lastModified,
-                storagePath: storageRef.fullPath
-              },
-            };
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('projectId', currentProject.id);
 
-            const docRef = await addDoc(collection(db, `projects/${currentProject.id}/assets`), assetData);
-            setUploadProgress(prev => {
-              const next = { ...prev };
-              delete next[fileId];
-              return next;
-            });
-            resolve({ id: docRef.id, ...assetData } as Asset);
-          } catch (error) {
-            handleFirestoreError(error, OperationType.CREATE, `projects/${currentProject.id}/assets`);
-            reject(error);
-          }
-        }
-      );
-    });
+      console.log(`[useAssets] Sending to backend: ${API_BASE}/upload`);
+      
+      const response = await fetch(`${API_BASE}/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || 'Backend upload failed');
+      }
+
+      const { url, fileName: storagePath } = await response.json();
+      console.log(`[useAssets] ✅ Backend upload success: ${url}`);
+      
+      // Finalize by saving metadata to Firestore
+      const asset = await finalizeAsset(file, url, storagePath);
+      
+      setUploadProgress(prev => {
+        const next = { ...prev };
+        delete next[fileId];
+        return next;
+      });
+      
+      if (onProgress) onProgress(100);
+      return asset;
+    } catch (error: any) {
+      console.error(`[useAssets] ❌ Upload failed for ${file.name}:`, error.message);
+      setUploadProgress(prev => {
+        const next = { ...prev };
+        delete next[fileId];
+        return next;
+      });
+      throw error;
+    }
+  };
+
+  const finalizeAsset = async (file: File, url: string, storagePath: string) => {
+    if (!currentProject || !auth.currentUser) throw new Error('Auth required');
+
+    const type = file.type.startsWith('image') ? 'image' : 
+                 file.type.startsWith('video') ? 'video' : 
+                 file.type.startsWith('audio') ? 'audio' : 'document';
+    
+    const assetData: any = {
+      name: file.name,
+      type,
+      url: url,
+      thumbnailUrl: url,
+      userId: auth.currentUser.uid,
+      createdAt: serverTimestamp(),
+      isFavorited: false,
+      tags: [type, 'upload'],
+      metadata: {
+        size: file.size,
+        mimeType: file.type,
+        lastModified: file.lastModified,
+        storagePath: storagePath
+      },
+    };
+
+    console.log('[useAssets] Saving metadata to Firestore...');
+    const docRef = await addDoc(collection(db, `projects/${currentProject.id}/assets`), assetData);
+    console.log('[useAssets] ✅ Metadata saved with ID:', docRef.id);
+    
+    return { id: docRef.id, ...assetData } as Asset;
   };
 
   const uploadBase64 = async (base64: string, fileName: string, type: AssetType) => {
     if (!currentProject || !auth.currentUser) throw new Error('No project selected');
 
-    const res = await fetch(base64);
-    const blob = await res.blob();
-    const file = new File([blob], fileName, { type: blob.type });
-    return uploadAsset(file);
+    try {
+      const res = await fetch(base64);
+      const blob = await res.blob();
+      const file = new File([blob], fileName, { type: blob.type });
+      return uploadAsset(file);
+    } catch (err: any) {
+      console.error('[useAssets] Base64 upload failed:', err.message);
+      throw err;
+    }
   };
 
   const addAsset = async (assetData: Partial<Asset>) => {

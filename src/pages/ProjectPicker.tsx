@@ -5,6 +5,7 @@ import { useProject } from '../hooks/useProject';
 import ProjectCard from '../components/ProjectCard';
 import ProjectCreationOverlay from '../components/ProjectCreationOverlay';
 import { auth, signOut } from '../firebase';
+import MinnLogo from '../assets/Minn.svg';
 
 export default function ProjectPicker() {
   const { projects, loading, createProject, selectProject, deleteProject } = useProject();
@@ -23,8 +24,8 @@ export default function ProjectPicker() {
     return (
       <div className="h-screen w-screen bg-black flex flex-col items-center justify-center gap-6">
         <div className="w-16 h-16 border-4 border-[#0097A7] border-t-transparent rounded-full animate-spin shadow-[0_0_30px_rgba(0,151,167,0.2)]" />
-        <div className="space-y-2 text-center">
-          <h1 className="text-2xl font-black text-white tracking-tighter uppercase">MINN <span className="text-[#0097A7]">STUDIO</span></h1>
+        <div className="space-y-4 text-center flex flex-col items-center">
+          <img src={MinnLogo} alt="MINN STUDIO" className="h-10 w-auto" />
           <p className="text-[10px] text-gray-500 font-bold uppercase tracking-[0.3em] animate-pulse">Loading Projects...</p>
         </div>
       </div>
@@ -37,9 +38,7 @@ export default function ProjectPicker() {
       <header className="fixed top-0 left-0 right-0 h-24 bg-black/80 backdrop-blur-xl border-b border-white/5 z-50 px-12 flex items-center justify-between">
         <div className="flex items-center gap-8">
           <div className="space-y-1">
-            <h1 className="text-3xl font-black text-white tracking-tighter uppercase">
-              MINN <span className="text-[#0097A7]">STUDIO</span>
-            </h1>
+            <img src={MinnLogo} alt="MINN STUDIO" className="h-8 w-auto mb-1" />
             <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Creative Pipeline Management</p>
           </div>
           

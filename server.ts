@@ -6,7 +6,7 @@ import cookieParser from 'cookie-parser';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 import multer from 'multer';
-import { initializeApp, cert, getApps } from 'firebase-admin/app';
+import { initializeApp, cert, getApps, App } from 'firebase-admin/app';
 import { getStorage as getAdminStorage } from 'firebase-admin/storage';
 import { GoogleGenAI } from '@google/genai';
 import firebaseConfig from './firebase-applet-config.json';
@@ -23,50 +23,110 @@ const SESSION_SECRET = process.env.SESSION_SECRET || 'default-secret';
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin';
 
+// --- Firebase Admin Initialization ---
+let adminApp: App | null = null;
+let resolvedBucketName: string | null = null;
+
+const serviceAccountStr = process.env.FIREBASE_SERVICE_ACCOUNT?.trim();
+const configBucketName = (process.env.FIREBASE_STORAGE_BUCKET || firebaseConfig.storageBucket || '').replace('gs://', '').trim();
+
+function initFirebaseAdmin() {
+  if (getApps().length > 0) {
+    adminApp = getApps()[0];
+    return;
+  }
+
+  if (!serviceAccountStr) {
+    console.warn('⚠️  FIREBASE_SERVICE_ACCOUNT not set. Backend uploads will be disabled.');
+    return;
+  }
+
+  try {
+    const sa = JSON.parse(serviceAccountStr);
+    console.log(`[Admin] Initializing for Project: ${sa.project_id}`);
+    
+    adminApp = initializeApp({
+      credential: cert(sa),
+      storageBucket: configBucketName
+    });
+    console.log('✅ Firebase Admin initialized successfully.');
+  } catch (err: any) {
+    console.error('❌ Failed to initialize Firebase Admin:', err.message);
+  }
+}
+
+// Helper to find a working bucket
+async function getWorkingBucket() {
+  if (resolvedBucketName) return getAdminStorage().bucket(resolvedBucketName);
+  
+  const storage = getAdminStorage();
+  const sa = serviceAccountStr ? JSON.parse(serviceAccountStr) : null;
+  const saProjectId = sa?.project_id?.trim();
+
+  const fallbacks = new Set<string>();
+  
+  // 1. Try variations of the Project ID (Most common working buckets)
+  if (saProjectId) {
+    fallbacks.add(`${saProjectId}.appspot.com`);
+    fallbacks.add(`${saProjectId}.firebasestorage.app`);
+    fallbacks.add(saProjectId);
+  }
+  
+  if (firebaseConfig.projectId) {
+    const pid = firebaseConfig.projectId.trim();
+    fallbacks.add(`${pid}.appspot.com`);
+    fallbacks.add(`${pid}.firebasestorage.app`);
+    fallbacks.add(pid);
+  }
+
+  // 2. Try the provided bucket name from env
+  if (configBucketName) {
+    fallbacks.add(configBucketName);
+  }
+
+  console.log(`[Storage] Probing buckets: ${Array.from(fallbacks).join(', ')}`);
+
+  for (const name of Array.from(fallbacks)) {
+    try {
+      const bucket = storage.bucket(name);
+      const [exists] = await bucket.exists();
+      if (exists) {
+        console.log(`[Storage] ✅ Found working bucket: ${name}`);
+        resolvedBucketName = name;
+        return bucket;
+      }
+    } catch (e: any) {
+      console.warn(`[Storage] ⚠️  Bucket ${name} check failed: ${e.message}`);
+    }
+  }
+
+  // 3. Last Resort: List all buckets and pick the first one
+  try {
+    console.log('[Storage] ℹ️  Attempting to list all available buckets...');
+    const [buckets] = await storage.getBuckets();
+    if (buckets.length > 0) {
+      const firstBucket = buckets[0];
+      console.log(`[Storage] ✅ Using first discovered bucket: ${firstBucket.name}`);
+      resolvedBucketName = firstBucket.name;
+      return firstBucket;
+    }
+  } catch (e: any) {
+    console.warn('[Storage] ⚠️  Could not list buckets:', e.message);
+  }
+
+  // Final fallback: try the system default
+  return storage.bucket();
+}
+
+initFirebaseAdmin();
+
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = parseInt(process.env.PORT || '3000');
 
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ extended: true, limit: '50mb' }));
   app.use(cookieParser());
-
-  // Check for required Firebase environment variables
-  let bucketName = process.env.FIREBASE_STORAGE_BUCKET || firebaseConfig.storageBucket;
-  if (bucketName && bucketName.startsWith('gs://')) {
-    bucketName = bucketName.replace('gs://', '');
-  }
-  // Ensure bucketName is not the string "undefined" or "null"
-  if (bucketName === 'undefined' || bucketName === 'null') {
-    bucketName = firebaseConfig.storageBucket;
-  }
-
-  const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
-
-  console.log('--- Firebase Configuration Check ---');
-  console.log(`Config Project ID: ${firebaseConfig.projectId}`);
-  console.log(`Config Storage Bucket: ${firebaseConfig.storageBucket}`);
-  console.log(`Resolved Bucket Name: ${bucketName}`);
-  console.log(`Service Account Present: ${!!serviceAccount}`);
-  if (serviceAccount) {
-    try {
-      const sa = JSON.parse(serviceAccount);
-      console.log(`Service Account Project ID: ${sa.project_id}`);
-      if (sa.project_id !== firebaseConfig.projectId) {
-        console.warn('⚠️  PROJECT ID MISMATCH detected on startup!');
-      }
-    } catch (e) {
-      console.error('❌ Failed to parse Service Account JSON on startup');
-    }
-  }
-  console.log('------------------------------------');
-
-  if (!bucketName || !serviceAccount) {
-    console.warn('\n⚠️  MISSING FIREBASE CONFIGURATION');
-    if (!bucketName) console.warn('   - FIREBASE_STORAGE_BUCKET is not set');
-    if (!serviceAccount) console.warn('   - FIREBASE_SERVICE_ACCOUNT is not set');
-    console.warn('   Please add these to your environment variables in AI Studio Settings.\n');
-  }
 
   const upload = multer({ 
     storage: multer.memoryStorage(), 
@@ -79,117 +139,37 @@ async function startServer() {
     if (!req.file) return res.status(400).json({ error: 'No file provided' });
 
     try {
-      if (!bucketName || !serviceAccount) {
-        throw new Error('Firebase Storage is not configured on the server. Please add FIREBASE_STORAGE_BUCKET and FIREBASE_SERVICE_ACCOUNT.');
+      if (!adminApp) {
+        throw new Error('Firebase Admin is not initialized. Please check FIREBASE_SERVICE_ACCOUNT.');
       }
 
-      // Initialize Firebase Admin if not already done
-      if (!getApps().length) {
-        console.log(`Initializing Firebase Admin with bucket: ${bucketName}`);
-        try {
-          const sa = JSON.parse(serviceAccount);
-          console.log(`Service Account Project ID: ${sa.project_id}`);
-          
-          if (sa.project_id !== firebaseConfig.projectId) {
-            console.warn(`⚠️  PROJECT ID MISMATCH: Service account project ID (${sa.project_id}) does not match config project ID (${firebaseConfig.projectId}). This may cause authentication errors.`);
-          }
-
-          initializeApp({ 
-            credential: cert(sa), 
-            storageBucket: bucketName 
-          });
-        } catch (parseErr: any) {
-          throw new Error(`Failed to parse FIREBASE_SERVICE_ACCOUNT: ${parseErr.message}`);
-        }
-      }
-
-      const sa = JSON.parse(serviceAccount);
-      const saProjectId = sa.project_id;
+      const bucket = await getWorkingBucket();
+      const sa = serviceAccountStr ? JSON.parse(serviceAccountStr) : {};
+      
+      console.log(`[Storage] Using bucket: ${bucket.name} for upload. (SA Project: ${sa.project_id})`);
 
       const projectId = req.body.projectId || 'default';
-      const fileName = `projects/${projectId}/assets/${Date.now()}-${req.file.originalname}`;
-
-      const trySave = async (targetBucketName: string) => {
-        console.log(`Attempting to upload to bucket: ${targetBucketName}`);
-        const currentBucket = getAdminStorage().bucket(targetBucketName);
-        const currentFile = currentBucket.file(fileName);
-        await currentFile.save(req.file.buffer, {
-          metadata: { contentType: req.file.mimetype },
-          public: true,
-        });
-        return targetBucketName;
-      };
-
-      let finalBucketName = bucketName;
-      const triedBuckets: string[] = [];
-
-      try {
-        triedBuckets.push(bucketName);
-        finalBucketName = await trySave(bucketName);
-      } catch (saveErr: any) {
-        if (saveErr.code === 404) {
-          console.warn(`Primary bucket ${bucketName} not found. Trying fallbacks...`);
-          
-          const fallbacks = new Set<string>();
-          
-          // Pattern 1: .appspot.com
-          if (bucketName.endsWith('.firebasestorage.app')) {
-            fallbacks.add(bucketName.replace('.firebasestorage.app', '.appspot.com'));
-          } else if (bucketName.endsWith('.appspot.com')) {
-            fallbacks.add(bucketName.replace('.appspot.com', '.firebasestorage.app'));
-          }
-
-          // Pattern 2: Project IDs
-          const projectIds = new Set([firebaseConfig.projectId, saProjectId]);
-          for (const pid of projectIds) {
-            fallbacks.add(pid);
-            fallbacks.add(`${pid}.appspot.com`);
-            fallbacks.add(`${pid}.firebasestorage.app`);
-          }
-
-          let success = false;
-          for (const fallback of fallbacks) {
-            if (triedBuckets.includes(fallback)) continue;
-            triedBuckets.push(fallback);
-            try {
-              finalBucketName = await trySave(fallback);
-              success = true;
-              bucketName = fallback; // Update for future uploads
-              console.log(`Successfully uploaded to fallback bucket: ${fallback}`);
-              break;
-            } catch (fallbackErr: any) {
-              console.warn(`Fallback bucket ${fallback} failed: ${fallbackErr.message}`);
-            }
-          }
-          
-          if (!success) {
-            const errorWithContext = new Error(`All storage buckets failed. Tried: ${triedBuckets.join(', ')}. Original error: ${saveErr.message}`);
-            (errorWithContext as any).triedBuckets = triedBuckets;
-            (errorWithContext as any).response = saveErr.response;
-            throw errorWithContext;
-          }
-        } else {
-          throw saveErr;
-        }
-      }
-
-      const publicUrl = `https://storage.googleapis.com/${finalBucketName}/${fileName}`;
-      return res.json({ success: true, url: publicUrl, fileName });
-    } catch (err: any) {
-      console.error('Upload error:', err);
+      const destination = `projects/${projectId}/assets/${Date.now()}-${req.file.originalname}`;
       
-      let errorMessage = err.message;
-      let errorDetails = err.response?.data || undefined;
+      const file = bucket.file(destination);
+      
+      await file.save(req.file.buffer, {
+        metadata: { contentType: req.file.mimetype },
+        public: true,
+      });
 
-      // Handle GaxiosError specifically if it has a response
-      if (err.response && err.response.data && err.response.data.error) {
-        errorMessage = err.response.data.error.message || errorMessage;
-      }
+      const publicUrl = `https://storage.googleapis.com/${bucket.name}/${destination}`;
+      console.log(`[Storage] ✅ Upload successful: ${publicUrl}`);
+      
+      return res.json({ success: true, url: publicUrl, fileName: destination });
+    } catch (err: any) {
+      console.error('[Storage] ❌ Upload error:', err.message);
 
-      return res.status(500).json({ 
-        error: errorMessage,
-        details: errorDetails,
-        triedBuckets: (err as any).triedBuckets || [bucketName]
+      const isBucketMissing = err.message?.includes('does not exist') || err.code === 404;
+      return res.status(500).json({
+        error: isBucketMissing
+          ? 'Firebase Storage bucket not found. Please enable Firebase Storage in the Firebase Console: Build → Storage → Get Started.'
+          : err.message || 'Internal Server Error',
       });
     }
   });
@@ -240,19 +220,41 @@ async function startServer() {
     res.json({ status: 'ok' });
   });
 
+  apiRouter.get('/storage-status', async (req, res) => {
+    try {
+      const sa = serviceAccountStr ? JSON.parse(serviceAccountStr) : null;
+      let availableBuckets: string[] = [];
+      
+      if (adminApp) {
+        try {
+          const [buckets] = await getAdminStorage().getBuckets();
+          availableBuckets = buckets.map(b => b.name);
+        } catch (e: any) {
+          availableBuckets = [`Error listing buckets: ${e.message}`];
+        }
+      }
+
+      res.json({
+        adminInitialized: !!adminApp,
+        hasServiceAccount: !!serviceAccountStr,
+        saProjectId: sa?.project_id || 'missing',
+        configProjectId: firebaseConfig.projectId,
+        configBucket: configBucketName,
+        resolvedBucket: resolvedBucketName || 'not yet resolved',
+        availableBuckets
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Gemini Proxy Route
   apiRouter.post('/gemini/proxy', async (req, res, next) => {
-    const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
     if (!apiKey) return res.status(500).json({ error: 'API key not configured on server' });
-
-    const maskedKey = apiKey.length > 8 
-      ? `${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)}`
-      : '********';
-    console.log(`Gemini Proxy using key: ${maskedKey}`);
 
     try {
       const { method, params } = req.body;
-      console.log(`Gemini Proxy: ${method}`, JSON.stringify(params).substring(0, 100) + '...');
       const ai = new GoogleGenAI({ apiKey });
 
       if (method === 'generateContent') {
@@ -261,7 +263,7 @@ async function startServer() {
           success: true, 
           data: {
             ...response,
-            text: response.text // Explicitly include the text property
+            text: response.text
           } 
         });
       }
@@ -302,7 +304,6 @@ async function startServer() {
   app.use('/api', apiRouter);
 
   console.log(`Starting server in ${process.env.NODE_ENV || 'development'} mode...`);
-  // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -322,7 +323,6 @@ async function startServer() {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 
-  // Global Error Handler
   app.use((err: any, req: any, res: any, next: any) => {
     console.error('Global Error Handler:', err);
     res.status(err.status || 500).json({

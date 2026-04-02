@@ -1,11 +1,12 @@
 import { GenerateContentResponse, Modality, VideoGenerationReferenceType, Type } from "@google/genai";
 import { API_BASE } from "../constants";
 
-async function callBackend(method: string, params: any) {
+async function callBackend(method: string, params: any, signal?: AbortSignal) {
   const response = await fetch(`${API_BASE}/gemini/proxy`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ method, params })
+    body: JSON.stringify({ method, params }),
+    signal
   });
 
   const contentType = response.headers.get('content-type');
@@ -46,7 +47,7 @@ export const generateImage = async (params: {
   guidanceStrength?: number;
   cfgScale?: number;
   projectContext?: string;
-}) => {
+}, signal?: AbortSignal) => {
   const { prompt, model, aspectRatio, imageSize, referenceImages, seed, guidanceStrength, cfgScale, projectContext } = params;
 
   const fullPrompt = projectContext 
@@ -62,7 +63,7 @@ export const generateImage = async (params: {
           numberOfImages: 1,
           aspectRatio: aspectRatio as any,
         },
-      });
+      }, signal);
       const base64Image = response.generatedImages[0].image.imageBytes;
       return `data:image/png;base64,${base64Image}`;
     } catch (err) {
@@ -96,7 +97,7 @@ export const generateImage = async (params: {
           topP: guidanceStrength ? guidanceStrength / 20 : undefined,
           temperature: cfgScale ? cfgScale / 15 : undefined,
         }
-      });
+      }, signal);
 
       for (const part of response.candidates?.[0]?.content?.parts || []) {
         if (part.inlineData) {
@@ -124,7 +125,7 @@ export const generateVideo = async (params: {
   videoUrl?: string;
   projectContext?: string;
   onProgress?: (progress: number) => void;
-}) => {
+}, signal?: AbortSignal) => {
   const { prompt, model, aspectRatio, resolution, duration, startFrameUrl, endFrameUrl, referenceImages, motionIntensity, videoUrl, projectContext, onProgress } = params;
 
   const fullPrompt = projectContext 
@@ -170,7 +171,7 @@ export const generateVideo = async (params: {
       prompt: fullPrompt || 'Animate this sequence',
       image: startFrameData,
       config: videoConfig
-    });
+    }, signal);
 
     let pollCount = 0;
     while (!operation.done) {
@@ -180,14 +181,15 @@ export const generateVideo = async (params: {
       onProgress?.(simulatedProgress);
       
       await new Promise(resolve => setTimeout(resolve, 5000));
-      operation = await callBackend('getOperation', { operation: operation });
+      if (signal?.aborted) throw new Error("Video generation cancelled");
+      operation = await callBackend('getOperation', { operation: operation }, signal);
     }
 
     onProgress?.(95);
     const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
     if (!downloadLink) throw new Error("No video generated");
 
-    const videoData = await callBackend('fetchVideoFile', { url: downloadLink });
+    const videoData = await callBackend('fetchVideoFile', { url: downloadLink }, signal);
     onProgress?.(100);
     return `data:${videoData.contentType};base64,${videoData.base64}`;
   } catch (err) {
@@ -203,7 +205,7 @@ export const generateText = async (params: {
   imageUrls?: string[];
   videoUrls?: string[];
   projectContext?: string;
-}) => {
+}, signal?: AbortSignal) => {
   const { prompt, model, systemInstruction, imageUrls = [], videoUrls = [], projectContext } = params;
 
   const fullPrompt = projectContext 
@@ -227,7 +229,7 @@ export const generateText = async (params: {
       model: model,
       contents: { parts },
       config: { systemInstruction }
-    });
+    }, signal);
 
     return response.text;
   } catch (err) {
@@ -239,7 +241,7 @@ export const generateText = async (params: {
 export const generateAudio = async (params: {
   prompt: string;
   voice?: string;
-}) => {
+}, signal?: AbortSignal) => {
   const { prompt, voice = 'Kore' } = params;
 
   try {
@@ -254,7 +256,7 @@ export const generateAudio = async (params: {
           },
         },
       },
-    });
+    }, signal);
 
     const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
     if (!base64Audio) throw new Error("No audio generated");
@@ -269,7 +271,7 @@ export const generateAudio = async (params: {
 export const generateMask = async (params: {
   prompt: string;
   imageUrl: string;
-}) => {
+}, signal?: AbortSignal) => {
   const { prompt, imageUrl } = params;
 
   const { data, mimeType } = await urlToBase64(imageUrl);
@@ -299,7 +301,7 @@ export const generateMask = async (params: {
           required: ["boxes"]
         }
       }
-    });
+    }, signal);
 
     const result = JSON.parse(response.text);
     return result.boxes;
@@ -313,7 +315,7 @@ export const upscaleImage = async (params: {
   imageUrl: string;
   scale: string;
   preserveStyle: boolean;
-}) => {
+}, signal?: AbortSignal) => {
   const { imageUrl, scale, preserveStyle } = params;
 
   const { data, mimeType } = await urlToBase64(imageUrl);
@@ -332,7 +334,7 @@ export const upscaleImage = async (params: {
           imageSize: "4K"
         }
       }
-    });
+    }, signal);
 
     let upscaledImageUrl = '';
     for (const part of response.candidates?.[0]?.content?.parts || []) {
@@ -358,7 +360,7 @@ export const suggestNodeConfig = async (params: {
   userGoal: string;
   currentConfig: any;
   projectContext?: string;
-}) => {
+}, signal?: AbortSignal) => {
   const { nodeType, userGoal, currentConfig, projectContext } = params;
 
   try {
@@ -374,7 +376,7 @@ export const suggestNodeConfig = async (params: {
       config: {
         responseMimeType: "application/json",
       }
-    });
+    }, signal);
 
     return JSON.parse(response.text);
   } catch (err) {
@@ -389,7 +391,7 @@ export const relightImage = async (params: {
   lightColor: string;
   intensity: number;
   style: string;
-}) => {
+}, signal?: AbortSignal) => {
   const { imageUrl, lightDirection, lightColor, intensity, style } = params;
 
   const { data, mimeType } = await urlToBase64(imageUrl);
@@ -403,7 +405,7 @@ export const relightImage = async (params: {
           { inlineData: { data, mimeType } }
         ]
       }
-    });
+    }, signal);
 
     let relitImageUrl = '';
     for (const part of response.candidates?.[0]?.content?.parts || []) {
@@ -424,7 +426,7 @@ export const relightImage = async (params: {
   }
 };
 
-export const fillProjectData = async (description: string) => {
+export const fillProjectData = async (description: string, signal?: AbortSignal) => {
   const prompt = `
     You are a creative project setup assistant for a professional AI media studio.
     The user will describe their project in natural language.
@@ -461,7 +463,7 @@ export const fillProjectData = async (description: string) => {
       config: {
         responseMimeType: "application/json",
       }
-    });
+    }, signal);
 
     return JSON.parse(response.text);
   } catch (err) {
@@ -470,7 +472,7 @@ export const fillProjectData = async (description: string) => {
   }
 };
 
-export const generateAIInstructions = async (formData: any) => {
+export const generateAIInstructions = async (formData: any, signal?: AbortSignal) => {
   const prompt = `
     Generate a set of master AI instructions for a creative project with the following details:
     Project Type: ${formData.type} - ${formData.subtype}
@@ -491,7 +493,7 @@ export const generateAIInstructions = async (formData: any) => {
     const response = await callBackend('generateContent', {
       model: "gemini-3-flash-preview",
       contents: [{ role: 'user', parts: [{ text: prompt }] }]
-    });
+    }, signal);
 
     return response.text;
   } catch (err) {
@@ -505,7 +507,7 @@ export const inpaintImage = async (params: {
   maskUrl: string;
   prompt: string;
   mode: 'mask' | 'unmask';
-}) => {
+}, signal?: AbortSignal) => {
   const { imageUrl, maskUrl, prompt, mode } = params;
 
   const { data: imageData, mimeType: imageMimeType } = await urlToBase64(imageUrl);
@@ -521,7 +523,7 @@ export const inpaintImage = async (params: {
           { inlineData: { data: maskData, mimeType: maskMimeType } }
         ]
       }
-    });
+    }, signal);
 
     let inpaintedImageUrl = '';
     for (const part of response.candidates?.[0]?.content?.parts || []) {
@@ -547,7 +549,7 @@ export const transferStyle = async (params: {
   styleUrl: string;
   strength: number;
   preserveStructure: boolean;
-}) => {
+}, signal?: AbortSignal) => {
   const { contentUrl, styleUrl, strength, preserveStructure } = params;
 
   const { data: contentData, mimeType: contentMimeType } = await urlToBase64(contentUrl);
@@ -563,7 +565,7 @@ export const transferStyle = async (params: {
           { inlineData: { data: styleData, mimeType: styleMimeType } }
         ]
       }
-    });
+    }, signal);
 
     let styledImageUrl = '';
     for (const part of response.candidates?.[0]?.content?.parts || []) {
@@ -588,7 +590,7 @@ export const generateVariations = async (params: {
   imageUrl: string;
   prompt?: string;
   count?: number;
-}) => {
+}, signal?: AbortSignal) => {
   const { imageUrl, prompt, count = 4 } = params;
 
   const { data, mimeType } = await urlToBase64(imageUrl);
@@ -600,7 +602,7 @@ export const generateVariations = async (params: {
       config: {
         numberOfImages: count,
       },
-    });
+    }, signal);
 
     return response.generatedImages.map((img: any) => `data:image/png;base64,${img.image.imageBytes}`);
   } catch (err) {

@@ -25,7 +25,8 @@ import {
   Clapperboard,
   Move,
   Film,
-  PanelLeftClose
+  PanelLeftClose,
+  Copy
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useProjectStore } from '../store/useProjectStore';
@@ -203,6 +204,21 @@ export default function ProjectSidebar() {
     setChatOpen(true);
   };
 
+  const duplicateWorkflow = async (e: React.MouseEvent, workflow: any) => {
+    e.stopPropagation();
+    if (!currentProject || !auth.currentUser) return;
+    
+    await addDoc(collection(db, 'workflows'), {
+      name: `${workflow.name} (Copy)`,
+      projectId: currentProject.id,
+      userId: auth.currentUser.uid,
+      createdAt: serverTimestamp(),
+      nodes: workflow.nodes || [],
+      edges: workflow.edges || [],
+      thumbnailUrl: workflow.thumbnailUrl || null
+    });
+  };
+
   const deleteItem = async (e: React.MouseEvent, collectionName: string, id: string) => {
     e.stopPropagation();
     if (window.confirm(`Delete this ${collectionName.slice(0, -1)}?`)) {
@@ -348,12 +364,22 @@ export default function ProjectSidebar() {
                           </div>
                         </div>
                       </div>
-                      <button
-                        onClick={(e) => deleteItem(e, 'workflows', wf.id)}
-                        className="absolute top-2 right-2 p-1.5 opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-500 transition-all"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="absolute top-2 right-2 flex gap-1">
+                        <button
+                          onClick={(e) => duplicateWorkflow(e, wf)}
+                          className="p-1.5 opacity-0 group-hover:opacity-100 text-gray-600 hover:text-[#0097A7] transition-all"
+                          title="Duplicate Workflow"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={(e) => deleteItem(e, 'workflows', wf.id)}
+                          className="p-1.5 opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-500 transition-all"
+                          title="Delete Workflow"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   ))
                 )}

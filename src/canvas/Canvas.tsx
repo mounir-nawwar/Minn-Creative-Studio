@@ -10,8 +10,11 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { useStore } from '../store/useStore';
+import { useProjectStore } from '../store/useProjectStore';
 import { nodeTypes } from '../utils/nodeTypes';
 import { motion, AnimatePresence } from 'motion/react';
+import { db, updateDoc, doc } from '../firebase';
+import { Loader2, CloudCheck, CloudOff } from 'lucide-react';
 
 const CanvasContent = () => {
   const {
@@ -26,14 +29,52 @@ const CanvasContent = () => {
     addNode,
   } = useStore();
 
+  const { activeWorkflowId } = useProjectStore();
   const { screenToFlowPosition } = useReactFlow();
   const [ghostPos, setGhostPos] = useState({ x: 0, y: 0 });
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const wrapperRef = useRef<HTMLDivElement>(null);
   const pendingRef = useRef<string | null>(null);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     pendingRef.current = pendingNodeType;
   }, [pendingNodeType]);
+
+  // Auto-save logic
+  useEffect(() => {
+    if (!activeWorkflowId) return;
+
+    const saveWorkflow = async () => {
+      setSaveStatus('saving');
+      try {
+        const wfRef = doc(db, 'workflows', activeWorkflowId);
+        await updateDoc(wfRef, {
+          nodes: nodes.map(n => ({
+            id: n.id,
+            type: n.type,
+            position: n.position,
+            data: n.data
+          })),
+          edges,
+          updatedAt: new Date()
+        });
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus('idle'), 2000);
+      } catch (err) {
+        console.error('Failed to save workflow:', err);
+        setSaveStatus('error');
+      }
+    };
+
+    // Debounce save
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(saveWorkflow, 2000);
+
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  }, [nodes, edges, activeWorkflowId]);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -114,11 +155,40 @@ const CanvasContent = () => {
         />
         <Panel
           position="bottom-left"
-          className="bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10"
+          className="bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-4"
         >
           <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">
             {nodes.length} Nodes • {edges.length} Connections
           </p>
+          
+          <div className="h-3 w-px bg-white/10" />
+          
+          <div className="flex items-center gap-1.5">
+            {saveStatus === 'saving' && (
+              <>
+                <Loader2 className="w-3 h-3 text-[#0097A7] animate-spin" />
+                <span className="text-[8px] text-[#0097A7] font-black uppercase tracking-widest">Saving Changes</span>
+              </>
+            )}
+            {saveStatus === 'saved' && (
+              <>
+                <CloudCheck className="w-3 h-3 text-green-500" />
+                <span className="text-[8px] text-green-500 font-black uppercase tracking-widest">Workflow Saved</span>
+              </>
+            )}
+            {saveStatus === 'error' && (
+              <>
+                <CloudOff className="w-3 h-3 text-red-500" />
+                <span className="text-[8px] text-red-500 font-black uppercase tracking-widest">Save Failed</span>
+              </>
+            )}
+            {saveStatus === 'idle' && (
+              <>
+                <CloudCheck className="w-3 h-3 text-gray-600" />
+                <span className="text-[8px] text-gray-600 font-black uppercase tracking-widest">Cloud Sync Active</span>
+              </>
+            )}
+          </div>
         </Panel>
       </ReactFlow>
 

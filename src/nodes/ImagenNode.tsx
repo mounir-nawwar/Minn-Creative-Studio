@@ -1,17 +1,16 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
 import { useProjectStore } from '../store/useProjectStore';
 import { Handle, Position } from 'reactflow';
 import ParameterSlider from '../components/ParameterSlider';
 import ReferenceStrip from '../components/ReferenceStrip';
-import { ImageIcon, Loader2 } from 'lucide-react';
+import { ImageIcon, Loader2, Download, XCircle } from 'lucide-react';
 import { generateImage } from '../services/geminiService';
-import { db, auth } from '../firebase';
 import { useAssets } from '../hooks/useAssets';
 
 const ImagenNode = ({ id, data }: any) => {
-  const [model, setModel] = useState(data.config?.model || 'gemini-2.5-flash-image');
+  const [model, setModel] = useState(data.config?.model || 'gemini-3.1-flash-image-preview');
   const [aspectRatio, setAspectRatio] = useState(data.config?.aspectRatio || '1:1');
   const [imageSize, setImageSize] = useState(data.config?.imageSize || '1K');
   const [style, setStyle] = useState(data.config?.style || 'Photorealistic');
@@ -23,6 +22,8 @@ const ImagenNode = ({ id, data }: any) => {
   const nodes = useStore((state) => state.nodes);
   const { currentProject } = useProjectStore();
   const { uploadBase64 } = useAssets();
+  
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const isNanoBanana = model.includes('flash') || model.includes('pro');
 
@@ -51,6 +52,24 @@ const ImagenNode = ({ id, data }: any) => {
     });
   };
 
+  const handleCancel = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      updateNodeData(id, { isRunning: false, progress: 0, error: 'Generation cancelled' });
+    }
+  };
+
+  const handleDownload = () => {
+    if (!data.output) return;
+    const link = document.createElement('a');
+    link.href = data.output;
+    link.download = `generated-image-${Date.now()}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleRun = async () => {
     const state = useStore.getState();
     const nodeEdges = state.edges.filter(e => e.target === id);
@@ -76,6 +95,8 @@ const ImagenNode = ({ id, data }: any) => {
       return;
     }
 
+    // Setup AbortController
+    abortControllerRef.current = new AbortController();
     updateNodeData(id, { isRunning: true, error: undefined, progress: 5 });
 
     // Construct project context string
@@ -107,7 +128,7 @@ const ImagenNode = ({ id, data }: any) => {
         guidanceStrength: parameters.guidanceStrength,
         cfgScale: parameters.cfgScale,
         projectContext
-      });
+      }, abortControllerRef.current.signal);
 
       updateNodeData(id, { progress: 80 });
 
@@ -126,7 +147,13 @@ const ImagenNode = ({ id, data }: any) => {
         });
 
     } catch (err: any) {
-      updateNodeData(id, { error: err.message, isRunning: false });
+      if (err.name === 'AbortError') {
+        console.log('Generation aborted');
+      } else {
+        updateNodeData(id, { error: err.message, isRunning: false });
+      }
+    } finally {
+      abortControllerRef.current = null;
     }
   };
 
@@ -187,14 +214,21 @@ const ImagenNode = ({ id, data }: any) => {
             >
               <option value="1:1">1:1 Square</option>
               <option value="16:9">16:9 Wide</option>
-              <option value="9:16">9:16 Tall</option>
+              <option value="9:16">9:16 Vertical</option>
               <option value="4:3">4:3 Photo</option>
+              <option value="3:4">3:4 Portrait</option>
+              <option value="3:2">3:2 Classic</option>
+              <option value="2:3">2:3 Classic Port</option>
+              <option value="4:5">4:5 Social</option>
+              <option value="5:4">5:4 Social Land</option>
+              <option value="21:9">21:9 Cinematic</option>
+              <option value="9:21">9:21 Ultrawide Vert</option>
             </select>
           </div>
           
-          {isNanoBanana ? (
-            <div className="space-y-1">
-              <label className="text-[10px] text-gray-500 uppercase font-bold">Size</label>
+          <div className="space-y-1">
+            <label className="text-[10px] text-gray-500 uppercase font-bold">{isNanoBanana ? 'Resolution' : 'Style'}</label>
+            {isNanoBanana ? (
               <select 
                 className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-1.5 text-[10px] text-gray-400 focus:outline-none"
                 value={imageSize}
@@ -204,14 +238,17 @@ const ImagenNode = ({ id, data }: any) => {
                 }}
               >
                 <option value="512px">512px</option>
+                <option value="768px">768px</option>
+                <option value="1024px">1024px</option>
                 <option value="1K">1K (Standard)</option>
                 <option value="2K">2K (High)</option>
                 <option value="4K">4K (Ultra)</option>
+                <option value="720p">720p HD</option>
+                <option value="1080p">1080p Full HD</option>
+                <option value="1440p">1440p QHD</option>
+                <option value="2160p">2160p 4K UHD</option>
               </select>
-            </div>
-          ) : (
-            <div className="space-y-1">
-              <label className="text-[10px] text-gray-500 uppercase font-bold">Style</label>
+            ) : (
               <select 
                 className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-1.5 text-[10px] text-gray-400 focus:outline-none"
                 value={style}
@@ -224,9 +261,11 @@ const ImagenNode = ({ id, data }: any) => {
                 <option value="Illustration">Illustration</option>
                 <option value="Cinematic">Cinematic</option>
                 <option value="Abstract">Abstract</option>
+                <option value="Digital Art">Digital Art</option>
+                <option value="3D Render">3D Render</option>
               </select>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         <ReferenceStrip 
@@ -263,23 +302,46 @@ const ImagenNode = ({ id, data }: any) => {
           </div>
         )}
 
-        <button
-          onClick={handleRun}
-          disabled={data.isRunning}
-          className="w-full py-2 bg-[#0097A7] hover:bg-[#00838F] text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-        >
-          {data.isRunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <ImageIcon className="w-3 h-3" />}
-          {data.isRunning ? "GENERATING..." : "GENERATE IMAGE"}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleRun}
+            disabled={data.isRunning}
+            className="flex-1 py-2 bg-[#0097A7] hover:bg-[#00838F] text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {data.isRunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <ImageIcon className="w-3 h-3" />}
+            {data.isRunning ? "GENERATING..." : "GENERATE IMAGE"}
+          </button>
+          
+          {data.isRunning && (
+            <button
+              onClick={handleCancel}
+              className="px-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 rounded-lg transition-all flex items-center justify-center"
+              title="Cancel Generation"
+            >
+              <XCircle className="w-4 h-4" />
+            </button>
+          )}
+        </div>
 
         {data.output && (
-          <div className="mt-2 h-[180px] rounded-lg overflow-hidden border border-[#2a2a2a] bg-[#0a0a0a]">
-            <img 
-              src={data.output} 
-              alt="Generated" 
-              className="w-full h-full object-cover"
-              referrerPolicy="no-referrer"
-            />
+          <div className="mt-2 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Result Image</span>
+              <button 
+                onClick={handleDownload}
+                className="p-1.5 bg-[#1a1a1a] hover:bg-[#0097A7] text-gray-400 hover:text-white rounded-lg transition-all border border-[#2a2a2a]"
+              >
+                <Download className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="h-[200px] rounded-xl overflow-hidden border border-[#2a2a2a] bg-[#0a0a0a] group/output relative">
+              <img 
+                src={data.output} 
+                alt="Generated" 
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                referrerPolicy="no-referrer"
+              />
+            </div>
           </div>
         )}
       </div>

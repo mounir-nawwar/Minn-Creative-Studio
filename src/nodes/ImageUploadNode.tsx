@@ -2,10 +2,9 @@ import React, { useState, useRef } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
 import { useProjectStore } from '../store/useProjectStore';
-import { Upload, X, ImageIcon, Loader2, Library } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { Upload, X, ImageIcon, Loader2 } from 'lucide-react';
 import AssetGrid from '../components/AssetGrid';
-import { API_BASE } from '../constants';
+import { useAssets } from '../hooks/useAssets';
 
 const ImageUploadNode = ({ id, data }: any) => {
   const [imageUrl, setImageUrl] = useState<string | null>(data.output || null);
@@ -14,42 +13,51 @@ const ImageUploadNode = ({ id, data }: any) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const updateNodeData = useStore((state) => state.updateNodeData);
   const { currentProject } = useProjectStore();
+  const { uploadAsset } = useAssets();
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !currentProject) return;
 
+    // 1. Instant Preview logic
+    const localUrl = URL.createObjectURL(file);
+    setImageUrl(localUrl);
+    
+    // Set as output immediately so it's usable by other nodes
+    updateNodeData(id, { 
+      output: localUrl, 
+      isRunning: true, 
+      progress: 1, 
+      error: null,
+      config: { ...data.config, url: localUrl, fileName: file.name }
+    });
+
     setIsUploading(true);
-    updateNodeData(id, { isRunning: true });
     
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('projectId', currentProject.id);
-
-      const response = await fetch(`${API_BASE}/upload`, {
-        method: 'POST',
-        body: formData,
+      // 2. Background Upload
+      const asset = await uploadAsset(file, (progress) => {
+        updateNodeData(id, { progress: Math.max(progress, 1) });
       });
-
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || 'Upload failed');
-      }
       
-      const { url } = await response.json();
-
-      // Store the Firebase Storage URL — short string, safe to save in Firestore
-      setImageUrl(url);
+      console.log('ImageUploadNode: Upload finished successfully:', asset.url);
+      
+      // Update with permanent URL
+      setImageUrl(asset.url);
       updateNodeData(id, { 
-        output: url, 
+        output: asset.url, 
         isRunning: false, 
-        config: { ...data.config, url } 
+        progress: 100,
+        config: { ...data.config, url: asset.url, fileName: file.name } 
       });
       setIsUploading(false);
+      
+      // Cleanup local URL
+      URL.revokeObjectURL(localUrl);
     } catch (err: any) {
       console.error('Upload error:', err);
-      updateNodeData(id, { error: err.message, isRunning: false });
+      // Keep the local URL usable even if upload fails, but show error
+      updateNodeData(id, { error: `Upload failed (Using local copy): ${err.message}`, isRunning: false });
       setIsUploading(false);
     }
   };
@@ -70,7 +78,7 @@ const ImageUploadNode = ({ id, data }: any) => {
   };
 
   return (
-    <BaseNode id={id} data={data} inputs={false}>
+    <BaseNode id={id} data={data} inputs={false} color="#0097A7">
       <div className="space-y-3">
         <input 
           type="file" 
