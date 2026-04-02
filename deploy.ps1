@@ -29,7 +29,7 @@ Write-Host "Environment variables: $($envVars.Count) vars loaded"
 gcloud run deploy minn-studio `
   --source . `
   --region us-west1 `
-  --project gen-lang-client-0046544084 `
+  --project gen-lang-client-0639313445 `
   --allow-unauthenticated `
   --set-env-vars "$envString"
 

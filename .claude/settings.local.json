@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(gcloud logging:*)",
+      "Bash(gcloud run:*)",
+      "Bash(python -c \"import sys,json; logs=json.load\\(sys.stdin\\); [print\\(l.get\\(''''textPayload''''\\) or l.get\\(''''jsonPayload'''',{}\\).get\\(''''message'''',''''''''\\)\\) for l in logs]\")"
     ]
   }
 }
