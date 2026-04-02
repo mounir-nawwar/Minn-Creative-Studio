@@ -38,7 +38,7 @@ export default function ProjectPicker() {
       <header className="fixed top-0 left-0 right-0 h-24 bg-black/80 backdrop-blur-xl border-b border-white/5 z-50 px-12 flex items-center justify-between">
         <div className="flex items-center gap-8">
           <div className="space-y-1">
-            <img src={MinnLogo} alt="MINN STUDIO" className="h-8 w-auto mb-1" />
+            <img src={MinnLogo} alt="MINN STUDIO" className="h-7 w-auto mb-2" />
             <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Creative Pipeline Management</p>
           </div>
           

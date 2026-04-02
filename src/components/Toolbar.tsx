@@ -213,8 +213,8 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
     <div className="h-16 bg-[#0a0a0a] border-b border-[#1a1a1a] flex items-center justify-between px-6 z-10">
       <div className="flex items-center gap-6">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-[#0097A7] rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(0,151,167,0.4)]">
-            <Zap className="w-5 h-5 text-white" />
+          <div className="w-5 h-5 bg-[#0097A7] rounded-md flex items-center justify-center shadow-[0_0_15px_rgba(0,151,167,0.4)]">
+            <Zap className="w-3 h-3 text-white" />
           </div>
           <div>
             <h2 className="text-xs font-black text-white uppercase tracking-widest">
