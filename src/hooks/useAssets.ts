@@ -70,20 +70,40 @@ export function useAssets() {
       formData.append('projectId', currentProject.id);
 
       console.log(`[useAssets] Sending to backend: ${API_BASE}/upload`);
-      
-      const response = await fetch(`${API_BASE}/upload`, {
-        method: 'POST',
-        body: formData,
+
+      const { url, fileName: storagePath } = await new Promise<{ url: string; fileName: string }>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${API_BASE}/upload`);
+
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const pct = Math.round((e.loaded / e.total) * 90); // cap at 90 until server confirms
+            setUploadProgress(prev => ({ ...prev, [fileId]: pct }));
+            if (onProgress) onProgress(pct);
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(JSON.parse(xhr.responseText));
+          } else {
+            try {
+              const err = JSON.parse(xhr.responseText);
+              reject(new Error(err.error || 'Backend upload failed'));
+            } catch {
+              reject(new Error('Backend upload failed'));
+            }
+          }
+        };
+
+        xhr.onerror = () => reject(new Error('Network error during upload'));
+        xhr.send(formData);
       });
 
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || 'Backend upload failed');
-      }
-
-      const { url, fileName: storagePath } = await response.json();
       console.log(`[useAssets] ✅ Backend upload success: ${url}`);
-      
+      setUploadProgress(prev => ({ ...prev, [fileId]: 95 }));
+      if (onProgress) onProgress(95);
+
       // Finalize by saving metadata to Firestore
       const asset = await finalizeAsset(file, url, storagePath);
       
