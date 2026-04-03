@@ -150,10 +150,23 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
 
         // Reset runtime state only — preserve all user inputs and config
         data.isRunning = false;
-        data.error = undefined;
+        data.error = null;
         data.progress = 0;
 
-        return { ...node, data };
+        // Firestore rejects undefined values — strip them recursively
+        const clean = (obj: any): any => {
+          if (Array.isArray(obj)) return obj.map(clean);
+          if (obj !== null && typeof obj === 'object') {
+            return Object.fromEntries(
+              Object.entries(obj)
+                .filter(([, v]) => v !== undefined)
+                .map(([k, v]) => [k, clean(v)])
+            );
+          }
+          return obj;
+        };
+
+        return { ...node, data: clean(data) };
       }));
 
       const workflowData = { nodes: sanitizedNodes, edges, updatedAt: serverTimestamp() };

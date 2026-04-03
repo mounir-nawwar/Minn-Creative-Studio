@@ -14,3 +14,4 @@ fix-uids.mjs
 # Temp deploy files
 *.yaml
 key.json
+cors.json
