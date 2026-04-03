@@ -24,6 +24,16 @@ async function callBackend(method: string, params: any, signal?: AbortSignal) {
 }
 
 export async function urlToBase64(url: string): Promise<{ data: string; mimeType: string }> {
+  // Firebase Storage URLs can't be fetched directly from the browser due to CORS — proxy through backend
+  if (url.includes('firebasestorage.googleapis.com') || url.includes('storage.googleapis.com')) {
+    const res = await fetch(`${API_BASE}/proxy-image`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    if (!res.ok) throw new Error(`Image proxy failed: ${res.status}`);
+    return res.json();
+  }
   const res = await fetch(url);
   const blob = await res.blob();
   return new Promise((resolve, reject) => {

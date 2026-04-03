@@ -248,6 +248,22 @@ async function startServer() {
     }
   });
 
+  // Image proxy — fetches a URL server-side and returns base64 (avoids browser CORS on Firebase Storage)
+  apiRouter.post('/proxy-image', async (req, res) => {
+    const { url } = req.body;
+    if (!url) return res.status(400).json({ error: 'url required' });
+    try {
+      const response = await fetch(url);
+      if (!response.ok) return res.status(502).json({ error: `Failed to fetch image: ${response.status}` });
+      const buffer = await response.arrayBuffer();
+      const mimeType = response.headers.get('content-type') || 'image/jpeg';
+      const data = Buffer.from(buffer).toString('base64');
+      res.json({ data, mimeType });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Gemini Proxy Route
   apiRouter.post('/gemini/proxy', async (req, res, next) => {
     const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
