@@ -338,8 +338,8 @@ export default function ChatDrawer() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.92, y: 16 }}
               transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-              style={{ transformOrigin: 'bottom right' }}
-              className="fixed right-6 bottom-24 z-[70] w-[370px] h-[580px] bg-[#161617] rounded-3xl shadow-[0_32px_80px_rgba(0,0,0,0.6)] flex flex-col overflow-hidden border border-white/[0.06]"
+              style={{ transformOrigin: 'bottom center' }}
+              className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[70] w-[70vw] max-w-[860px] h-[620px] bg-[#161617] rounded-3xl shadow-[0_32px_80px_rgba(0,0,0,0.6)] flex flex-col overflow-hidden border border-white/[0.06]"
             >
               {/* Header */}
               <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-white/[0.06]">
@@ -439,8 +439,8 @@ export default function ChatDrawer() {
                               : 'bg-[#2c2c2e] text-gray-200 rounded-t-2xl rounded-br-2xl rounded-bl-[3px]'
                           }`}>
                             {msg.role === 'user'
-                              ? <svg className="absolute -right-[7px] bottom-0" width="8" height="10" viewBox="0 0 8 10"><path d="M0 10 Q0 6 8 0 L8 10 Z" fill="#0097A7"/></svg>
-                              : <svg className="absolute -left-[7px] bottom-0" width="8" height="10" viewBox="0 0 8 10"><path d="M8 10 Q8 6 0 0 L0 10 Z" fill="#2c2c2e"/></svg>
+                              ? <svg className="absolute -right-[7px] bottom-0" width="8" height="10" viewBox="0 0 8 10"><path d="M0 0 L0 10 L8 10 Z" fill="#0097A7"/></svg>
+                              : <svg className="absolute -left-[7px] bottom-0" width="8" height="10" viewBox="0 0 8 10"><path d="M8 0 L8 10 L0 10 Z" fill="#2c2c2e"/></svg>
                             }
                             {msg.role === 'user' ? msg.text : renderMarkdown(msg.text)}
                           </div>
@@ -449,7 +449,7 @@ export default function ChatDrawer() {
                       {isTyping && (
                         <div className="flex justify-start">
                           <div className="relative bg-[#2c2c2e] px-4 py-3 rounded-t-2xl rounded-br-2xl rounded-bl-[3px]">
-                            <svg className="absolute -left-[7px] bottom-0" width="8" height="10" viewBox="0 0 8 10"><path d="M8 10 Q8 6 0 0 L0 10 Z" fill="#2c2c2e"/></svg>
+                            <svg className="absolute -left-[7px] bottom-0" width="8" height="10" viewBox="0 0 8 10"><path d="M8 0 L8 10 L0 10 Z" fill="#2c2c2e"/></svg>
                             <div className="flex gap-1 items-center">
                               <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" />
                               <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce [animation-delay:0.15s]" />
