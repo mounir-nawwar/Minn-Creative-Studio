@@ -11,7 +11,9 @@ import {
   Trash2,
   Library,
   Copy,
-  Check
+  Check,
+  ChevronLeft,
+  Paperclip
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -75,8 +77,8 @@ function CodeCanvas({ code, label }: { code: string; label: string }) {
     setTimeout(() => setCopied(false), 2000);
   };
   return (
-    <div className="mt-2 mb-1 rounded-xl overflow-hidden border border-white/10 bg-[#111111]">
-      <div className="flex items-center justify-between px-3 py-2 bg-[#0a0a0a] border-b border-white/10">
+    <div className="mt-2 mb-1 rounded-xl overflow-hidden border border-white/10 bg-[#1c1c1e]">
+      <div className="flex items-center justify-between px-3 py-2 bg-[#111111] border-b border-white/10">
         <span className="text-[10px] font-bold uppercase tracking-widest text-[#0097A7]">{label || 'Prompt'}</span>
         <button
           onClick={handleCopy}
@@ -138,6 +140,7 @@ export default function ChatDrawer() {
   const [isTyping, setIsTyping] = useState(false);
   const [showAssetPicker, setShowAssetPicker] = useState(false);
   const [selectedAssets, setSelectedAssets] = useState<any[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { currentProject } = useProjectStore();
 
@@ -278,7 +281,7 @@ export default function ChatDrawer() {
       const modelText = await generateText({
         prompt: userMsg,
         model: "gemini-3-flash-preview",
-        systemInstruction: "You are a creative director assistant for AI video/image generation. Provide detailed, comprehensive, well-structured responses. When asked for prompts, write complete, rich, detailed prompts with specific visual descriptions, and always wrap the prompt itself inside a fenced code block using triple backticks so it appears as a copyable block. Help with visual ideas, camera directions, lighting setups, style references, color palettes, and technical advice.",
+        systemInstruction: "You are a creative director assistant for AI video/image generation. You specialize in writing detailed generative prompts for Midjourney, Stable Diffusion, Sora, Runway, Kling, and similar tools. When asked for prompts, write complete, rich, detailed prompts with specific visual descriptions. Help with visual ideas, camera directions, lighting setups, style references, color palettes, and technical advice. Wrap any prompt in a fenced code block (triple backticks) so it renders as a copyable block.\n\nIMPORTANT: Match your response length to what was asked. Casual messages get short natural replies. Only go detailed when the user explicitly asks for prompts, ideas, or guidance. Never volunteer unsolicited project analysis or example prompts.",
         imageUrls,
         projectContext,
         maxOutputTokens: 8192,
@@ -308,243 +311,251 @@ export default function ChatDrawer() {
 
   return (
     <>
-      {/* Toggle Button */}
+      {/* Trigger Button */}
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed right-6 bottom-6 w-14 h-14 bg-[#0097A7] text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 transition-all z-50 group"
+        className="fixed right-6 bottom-6 w-13 h-13 bg-[#0097A7] text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all z-50"
+        style={{ width: 52, height: 52 }}
       >
-        <MessageSquare className="w-6 h-6 group-hover:rotate-12 transition-transform" />
-        <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-black animate-pulse" />
+        <MessageSquare className="w-5 h-5" />
       </button>
 
       <AnimatePresence>
         {isOpen && (
           <>
-            {/* Backdrop */}
+            {/* Soft backdrop — doesn't block the app, just dims slightly */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsOpen(false)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60]"
+              className="fixed inset-0 z-[60]"
             />
 
-            {/* Drawer */}
+            {/* Popup Card */}
             <motion.div
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed right-0 top-0 bottom-0 w-[400px] bg-[#0a0a0a] border-l border-white/10 z-[70] flex flex-col shadow-[-20px_0_50px_rgba(0,0,0,0.5)]"
+              initial={{ opacity: 0, scale: 0.92, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 16 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+              style={{ transformOrigin: 'bottom right' }}
+              className="fixed right-6 bottom-24 z-[70] w-[370px] h-[580px] bg-[#161617] rounded-3xl shadow-[0_32px_80px_rgba(0,0,0,0.6)] flex flex-col overflow-hidden border border-white/[0.06]"
             >
               {/* Header */}
-              <div className="p-6 border-b border-white/5 flex items-center justify-between bg-[#111111]">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-[#0097A7]/20 rounded-xl">
-                    <Sparkles className="w-5 h-5 text-[#0097A7]" />
+              <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-white/[0.06]">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-7 h-7 bg-[#0097A7]/15 rounded-xl flex items-center justify-center">
+                    <Sparkles className="w-3.5 h-3.5 text-[#0097A7]" />
                   </div>
                   <div>
-                    <h2 className="text-sm font-black text-white uppercase tracking-widest">Creative Assistant</h2>
-                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-tighter">Project: {currentProject.name}</p>
+                    <p className="text-[13px] font-semibold text-white leading-none">Creative Assistant</p>
+                    <p className="text-[11px] text-gray-500 mt-0.5 leading-none">{currentProject.name}</p>
                   </div>
                 </div>
-                <button 
-                  onClick={() => setIsOpen(false)}
-                  className="p-2 hover:bg-white/5 rounded-full text-gray-500 hover:text-white transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => { createNewChat(); setShowHistory(false); }}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 hover:text-white hover:bg-white/8 transition-all"
+                    title="New chat"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setShowHistory(h => !h)}
+                    className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all ${showHistory ? 'text-[#0097A7] bg-[#0097A7]/10' : 'text-gray-500 hover:text-white hover:bg-white/8'}`}
+                    title="Chat history"
+                  >
+                    <History className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setIsOpen(false)}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 hover:text-white hover:bg-white/8 transition-all"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
 
-              {/* Main Content Area */}
-              <div className="flex-1 flex overflow-hidden">
-                {/* Sidebar (Chat History) */}
-                <div className="w-16 hover:w-64 transition-all duration-300 border-r border-white/5 bg-[#0a0a0a] flex flex-col group/sidebar overflow-hidden">
-                  <div className="p-3">
-                    <button 
+              {/* History Panel */}
+              <AnimatePresence>
+                {showHistory && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden border-b border-white/[0.06]"
+                  >
+                    <div className="max-h-48 overflow-y-auto p-2 space-y-0.5">
+                      {chats.length === 0 && (
+                        <p className="text-[12px] text-gray-600 text-center py-4">No previous chats</p>
+                      )}
+                      {chats.map(chat => (
+                        <div
+                          key={chat.id}
+                          onClick={() => { setActiveChatId(chat.id); setShowHistory(false); }}
+                          className={`group flex items-center justify-between px-3 py-2 rounded-xl cursor-pointer transition-all ${activeChatId === chat.id ? 'bg-[#0097A7]/15 text-[#0097A7]' : 'hover:bg-white/5 text-gray-400 hover:text-gray-200'}`}
+                        >
+                          <span className="text-[12px] truncate">{chat.title}</span>
+                          <button
+                            onClick={(e) => deleteChat(e, chat.id)}
+                            className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 transition-all flex-shrink-0"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Chat Area */}
+              <div className="flex-1 flex flex-col overflow-hidden">
+                {!activeChatId ? (
+                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center gap-4">
+                    <div className="w-14 h-14 bg-[#0097A7]/10 rounded-2xl flex items-center justify-center">
+                      <Bot className="w-7 h-7 text-[#0097A7]" />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[14px] font-semibold text-white">Project Assistant</p>
+                      <p className="text-[12px] text-gray-500 leading-relaxed">Ask for prompt ideas, camera directions,<br/>or creative help for <span className="text-[#0097A7]">{currentProject.name}</span>.</p>
+                    </div>
+                    <button
                       onClick={createNewChat}
-                      className="w-full aspect-square group-hover/sidebar:aspect-auto group-hover/sidebar:py-3 bg-[#0097A7]/10 hover:bg-[#0097A7]/20 text-[#0097A7] rounded-xl flex items-center justify-center gap-3 transition-all"
+                      className="mt-1 px-5 py-2.5 bg-[#0097A7] text-white text-[12px] font-semibold rounded-xl hover:bg-[#00b3c6] active:scale-95 transition-all"
                     >
-                      <Plus className="w-5 h-5" />
-                      <span className="hidden group-hover/sidebar:inline text-xs font-bold uppercase tracking-widest">New Chat</span>
+                      Start New Chat
                     </button>
                   </div>
-                  
-                  <div className="flex-1 overflow-y-auto px-3 space-y-2">
-                    {chats.map(chat => (
-                      <div
-                        key={chat.id}
-                        onClick={() => setActiveChatId(chat.id)}
-                        className={`group relative flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${activeChatId === chat.id ? 'bg-[#0097A7]/20 text-[#0097A7]' : 'hover:bg-white/5 text-gray-500 hover:text-gray-300'}`}
-                      >
-                        <History className="w-5 h-5 flex-shrink-0" />
-                        <span className="hidden group-hover/sidebar:inline text-[11px] font-bold truncate pr-6">{chat.title}</span>
-                        <button 
-                          onClick={(e) => deleteChat(e, chat.id)}
-                          className="absolute right-2 opacity-0 group-hover:opacity-100 p-1 hover:text-red-500 transition-all"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Chat Area */}
-                <div className="flex-1 flex flex-col bg-[#0d0d0d]">
-                  {!activeChatId ? (
-                    <div className="flex-1 flex flex-col items-center justify-center p-12 text-center space-y-6">
-                      <div className="w-20 h-20 bg-[#0097A7]/10 rounded-3xl flex items-center justify-center animate-pulse">
-                        <Bot className="w-10 h-10 text-[#0097A7]" />
-                      </div>
-                      <div className="space-y-2">
-                        <h3 className="text-lg font-bold text-white">Project Assistant</h3>
-                        <p className="text-xs text-gray-500 leading-relaxed">Ask me for prompt ideas, camera directions, or help with your creative workflow for <span className="text-[#0097A7] font-bold">{currentProject.name}</span>.</p>
-                      </div>
-                      <button 
-                        onClick={createNewChat}
-                        className="px-6 py-3 bg-[#0097A7] text-white text-[11px] font-black uppercase tracking-widest rounded-2xl hover:scale-105 transition-all"
-                      >
-                        Start New Session
-                      </button>
+                ) : (
+                  <>
+                    {/* Messages */}
+                    <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+                      {messages.map((msg) => (
+                        <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                          <div className={`relative max-w-[78%] px-4 py-2.5 text-[13px] leading-relaxed ${
+                            msg.role === 'user'
+                              ? 'bg-[#0097A7] text-white rounded-t-2xl rounded-bl-2xl rounded-br-[3px]'
+                              : 'bg-[#2c2c2e] text-gray-200 rounded-t-2xl rounded-br-2xl rounded-bl-[3px]'
+                          }`}>
+                            {msg.role === 'user'
+                              ? <svg className="absolute -right-[7px] bottom-0" width="8" height="10" viewBox="0 0 8 10"><path d="M0 10 Q0 6 8 0 L8 10 Z" fill="#0097A7"/></svg>
+                              : <svg className="absolute -left-[7px] bottom-0" width="8" height="10" viewBox="0 0 8 10"><path d="M8 10 Q8 6 0 0 L0 10 Z" fill="#2c2c2e"/></svg>
+                            }
+                            {msg.role === 'user' ? msg.text : renderMarkdown(msg.text)}
+                          </div>
+                        </div>
+                      ))}
+                      {isTyping && (
+                        <div className="flex justify-start">
+                          <div className="relative bg-[#2c2c2e] px-4 py-3 rounded-t-2xl rounded-br-2xl rounded-bl-[3px]">
+                            <svg className="absolute -left-[7px] bottom-0" width="8" height="10" viewBox="0 0 8 10"><path d="M8 10 Q8 6 0 0 L0 10 Z" fill="#2c2c2e"/></svg>
+                            <div className="flex gap-1 items-center">
+                              <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" />
+                              <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce [animation-delay:0.15s]" />
+                              <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce [animation-delay:0.3s]" />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      <div ref={messagesEndRef} />
                     </div>
-                  ) : (
-                    <>
-                      {/* Messages */}
-                      <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                        {messages.map((msg) => (
-                          <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`relative max-w-[78%] px-4 py-3 text-[13px] leading-relaxed ${
-                              msg.role === 'user'
-                                ? 'bg-[#0097A7] text-white rounded-t-2xl rounded-bl-2xl rounded-br-sm'
-                                : 'bg-[#1e1e1e] text-gray-200 rounded-t-2xl rounded-br-2xl rounded-bl-sm'
-                            }`}>
-                              {msg.role === 'user'
-                                ? <div className="absolute -right-[6px] bottom-0 w-0 h-0 border-t-[7px] border-t-transparent border-l-[7px] border-l-[#0097A7]" />
-                                : <div className="absolute -left-[6px] bottom-0 w-0 h-0 border-t-[7px] border-t-transparent border-r-[7px] border-r-[#1e1e1e]" />
-                              }
-                              {msg.role === 'user' ? msg.text : renderMarkdown(msg.text)}
-                            </div>
-                          </div>
-                        ))}
-                        {isTyping && (
-                          <div className="flex justify-start">
-                            <div className="relative bg-[#1e1e1e] px-4 py-3 rounded-t-2xl rounded-br-2xl rounded-bl-sm">
-                              <div className="absolute -left-[6px] bottom-0 w-0 h-0 border-t-[7px] border-t-transparent border-r-[7px] border-r-[#1e1e1e]" />
-                              <div className="flex gap-1 items-center h-4">
-                                <div className="w-1.5 h-1.5 bg-[#0097A7] rounded-full animate-bounce" />
-                                <div className="w-1.5 h-1.5 bg-[#0097A7] rounded-full animate-bounce [animation-delay:0.2s]" />
-                                <div className="w-1.5 h-1.5 bg-[#0097A7] rounded-full animate-bounce [animation-delay:0.4s]" />
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                        <div ref={messagesEndRef} />
-                      </div>
 
-                      {/* Input */}
-                      <div className="p-6 bg-[#111111] border-t border-white/5">
-                        {/* Selected Assets Thumbnails */}
-                        <AnimatePresence>
-                          {selectedAssets.length > 0 && (
-                            <motion.div 
-                              initial={{ opacity: 0, y: 10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: 10 }}
-                              className="flex flex-wrap gap-2 mb-4"
-                            >
-                              {selectedAssets.map(asset => (
-                                <div key={asset.id} className="relative group/asset">
-                                  <div className="w-12 h-12 rounded-lg overflow-hidden border border-white/10 bg-black">
-                                    {asset.type === 'image' ? (
-                                      <img src={asset.thumbnailUrl || asset.url} className="w-full h-full object-cover" />
-                                    ) : (
-                                      <div className="w-full h-full flex items-center justify-center">
-                                        <Library className="w-4 h-4 text-gray-500" />
-                                      </div>
-                                    )}
-                                  </div>
-                                  <button 
-                                    onClick={() => removeSelectedAsset(asset.id)}
-                                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover/asset:opacity-100 transition-opacity"
-                                  >
-                                    <X className="w-2 h-2" />
-                                  </button>
-                                </div>
-                              ))}
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-
-                        <form onSubmit={handleSendMessage} className="relative flex gap-2">
-                          <div className="relative flex-1">
-                            <input
-                              type="text"
-                              value={inputText}
-                              onChange={(e) => setInputText(e.target.value)}
-                              placeholder="Describe your creative vision..."
-                              className="w-full bg-black border border-white/10 rounded-2xl py-4 pl-5 pr-14 text-[13px] text-white focus:outline-none focus:border-[#0097A7] transition-all placeholder:text-gray-700"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowAssetPicker(true)}
-                              className="absolute right-14 top-1/2 -translate-y-1/2 p-2 text-gray-600 hover:text-[#0097A7] transition-colors"
-                              title="Add Asset"
-                            >
-                              <Library className="w-4 h-4" />
-                            </button>
-                            <button
-                              type="submit"
-                              disabled={!inputText.trim() || isTyping}
-                              className="absolute right-2 top-2 bottom-2 w-10 bg-[#0097A7] text-white rounded-xl flex items-center justify-center disabled:opacity-50 hover:scale-105 transition-all"
-                            >
-                              <Send className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </form>
-                        <p className="text-[9px] text-gray-600 text-center mt-3 uppercase font-bold tracking-widest">Gemini can make mistakes. Verify important info.</p>
-                      </div>
-
+                    {/* Input */}
+                    <div className="px-3 pb-3 pt-2 border-t border-white/[0.06]">
                       <AnimatePresence>
-                        {showAssetPicker && (
-                          <div className="fixed inset-0 z-[100] flex items-center justify-center p-8">
-                            <motion.div
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              exit={{ opacity: 0 }}
-                              onClick={() => setShowAssetPicker(false)}
-                              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-                            />
-                            <motion.div
-                              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                              animate={{ opacity: 1, scale: 1, y: 0 }}
-                              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                              className="relative w-full max-w-2xl h-[600px] bg-[#0a0a0a] border border-white/10 rounded-3xl shadow-2xl flex flex-col overflow-hidden"
-                            >
-                              <div className="p-6 border-b border-white/5 flex items-center justify-between bg-[#111111]">
-                                <div className="flex items-center gap-3">
-                                  <Library className="w-5 h-5 text-[#0097A7]" />
-                                  <h3 className="text-sm font-black text-white uppercase tracking-widest">Link Asset to Chat</h3>
+                        {selectedAssets.length > 0 && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="flex flex-wrap gap-2 mb-2"
+                          >
+                            {selectedAssets.map(asset => (
+                              <div key={asset.id} className="relative group/asset">
+                                <div className="w-10 h-10 rounded-lg overflow-hidden border border-white/10 bg-black">
+                                  {asset.type === 'image'
+                                    ? <img src={asset.thumbnailUrl || asset.url} className="w-full h-full object-cover" />
+                                    : <div className="w-full h-full flex items-center justify-center"><Library className="w-3.5 h-3.5 text-gray-500" /></div>
+                                  }
                                 </div>
-                                <button 
-                                  onClick={() => setShowAssetPicker(false)}
-                                  className="p-2 hover:bg-white/5 rounded-full text-gray-500 hover:text-white transition-colors"
+                                <button
+                                  onClick={() => removeSelectedAsset(asset.id)}
+                                  className="absolute -top-1 -right-1 w-4 h-4 bg-black/80 text-white rounded-full flex items-center justify-center opacity-0 group-hover/asset:opacity-100 transition-opacity"
                                 >
-                                  <X className="w-5 h-5" />
+                                  <X className="w-2.5 h-2.5" />
                                 </button>
                               </div>
-                              <div className="flex-1 overflow-hidden flex flex-col">
-                                <AssetGrid isPicker onAssetClick={handleAssetSelect} />
-                              </div>
-                            </motion.div>
-                          </div>
+                            ))}
+                          </motion.div>
                         )}
                       </AnimatePresence>
-                    </>
-                  )}
-                </div>
+
+                      <form onSubmit={handleSendMessage} className="flex items-center gap-2 bg-[#2c2c2e] rounded-2xl px-3 py-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowAssetPicker(true)}
+                          className="text-gray-500 hover:text-gray-300 transition-colors flex-shrink-0"
+                        >
+                          <Paperclip className="w-4 h-4" />
+                        </button>
+                        <input
+                          type="text"
+                          value={inputText}
+                          onChange={(e) => setInputText(e.target.value)}
+                          placeholder="Ask anything..."
+                          className="flex-1 bg-transparent text-[13px] text-white placeholder:text-gray-600 focus:outline-none"
+                        />
+                        <button
+                          type="submit"
+                          disabled={!inputText.trim() || isTyping}
+                          className="w-7 h-7 bg-[#0097A7] text-white rounded-xl flex items-center justify-center disabled:opacity-40 hover:bg-[#00b3c6] active:scale-90 transition-all flex-shrink-0"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                        </button>
+                      </form>
+                    </div>
+                  </>
+                )}
               </div>
             </motion.div>
+
+            {/* Asset Picker Modal */}
+            <AnimatePresence>
+              {showAssetPicker && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-8">
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    onClick={() => setShowAssetPicker(false)}
+                    className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+                  />
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.96, y: 12 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.96, y: 12 }}
+                    className="relative w-full max-w-2xl h-[580px] bg-[#161617] border border-white/[0.06] rounded-3xl shadow-2xl flex flex-col overflow-hidden"
+                  >
+                    <div className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <Library className="w-4 h-4 text-[#0097A7]" />
+                        <span className="text-[13px] font-semibold text-white">Link Asset</span>
+                      </div>
+                      <button
+                        onClick={() => setShowAssetPicker(false)}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 hover:text-white hover:bg-white/8 transition-all"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="flex-1 overflow-hidden flex flex-col">
+                      <AssetGrid isPicker onAssetClick={handleAssetSelect} />
+                    </div>
+                  </motion.div>
+                </div>
+              )}
+            </AnimatePresence>
           </>
         )}
       </AnimatePresence>
