@@ -14,6 +14,7 @@ import { useProjectStore } from '../store/useProjectStore';
 import { nodeTypes } from '../utils/nodeTypes';
 import { motion, AnimatePresence } from 'motion/react';
 import { db, updateDoc, doc } from '../firebase';
+import { stripUndefined } from '../lib/utils';
 import { Loader2, CloudCheck, CloudOff } from 'lucide-react';
 
 const CanvasContent = () => {
@@ -54,9 +55,9 @@ const CanvasContent = () => {
             id: n.id,
             type: n.type,
             position: n.position,
-            data: n.data
+            data: stripUndefined(n.data),
           })),
-          edges,
+          edges: edges.map(e => stripUndefined(e)),
           updatedAt: new Date()
         });
         setSaveStatus('saved');

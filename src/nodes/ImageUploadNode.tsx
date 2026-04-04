@@ -198,7 +198,7 @@ const ImageUploadNode = ({ id, data }: any) => {
             </div>
           )
         ) : (
-          <div className="h-[240px] bg-[#0a0a0a] border border-[#2a2a2a] rounded-xl overflow-hidden">
+          <div className="h-[240px] bg-[#0a0a0a] border border-[#2a2a2a] rounded-xl overflow-hidden flex flex-col">
             <AssetGrid isPicker onAssetClick={handleAssetSelect} />
           </div>
         )}
