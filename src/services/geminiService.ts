@@ -215,8 +215,9 @@ export const generateText = async (params: {
   imageUrls?: string[];
   videoUrls?: string[];
   projectContext?: string;
+  maxOutputTokens?: number;
 }, signal?: AbortSignal) => {
-  const { prompt, model, systemInstruction, imageUrls = [], videoUrls = [], projectContext } = params;
+  const { prompt, model, systemInstruction, imageUrls = [], videoUrls = [], projectContext, maxOutputTokens } = params;
 
   const fullPrompt = projectContext 
     ? `Project Context: ${projectContext}\n\nTask: ${prompt}`
@@ -238,7 +239,10 @@ export const generateText = async (params: {
     const response = await callBackend('generateContent', {
       model: model,
       contents: { parts },
-      config: { systemInstruction }
+      config: {
+        systemInstruction,
+        ...(maxOutputTokens && { maxOutputTokens }),
+      }
     }, signal);
 
     return response.text;

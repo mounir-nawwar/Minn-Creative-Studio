@@ -1,18 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  MessageSquare, 
-  Send, 
-  X, 
-  Plus, 
-  History, 
-  Sparkles, 
-  User as UserIcon, 
-  Bot, 
+import {
+  MessageSquare,
+  Send,
+  X,
+  Plus,
+  History,
+  Sparkles,
+  Bot,
   Loader2,
-  ChevronRight,
   Trash2,
-  Layout,
-  Library
+  Library,
+  Copy,
+  Check
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -53,6 +52,82 @@ interface Chat {
   projectId: string;
   createdAt: any;
   lastMessage?: string;
+}
+
+function parseInline(text: string): React.ReactNode {
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**'))
+      return <strong key={i} className="font-semibold text-white">{part.slice(2, -2)}</strong>;
+    if (part.startsWith('*') && part.endsWith('*'))
+      return <em key={i} className="italic">{part.slice(1, -1)}</em>;
+    if (part.startsWith('`') && part.endsWith('`'))
+      return <code key={i} className="bg-white/10 px-1 rounded text-[11px] font-mono text-[#0097A7]">{part.slice(1, -1)}</code>;
+    return part;
+  });
+}
+
+function CodeCanvas({ code, label }: { code: string; label: string }) {
+  const [copied, setCopied] = React.useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code.trim());
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <div className="mt-2 mb-1 rounded-xl overflow-hidden border border-white/10 bg-[#111111]">
+      <div className="flex items-center justify-between px-3 py-2 bg-[#0a0a0a] border-b border-white/10">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-[#0097A7]">{label || 'Prompt'}</span>
+        <button
+          onClick={handleCopy}
+          className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all text-[11px] font-medium"
+        >
+          {copied
+            ? <><Check className="w-3 h-3 text-green-400" /><span className="text-green-400">Copied</span></>
+            : <><Copy className="w-3 h-3" /><span>Copy</span></>
+          }
+        </button>
+      </div>
+      <pre className="p-3 text-[12px] leading-relaxed text-gray-200 whitespace-pre-wrap font-sans overflow-x-auto">
+        {code.trim()}
+      </pre>
+    </div>
+  );
+}
+
+function renderMarkdown(text: string): React.ReactNode {
+  // Split on fenced code blocks first
+  const segments = text.split(/(```[\w]*\n[\s\S]*?```)/g);
+  return (
+    <div className="space-y-0.5">
+      {segments.map((seg, si) => {
+        const fenceMatch = seg.match(/^```([\w]*)\n([\s\S]*?)```$/);
+        if (fenceMatch) {
+          const lang = fenceMatch[1];
+          const code = fenceMatch[2];
+          const label = lang === 'prompt' ? 'Prompt' : lang ? lang : 'Prompt';
+          return <CodeCanvas key={si} code={code} label={label} />;
+        }
+        // Regular markdown text
+        const lines = seg.split('\n');
+        return lines.map((line, i) => {
+          if (line.startsWith('### ')) return <p key={`${si}-${i}`} className="font-bold text-[13px] text-white mt-2 mb-0.5">{parseInline(line.slice(4))}</p>;
+          if (line.startsWith('## '))  return <p key={`${si}-${i}`} className="font-bold text-[14px] text-white mt-2 mb-0.5">{parseInline(line.slice(3))}</p>;
+          if (line.startsWith('# '))   return <p key={`${si}-${i}`} className="font-bold text-[15px] text-white mt-2 mb-0.5">{parseInline(line.slice(2))}</p>;
+          if (line.startsWith('- ') || line.startsWith('* '))
+            return (
+              <p key={`${si}-${i}`} className="flex gap-2 items-start">
+                <span className="text-[#0097A7] mt-0.5 leading-none">•</span>
+                <span>{parseInline(line.slice(2))}</span>
+              </p>
+            );
+          if (/^\d+\. /.test(line)) return <p key={`${si}-${i}`}>{parseInline(line)}</p>;
+          if (line.trim() === '') return <div key={`${si}-${i}`} className="h-2" />;
+          return <p key={`${si}-${i}`}>{parseInline(line)}</p>;
+        });
+      })}
+    </div>
+  );
 }
 
 export default function ChatDrawer() {
@@ -203,9 +278,10 @@ export default function ChatDrawer() {
       const modelText = await generateText({
         prompt: userMsg,
         model: "gemini-3-flash-preview",
-        systemInstruction: "You are a creative director assistant. Help with prompts, visual ideas, and technical advice for AI video/image generation within the context of the current project.",
+        systemInstruction: "You are a creative director assistant for AI video/image generation. Provide detailed, comprehensive, well-structured responses. When asked for prompts, write complete, rich, detailed prompts with specific visual descriptions, and always wrap the prompt itself inside a fenced code block using triple backticks so it appears as a copyable block. Help with visual ideas, camera directions, lighting setups, style references, color palettes, and technical advice.",
         imageUrls,
-        projectContext
+        projectContext,
+        maxOutputTokens: 8192,
       });
 
       // Save Model Message
@@ -335,24 +411,27 @@ export default function ChatDrawer() {
                   ) : (
                     <>
                       {/* Messages */}
-                      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                      <div className="flex-1 overflow-y-auto p-4 space-y-3">
                         {messages.map((msg) => (
-                          <div key={msg.id} className={`flex gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${msg.role === 'user' ? 'bg-[#0097A7] text-white' : 'bg-white/10 text-[#0097A7]'}`}>
-                              {msg.role === 'user' ? <UserIcon className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
-                            </div>
-                            <div className={`max-w-[85%] p-4 rounded-2xl text-[12px] leading-relaxed ${msg.role === 'user' ? 'bg-[#0097A7]/10 text-white border border-[#0097A7]/20' : 'bg-white/5 text-gray-300 border border-white/5'}`}>
-                              {msg.text}
+                          <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                            <div className={`relative max-w-[78%] px-4 py-3 text-[13px] leading-relaxed ${
+                              msg.role === 'user'
+                                ? 'bg-[#0097A7] text-white rounded-t-2xl rounded-bl-2xl rounded-br-sm'
+                                : 'bg-[#1e1e1e] text-gray-200 rounded-t-2xl rounded-br-2xl rounded-bl-sm'
+                            }`}>
+                              {msg.role === 'user'
+                                ? <div className="absolute -right-[6px] bottom-0 w-0 h-0 border-t-[7px] border-t-transparent border-l-[7px] border-l-[#0097A7]" />
+                                : <div className="absolute -left-[6px] bottom-0 w-0 h-0 border-t-[7px] border-t-transparent border-r-[7px] border-r-[#1e1e1e]" />
+                              }
+                              {msg.role === 'user' ? msg.text : renderMarkdown(msg.text)}
                             </div>
                           </div>
                         ))}
                         {isTyping && (
-                          <div className="flex gap-4">
-                            <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center">
-                              <Loader2 className="w-4 h-4 text-[#0097A7] animate-spin" />
-                            </div>
-                            <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
-                              <div className="flex gap-1">
+                          <div className="flex justify-start">
+                            <div className="relative bg-[#1e1e1e] px-4 py-3 rounded-t-2xl rounded-br-2xl rounded-bl-sm">
+                              <div className="absolute -left-[6px] bottom-0 w-0 h-0 border-t-[7px] border-t-transparent border-r-[7px] border-r-[#1e1e1e]" />
+                              <div className="flex gap-1 items-center h-4">
                                 <div className="w-1.5 h-1.5 bg-[#0097A7] rounded-full animate-bounce" />
                                 <div className="w-1.5 h-1.5 bg-[#0097A7] rounded-full animate-bounce [animation-delay:0.2s]" />
                                 <div className="w-1.5 h-1.5 bg-[#0097A7] rounded-full animate-bounce [animation-delay:0.4s]" />
