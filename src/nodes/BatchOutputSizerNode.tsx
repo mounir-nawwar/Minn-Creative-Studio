@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Handle, Position } from 'reactflow';
 import { Maximize, Layout, Check, Loader2, Download, ExternalLink } from 'lucide-react';
 import { API_BASE } from '../constants';
+import { downloadFile } from '../lib/utils';
 
 const SIZES = [
   { id: '1:1', label: '1:1 (Instagram Post)', aspect: 1 },
@@ -93,9 +94,12 @@ const BatchOutputSizerNode = ({ data, id }: any) => {
                   <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
                     <span className="text-[10px] text-white font-bold">{out.size}</span>
                     <div className="flex gap-2">
-                      <a href={out.url} download={`batch_${out.size}.png`} className="p-1.5 bg-white/20 hover:bg-white/40 rounded-full">
+                      <button 
+                        onClick={() => downloadFile(out.url, `batch_${out.size}.png`)} 
+                        className="p-1.5 bg-white/20 hover:bg-white/40 rounded-full"
+                      >
                         <Download className="w-3 h-3 text-white" />
-                      </a>
+                      </button>
                       <button onClick={() => window.open(out.url)} className="p-1.5 bg-white/20 hover:bg-white/40 rounded-full">
                         <ExternalLink className="w-3 h-3 text-white" />
                       </button>

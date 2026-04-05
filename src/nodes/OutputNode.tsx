@@ -3,6 +3,7 @@ import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
 import { Download, FileDown, Trash2 } from 'lucide-react';
 import VideoPreview from '../components/VideoPreview';
+import { downloadFile } from '../lib/utils';
 
 const OutputNode = ({ id, data }: any) => {
   const edges = useStore((state) => state.edges);
@@ -20,12 +21,7 @@ const OutputNode = ({ id, data }: any) => {
   }).filter(o => o.content);
 
   const handleDownload = (url: string, label: string) => {
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${label.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadFile(url, `${label.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`);
   };
 
   return (

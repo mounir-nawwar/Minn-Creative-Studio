@@ -8,6 +8,7 @@ import ReferenceStrip from '../components/ReferenceStrip';
 import { ImageIcon, Loader2, Download, XCircle } from 'lucide-react';
 import { generateImage } from '../services/geminiService';
 import { useAssets } from '../hooks/useAssets';
+import { downloadFile } from '../lib/utils';
 
 const ImagenNode = ({ id, data }: any) => {
   const [model, setModel] = useState(data.config?.model || 'gemini-3.1-flash-image-preview');
@@ -62,12 +63,7 @@ const ImagenNode = ({ id, data }: any) => {
 
   const handleDownload = () => {
     if (!data.output) return;
-    const link = document.createElement('a');
-    link.href = data.output;
-    link.download = `generated-image-${Date.now()}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadFile(data.output, `generated-image-${Date.now()}.png`);
   };
 
   const handleRun = async () => {

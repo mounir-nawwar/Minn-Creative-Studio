@@ -8,6 +8,7 @@ import ReferenceStrip from '../components/ReferenceStrip';
 import { Video, Loader2, AlertCircle, XCircle, Download } from 'lucide-react';
 import { generateVideo } from '../services/geminiService';
 import { useAssets } from '../hooks/useAssets';
+import { downloadFile } from '../lib/utils';
 
 const VeoNode = ({ id, data }: any) => {
   const [model, setModel] = useState(data.config?.model || 'veo-3.1-fast-generate-preview');
@@ -83,12 +84,7 @@ const VeoNode = ({ id, data }: any) => {
 
   const handleDownload = () => {
     if (!data.output) return;
-    const link = document.createElement('a');
-    link.href = data.output;
-    link.download = `generated-video-${Date.now()}.mp4`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadFile(data.output, `generated-video-${Date.now()}.mp4`);
   };
 
   const handleRun = async () => {

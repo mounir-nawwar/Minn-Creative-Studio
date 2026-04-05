@@ -2,6 +2,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Download, Share2, Heart, Trash2, ExternalLink, Info, Calendar, User, Box, Sparkles } from 'lucide-react';
 import { Asset } from '../types/project.types';
+import { downloadFile } from '../lib/utils';
 
 interface AssetPreviewModalProps {
   asset: Asset | null;
@@ -109,14 +110,13 @@ export default function AssetPreviewModal({ asset, onClose, onDelete, onToggleFa
                 <Heart className={`w-4 h-4 ${asset.isFavorited ? 'fill-current' : ''}`} />
                 {asset.isFavorited ? 'Favorited' : 'Favorite'}
               </button>
-              <a 
-                href={asset.url} 
-                download={asset.name}
+              <button 
+                onClick={() => downloadFile(asset.url, asset.name)}
                 className="flex items-center justify-center gap-3 py-4 bg-white text-black rounded-2xl font-black uppercase text-[10px] tracking-widest hover:scale-[1.02] transition-all"
               >
                 <Download className="w-4 h-4" />
                 Download
-              </a>
+              </button>
             </div>
 
             {/* Metadata Section */}

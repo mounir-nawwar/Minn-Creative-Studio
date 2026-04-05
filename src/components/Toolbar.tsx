@@ -10,7 +10,8 @@ import {
   ChevronDown,
   Zap,
   User as UserIcon,
-  LogOut
+  LogOut,
+  Pencil
 } from 'lucide-react';
 import ToggleSwitch from './ToggleSwitch';
 import { useStore } from '../store/useStore';
@@ -45,6 +46,8 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [workflowName, setWorkflowName] = useState('');
   const [workflows, setWorkflows] = useState<any[]>([]);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [tempName, setTempName] = useState('');
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -222,6 +225,30 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
     }
   };
 
+  const handleRename = async () => {
+    if (!activeWorkflowId || !tempName.trim()) {
+      setIsEditingName(false);
+      return;
+    }
+
+    const currentWf = workflows.find(w => w.id === activeWorkflowId);
+    if (currentWf && currentWf.name === tempName.trim()) {
+      setIsEditingName(false);
+      return;
+    }
+
+    try {
+      await updateDoc(doc(db, 'workflows', activeWorkflowId), {
+        name: tempName.trim(),
+        updatedAt: serverTimestamp()
+      });
+      setIsEditingName(false);
+    } catch (err) {
+      console.error('Rename failed:', err);
+      setIsEditingName(false);
+    }
+  };
+
   return (
     <div className="h-16 bg-[#0a0a0a] border-b border-[#1a1a1a] flex items-center justify-between px-6 z-10">
       <div className="flex items-center gap-6">
@@ -230,9 +257,33 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
             <Zap className="w-3 h-3 text-white" />
           </div>
           <div>
-            <h2 className="text-xs font-black text-white uppercase tracking-widest">
-              {activeWorkflowId ? workflows.find(w => w.id === activeWorkflowId)?.name : 'Untitled Workflow'}
-            </h2>
+            {isEditingName && activeWorkflowId ? (
+              <input
+                value={tempName}
+                onChange={(e) => setTempName(e.target.value)}
+                onBlur={handleRename}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleRename();
+                  if (e.key === 'Escape') setIsEditingName(false);
+                }}
+                className="bg-transparent border-b border-[#0097A7] text-xs font-black text-white uppercase tracking-widest focus:outline-none mb-1"
+                autoFocus
+              />
+            ) : (
+              <h2 
+                className={`text-xs font-black text-white uppercase tracking-widest flex items-center gap-2 group ${activeWorkflowId ? 'cursor-pointer hover:text-[#0097A7] transition-colors' : ''}`}
+                onClick={() => {
+                  if (activeWorkflowId) {
+                    const currentWf = workflows.find(w => w.id === activeWorkflowId);
+                    setTempName(currentWf?.name || '');
+                    setIsEditingName(true);
+                  }
+                }}
+              >
+                {activeWorkflowId ? workflows.find(w => w.id === activeWorkflowId)?.name : 'Untitled Workflow'}
+                {activeWorkflowId && <Pencil className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100 transition-opacity text-[#0097A7]" />}
+              </h2>
+            )}
             <div className="flex items-center gap-2">
               <span className="text-[8px] text-gray-500 font-bold uppercase tracking-tighter">
                 {currentProject?.name}
