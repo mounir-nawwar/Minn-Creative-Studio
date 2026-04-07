@@ -99,13 +99,14 @@ export const generateImage = async (params: {
         model: model,
         contents: { parts },
         config: {
-          imageConfig: { 
+          responseModalities: [Modality.IMAGE],
+          imageConfig: {
             aspectRatio: aspectRatio as any,
             imageSize: imageSize as any
           },
-          seed: seed,
-          topP: guidanceStrength ? guidanceStrength / 20 : undefined,
-          temperature: cfgScale ? cfgScale / 15 : undefined,
+          ...(seed !== undefined && { seed }),
+          ...(guidanceStrength !== undefined && { topP: guidanceStrength / 20 }),
+          ...(cfgScale !== undefined && { temperature: cfgScale / 15 }),
         }
       }, signal);
 

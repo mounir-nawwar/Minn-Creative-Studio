@@ -57,7 +57,16 @@ const CanvasContent = () => {
             position: n.position,
             data: stripUndefined(n.data),
           })),
-          edges: edges.map(e => stripUndefined(e)),
+          edges: edges.map(e => ({
+            id: e.id,
+            source: e.source,
+            target: e.target,
+            sourceHandle: e.sourceHandle ?? null,
+            targetHandle: e.targetHandle ?? null,
+            type: e.type ?? null,
+            animated: e.animated ?? false,
+            data: e.data ? stripUndefined(e.data) : null,
+          })),
           updatedAt: new Date()
         });
         setSaveStatus('saved');
