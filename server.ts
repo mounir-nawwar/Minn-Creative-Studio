@@ -16,6 +16,11 @@ import videoRoutes from './backend/routes/video.ts';
 
 dotenv.config({ override: false });
 
+// Cloud Run injects GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION which cause
+// the @google/genai SDK to attempt Vertex AI auth instead of using the API key.
+delete process.env.GOOGLE_CLOUD_PROJECT;
+delete process.env.GOOGLE_CLOUD_LOCATION;
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 

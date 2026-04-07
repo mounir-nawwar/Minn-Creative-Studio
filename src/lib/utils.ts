@@ -6,8 +6,15 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function stripUndefined<T>(obj: T): T {
-  if (obj === null || typeof obj !== 'object') return obj;
-  if (Array.isArray(obj)) return (obj as any[]).map(stripUndefined) as unknown as T;
+  if (obj === undefined) return null as any;
+  if (obj === null) return obj;
+  if (typeof obj === 'number') return (isFinite(obj) ? obj : null) as any;
+  if (typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) {
+    return (obj as any[])
+      .map(stripUndefined)
+      .filter(v => v !== undefined) as unknown as T;
+  }
   return Object.fromEntries(
     Object.entries(obj as object)
       .filter(([, v]) => v !== undefined)

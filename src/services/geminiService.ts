@@ -1,4 +1,3 @@
-import { GenerateContentResponse, Modality, VideoGenerationReferenceType, Type } from "@google/genai";
 import { API_BASE } from "../constants";
 
 async function callBackend(method: string, params: any, signal?: AbortSignal) {
@@ -99,7 +98,7 @@ export const generateImage = async (params: {
         model: model,
         contents: { parts },
         config: {
-          responseModalities: [Modality.IMAGE],
+          responseModalities: ['IMAGE'],
           imageConfig: {
             aspectRatio: aspectRatio as any,
             imageSize: imageSize as any
@@ -170,7 +169,7 @@ export const generateVideo = async (params: {
       const { data, mimeType } = await urlToBase64(ref.url);
       return {
         image: { imageBytes: data, mimeType },
-        referenceType: VideoGenerationReferenceType.ASSET,
+        referenceType: 'ASSET',
       };
     }));
   }
@@ -264,7 +263,7 @@ export const generateAudio = async (params: {
       model: "gemini-2.5-flash-preview-tts",
       contents: [{ parts: [{ text: prompt }] }],
       config: {
-        responseModalities: [Modality.AUDIO],
+        responseModalities: ['AUDIO'],
         speechConfig: {
           voiceConfig: {
             prebuiltVoiceConfig: { voiceName: voice as any },
@@ -303,13 +302,13 @@ export const generateMask = async (params: {
       config: {
         responseMimeType: "application/json",
         responseSchema: {
-          type: Type.OBJECT,
+          type: 'OBJECT',
           properties: {
             boxes: {
-              type: Type.ARRAY,
+              type: 'ARRAY',
               items: {
-                type: Type.ARRAY,
-                items: { type: Type.NUMBER }
+                type: 'ARRAY',
+                items: { type: 'NUMBER' }
               }
             }
           },
