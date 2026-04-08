@@ -16,11 +16,8 @@ import videoRoutes from './backend/routes/video.ts';
 
 dotenv.config({ override: false });
 
-// Prevent the @google/genai SDK from auto-detecting GCP and routing through Vertex AI.
-// GOOGLE_GENAI_USE_VERTEXAI is explicitly set to "false" in the Cloud Run service config —
-// do NOT delete it here or the SDK will fall back to metadata-server detection.
-// delete process.env.GOOGLE_CLOUD_PROJECT;
-// delete process.env.GOOGLE_CLOUD_LOCATION;
+// On Cloud Run (production), use Vertex AI with ADC (service account auth).
+// Locally, use the Gemini Developer API with an API key.
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -298,19 +295,27 @@ async function startServer() {
   // Gemini Proxy Route
   apiRouter.post('/gemini/proxy', async (req, res, next) => {
     const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
-    if (!apiKey) return res.status(500).json({ error: 'API key not configured on server' });
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    if (!isProduction && !apiKey) {
+      return res.status(500).json({ error: 'API key not configured on server' });
+    }
 
     try {
       const { method } = req.body;
       let params = req.body.params;
 
-      // Log payload size to diagnose Cloud Run request size issues
-      const payloadSizeKB = Math.round(JSON.stringify(params || {}).length / 1024);
-      const contentsStr = JSON.stringify(params?.contents || {});
-      const inlineDataCount = (contentsStr.match(/inlineData/g) || []).length;
-      console.log(`[Gemini] Request: method=${method} model=${params?.model} payload=${payloadSizeKB}KB inlineImages=${inlineDataCount}`);
+      console.log(`[Gemini] Request: method=${method} model=${params?.model} backend=${isProduction ? 'vertex' : 'gemini-dev'}`);
 
-      const ai = new GoogleGenAI({ apiKey });
+      // Production: Vertex AI with ADC (Cloud Run service account handles auth automatically)
+      // Local: Gemini Developer API with API key
+      const ai = isProduction
+        ? new GoogleGenAI({
+            vertexai: true,
+            project: process.env.GOOGLE_CLOUD_PROJECT || 'gen-lang-client-0639313445',
+            location: process.env.GOOGLE_CLOUD_LOCATION || 'us-central1',
+          })
+        : new GoogleGenAI({ apiKey: apiKey! });
 
       if (method === 'generateContent') {
         // Resolve any _imageUrl markers to inlineData server-side before calling Gemini
@@ -360,9 +365,9 @@ async function startServer() {
 
       if (method === 'fetchVideoFile') {
         const { url } = params;
-        const videoRes = await fetch(url, {
-          headers: { 'x-goog-api-key': apiKey }
-        });
+        const fetchHeaders: Record<string, string> = {};
+        if (apiKey) fetchHeaders['x-goog-api-key'] = apiKey;
+        const videoRes = await fetch(url, { headers: fetchHeaders });
         const arrayBuffer = await videoRes.arrayBuffer();
         const base64 = Buffer.from(arrayBuffer).toString('base64');
         const contentType = videoRes.headers.get('content-type') || 'video/mp4';
