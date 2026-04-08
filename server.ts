@@ -301,7 +301,8 @@ async function startServer() {
     if (!apiKey) return res.status(500).json({ error: 'API key not configured on server' });
 
     try {
-      const { method, params } = req.body;
+      const { method } = req.body;
+      let params = req.body.params;
 
       // Log payload size to diagnose Cloud Run request size issues
       const payloadSizeKB = Math.round(JSON.stringify(params || {}).length / 1024);
