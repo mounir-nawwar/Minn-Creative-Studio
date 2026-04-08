@@ -82,6 +82,20 @@ async function resolveImageUrls(contents: any): Promise<any> {
   return contents;
 }
 
+const VERTEX_PROJECT = process.env.GOOGLE_CLOUD_PROJECT || 'gen-lang-client-0639313445';
+
+// Lazy Vertex AI clients — global for Gemini/preview models, us-central1 for Veo/Imagen
+const vertexClients: Record<string, GoogleGenAI> = {};
+function getVertexClient(model = ''): GoogleGenAI {
+  // Veo, Imagen, Lyra/TTS/Audio require us-central1 (high-compute TPU hardware)
+  const needsUsCentral = /^(veo-|imagen-)/.test(model) || model.includes('tts') || model.includes('lyra') || model.includes('audio');
+  const location = needsUsCentral ? 'us-central1' : 'global';
+  if (!vertexClients[location]) {
+    vertexClients[location] = new GoogleGenAI({ vertexai: true, project: VERTEX_PROJECT, location });
+  }
+  return vertexClients[location];
+}
+
 // Vertex AI only accepts role 'user'|'model' — normalize roles and extract system prompts
 function sanitizeForVertex(params: any): any {
   if (!params.contents) return params;
@@ -186,14 +200,13 @@ async function startServer() {
       const { method } = req.body;
       let params = req.body.params;
 
-      const ai = IS_PRODUCTION
-        ? new GoogleGenAI({ vertexai: true, project: process.env.GOOGLE_CLOUD_PROJECT || 'gen-lang-client-0639313445', location: process.env.GOOGLE_CLOUD_LOCATION || 'global' })
-        : new GoogleGenAI({ apiKey: apiKey! });
+      const devAi = !IS_PRODUCTION ? new GoogleGenAI({ apiKey: apiKey! }) : null;
+      const ai = (model: string) => IS_PRODUCTION ? getVertexClient(model) : devAi!;
 
       if (method === 'generateContent') {
         if (params?.contents) params = { ...params, contents: await resolveImageUrls(params.contents) };
         if (IS_PRODUCTION) params = sanitizeForVertex(params);
-        const response = await ai.models.generateContent(params);
+        const response = await ai(params.model).models.generateContent(params);
         const candidates = response.candidates ?? [];
         const text = candidates.flatMap((c: any) => (c?.content?.parts ?? []).filter((p: any) => p.text).map((p: any) => p.text)).join('');
         const promptBlock = (response as any).promptFeedback?.blockReason;
@@ -202,9 +215,9 @@ async function startServer() {
         return res.json({ success: true, data: { candidates, text, promptFeedback: (response as any).promptFeedback } });
       }
 
-      if (method === 'generateImages') return res.json({ success: true, data: await ai.models.generateImages(params) });
-      if (method === 'generateVideos') return res.json({ success: true, data: await ai.models.generateVideos(params) });
-      if (method === 'getOperation') return res.json({ success: true, data: await ai.operations.getVideosOperation(params) });
+      if (method === 'generateImages') return res.json({ success: true, data: await ai(params.model).models.generateImages(params) });
+      if (method === 'generateVideos') return res.json({ success: true, data: await ai(params.model).models.generateVideos(params) });
+      if (method === 'getOperation') return res.json({ success: true, data: await ai('').operations.getVideosOperation(params) });
 
       if (method === 'fetchVideoFile') {
         const headers: Record<string, string> = {};
