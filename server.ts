@@ -277,77 +277,28 @@ async function startServer() {
 
     try {
       const { method, params } = req.body;
-      // Use raw fetch for generateContent to guarantee the Gemini Developer API endpoint
-      // is used (generativelanguage.googleapis.com) — never Vertex AI via ADC.
+
+      const ai = new GoogleGenAI({ apiKey });
+
       if (method === 'generateContent') {
-        const { model, config, contents, ...otherParams } = params;
-
-        // The SDK accepts a 'config' object and translates it for the REST API:
-        // - 'systemInstruction', 'tools', 'toolConfig', 'safetySettings' → top-level fields
-        // - everything else → 'generationConfig'
-        // We replicate that translation here since we're bypassing the SDK.
-        const TOP_LEVEL_KEYS = new Set(['systemInstruction', 'tools', 'toolConfig', 'safetySettings', 'cachedContent']);
-        const generationConfig: any = {};
-        const topLevelFromConfig: any = {};
-
-        if (config) {
-          for (const [k, v] of Object.entries(config as Record<string, any>)) {
-            if (v === undefined) continue;
-            if (TOP_LEVEL_KEYS.has(k)) {
-              // systemInstruction must be a Content object, not a plain string
-              topLevelFromConfig[k] = (k === 'systemInstruction' && typeof v === 'string')
-                ? { parts: [{ text: v }] }
-                : v;
-            } else {
-              generationConfig[k] = v;
-            }
-          }
-        }
-
-        // REST API requires contents to be an array
-        const normalizedContents = Array.isArray(contents) ? contents : (contents ? [contents] : []);
-
-        const body: any = { contents: normalizedContents, ...otherParams, ...topLevelFromConfig };
-        if (Object.keys(generationConfig).length > 0) body.generationConfig = generationConfig;
-
-        const geminiRes = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-          }
-        );
-        const data: any = await geminiRes.json();
-
-        if (!geminiRes.ok) {
-          console.error('[Gemini] API error:', JSON.stringify(data));
-          return res.status(geminiRes.status).json({ success: false, error: data?.error?.message || 'Gemini API error' });
-        }
-
-        const candidates = data.candidates ?? [];
-        const promptBlock = data.promptFeedback?.blockReason;
+        const response = await ai.models.generateContent(params);
+        const candidates = response.candidates ?? [];
+        const computedText = candidates
+          .flatMap((c: any) => (c?.content?.parts ?? []).filter((p: any) => p.text).map((p: any) => p.text))
+          .join('');
+        const promptBlock = (response as any).promptFeedback?.blockReason;
         const hasImage = candidates.some((c: any) =>
           c?.content?.parts?.some((p: any) => p.inlineData)
         );
 
-        // Compute 'text' from candidates — the SDK does this automatically but since we
-        // bypassed it, we must replicate it so clients using response.text still work.
-        const computedText = candidates
-          .flatMap((c: any) => (c?.content?.parts ?? []).filter((p: any) => p.text).map((p: any) => p.text))
-          .join('');
-        if (computedText) data.text = computedText;
-
         if (promptBlock && !hasImage) {
           const detail = `Prompt blocked: ${promptBlock}${computedText ? ` — ${computedText.substring(0, 200)}` : ''}`;
-          console.warn(`[Gemini] ${detail} model=${model}`);
+          console.warn(`[Gemini] ${detail} model=${params?.model}`);
           return res.status(422).json({ success: false, error: detail });
         }
 
-        return res.json({ success: true, data });
+        return res.json({ success: true, data: { candidates, text: computedText, promptFeedback: (response as any).promptFeedback } });
       }
-
-      const ai = new GoogleGenAI({ apiKey });
 
       if (method === 'generateImages') {
         const response = await ai.models.generateImages(params);
