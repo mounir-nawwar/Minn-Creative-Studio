@@ -8,16 +8,26 @@ export function cn(...inputs: ClassValue[]) {
 export function stripUndefined<T>(obj: T): T {
   if (obj === undefined) return null as any;
   if (obj === null) return obj;
+  if (typeof obj === 'function') return null as any;
   if (typeof obj === 'number') return (isFinite(obj) ? obj : null) as any;
   if (typeof obj !== 'object') return obj;
+  if (obj instanceof Date) return obj; // Firestore supports Date natively
   if (Array.isArray(obj)) {
     return (obj as any[])
-      .map(stripUndefined)
+      .map(item =>
+        // Firestore doesn't support nested arrays — convert inner arrays to JSON strings
+        Array.isArray(item) ? JSON.stringify(item) : stripUndefined(item)
+      )
       .filter(v => v !== undefined) as unknown as T;
+  }
+  // Only recurse into plain objects — class instances get converted to null to avoid
+  // Firestore "invalid nested entity" errors from non-serializable types
+  if (Object.getPrototypeOf(obj) !== Object.prototype) {
+    return null as any;
   }
   return Object.fromEntries(
     Object.entries(obj as object)
-      .filter(([, v]) => v !== undefined)
+      .filter(([, v]) => v !== undefined && typeof v !== 'function')
       .map(([k, v]) => [k, stripUndefined(v)])
   ) as T;
 }

@@ -32,6 +32,7 @@ import {
 } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { API_BASE } from '../constants';
+import { stripUndefined } from '../lib/utils';
 
 interface ToolbarProps { user: User | null; onLogout: () => void; }
 const Toolbar = ({ user, onLogout }: ToolbarProps) => {
@@ -156,23 +157,28 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
         data.error = null;
         data.progress = 0;
 
-        // Firestore rejects undefined values — strip them recursively
-        const clean = (obj: any): any => {
-          if (Array.isArray(obj)) return obj.map(clean);
-          if (obj !== null && typeof obj === 'object') {
-            return Object.fromEntries(
-              Object.entries(obj)
-                .filter(([, v]) => v !== undefined)
-                .map(([k, v]) => [k, clean(v)])
-            );
-          }
-          return obj;
+        // Only save plain safe fields — spreading { ...node } includes React Flow internal
+        // properties (positionAbsolute, selected, dragging, __rf, etc.) that Firestore rejects
+        return {
+          id: node.id,
+          type: node.type,
+          position: node.position,
+          data: stripUndefined(data),
         };
-
-        return { ...node, data: clean(data) };
       }));
 
-      const workflowData = { nodes: sanitizedNodes, edges, updatedAt: serverTimestamp() };
+      const sanitizedEdges = edges.map(e => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        sourceHandle: e.sourceHandle ?? null,
+        targetHandle: e.targetHandle ?? null,
+        type: e.type ?? null,
+        animated: e.animated ?? false,
+        data: e.data ? stripUndefined(e.data) : null,
+      }));
+
+      const workflowData = { nodes: sanitizedNodes, edges: sanitizedEdges, updatedAt: serverTimestamp() };
 
       if (activeWorkflowId) {
         await updateDoc(doc(db, 'workflows', activeWorkflowId), workflowData);

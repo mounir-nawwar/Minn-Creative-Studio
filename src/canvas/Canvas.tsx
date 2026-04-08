@@ -54,7 +54,7 @@ const CanvasContent = () => {
           nodes: nodes.map(n => ({
             id: n.id,
             type: n.type,
-            position: n.position,
+            position: { x: isFinite(n.position.x) ? n.position.x : 0, y: isFinite(n.position.y) ? n.position.y : 0 },
             data: stripUndefined(n.data),
           })),
           edges: edges.map(e => ({
