@@ -16,11 +16,11 @@ import videoRoutes from './backend/routes/video.ts';
 
 dotenv.config({ override: false });
 
-// Cloud Run injects env vars that cause the @google/genai SDK to attempt
-// Vertex AI auth instead of using the API key. Delete all of them.
+// Prevent the @google/genai SDK from auto-detecting GCP and routing through Vertex AI.
+// GOOGLE_GENAI_USE_VERTEXAI is explicitly set to "false" in the Cloud Run service config —
+// do NOT delete it here or the SDK will fall back to metadata-server detection.
 delete process.env.GOOGLE_CLOUD_PROJECT;
 delete process.env.GOOGLE_CLOUD_LOCATION;
-delete process.env.GOOGLE_GENAI_USE_VERTEXAI;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -280,13 +280,42 @@ async function startServer() {
       // Use raw fetch for generateContent to guarantee the Gemini Developer API endpoint
       // is used (generativelanguage.googleapis.com) — never Vertex AI via ADC.
       if (method === 'generateContent') {
-        const { model, ...rest } = params;
+        const { model, config, contents, ...otherParams } = params;
+
+        // The SDK accepts a 'config' object and translates it for the REST API:
+        // - 'systemInstruction', 'tools', 'toolConfig', 'safetySettings' → top-level fields
+        // - everything else → 'generationConfig'
+        // We replicate that translation here since we're bypassing the SDK.
+        const TOP_LEVEL_KEYS = new Set(['systemInstruction', 'tools', 'toolConfig', 'safetySettings', 'cachedContent']);
+        const generationConfig: any = {};
+        const topLevelFromConfig: any = {};
+
+        if (config) {
+          for (const [k, v] of Object.entries(config as Record<string, any>)) {
+            if (v === undefined) continue;
+            if (TOP_LEVEL_KEYS.has(k)) {
+              // systemInstruction must be a Content object, not a plain string
+              topLevelFromConfig[k] = (k === 'systemInstruction' && typeof v === 'string')
+                ? { parts: [{ text: v }] }
+                : v;
+            } else {
+              generationConfig[k] = v;
+            }
+          }
+        }
+
+        // REST API requires contents to be an array
+        const normalizedContents = Array.isArray(contents) ? contents : (contents ? [contents] : []);
+
+        const body: any = { contents: normalizedContents, ...otherParams, ...topLevelFromConfig };
+        if (Object.keys(generationConfig).length > 0) body.generationConfig = generationConfig;
+
         const geminiRes = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(rest),
+            body: JSON.stringify(body),
           }
         );
         const data: any = await geminiRes.json();
@@ -302,11 +331,15 @@ async function startServer() {
           c?.content?.parts?.some((p: any) => p.inlineData)
         );
 
+        // Compute 'text' from candidates — the SDK does this automatically but since we
+        // bypassed it, we must replicate it so clients using response.text still work.
+        const computedText = candidates
+          .flatMap((c: any) => (c?.content?.parts ?? []).filter((p: any) => p.text).map((p: any) => p.text))
+          .join('');
+        if (computedText) data.text = computedText;
+
         if (promptBlock && !hasImage) {
-          const textParts = candidates.flatMap((c: any) =>
-            (c?.content?.parts ?? []).filter((p: any) => p.text).map((p: any) => p.text)
-          ).join(' ');
-          const detail = `Prompt blocked: ${promptBlock}${textParts ? ` — ${textParts.substring(0, 200)}` : ''}`;
+          const detail = `Prompt blocked: ${promptBlock}${computedText ? ` — ${computedText.substring(0, 200)}` : ''}`;
           console.warn(`[Gemini] ${detail} model=${model}`);
           return res.status(422).json({ success: false, error: detail });
         }
