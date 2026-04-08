@@ -84,10 +84,8 @@ export const generateImage = async (params: {
     
     if (referenceImages && referenceImages.length > 0) {
       for (const ref of referenceImages) {
-        const { data, mimeType } = await urlToBase64(ref.url);
-        parts.push({
-          inlineData: { data, mimeType }
-        });
+        // Send URL only — server fetches image directly to avoid Cloud Run 32MB request size limit
+        parts.push({ _imageUrl: ref.url });
       }
     }
     

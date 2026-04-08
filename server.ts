@@ -126,6 +126,29 @@ async function getWorkingBucket() {
 
 initFirebaseAdmin();
 
+// Resolve { _imageUrl } part markers to { inlineData } server-side.
+// This keeps large base64 image data out of the Cloud Run HTTP request body (32MB limit).
+async function resolveImageUrls(contents: any): Promise<any> {
+  const resolveParts = async (parts: any[]): Promise<any[]> =>
+    Promise.all(parts.map(async (part: any) => {
+      if (!part._imageUrl) return part;
+      const r = await fetch(part._imageUrl);
+      if (!r.ok) throw new Error(`Image fetch failed: ${r.status} for ${part._imageUrl.substring(0, 80)}`);
+      const buf = await r.arrayBuffer();
+      const mimeType = r.headers.get('content-type') || 'image/jpeg';
+      console.log(`[Gemini] Server-fetched image: ${Math.round(buf.byteLength / 1024)}KB type=${mimeType}`);
+      return { inlineData: { data: Buffer.from(buf).toString('base64'), mimeType } };
+    }));
+
+  if (Array.isArray(contents)) {
+    return Promise.all(contents.map(async (c: any) =>
+      c?.parts ? { ...c, parts: await resolveParts(c.parts) } : c
+    ));
+  }
+  if (contents?.parts) return { ...contents, parts: await resolveParts(contents.parts) };
+  return contents;
+}
+
 async function startServer() {
   const app = express();
   const PORT = parseInt(process.env.PORT || '3000');
@@ -289,6 +312,10 @@ async function startServer() {
       const ai = new GoogleGenAI({ apiKey });
 
       if (method === 'generateContent') {
+        // Resolve any _imageUrl markers to inlineData server-side before calling Gemini
+        if (params?.contents) {
+          params = { ...params, contents: await resolveImageUrls(params.contents) };
+        }
         const response = await ai.models.generateContent(params);
 
         const blockReason = (response as any).promptFeedback?.blockReason;
