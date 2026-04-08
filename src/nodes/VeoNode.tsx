@@ -11,7 +11,7 @@ import { useAssets } from '../hooks/useAssets';
 import { downloadFile } from '../lib/utils';
 
 const VeoNode = ({ id, data }: any) => {
-  const [model, setModel] = useState(data.config?.model || 'veo-3.1-fast-generate-preview');
+  const [model, setModel] = useState(data.config?.model || 'veo-3.1-fast-generate-001');
   const [aspectRatio, setAspectRatio] = useState(data.config?.aspectRatio || '16:9');
   const [resolution, setResolution] = useState(data.config?.resolution || '720p');
   const [duration, setDuration] = useState(data.config?.duration || 5);
@@ -215,8 +215,8 @@ const VeoNode = ({ id, data }: any) => {
                 updateNodeData(id, { config: { ...data.config, model: e.target.value } });
               }}
             >
-              <option value="veo-3.1-fast-generate-preview">Veo 3.1 Fast</option>
-              <option value="veo-3.1-generate-preview">Veo 3.1 (High Quality)</option>
+              <option value="veo-3.1-fast-generate-001">Veo 3.1 Fast</option>
+              <option value="veo-3.1-generate-001">Veo 3.1 (High Quality)</option>
             </select>
           </div>
 

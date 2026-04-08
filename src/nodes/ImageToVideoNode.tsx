@@ -8,7 +8,7 @@ import { Video, Loader2, AlertCircle } from 'lucide-react';
 import { generateVideo } from '../services/geminiService';
 
 const ImageToVideoNode = ({ id, data }: any) => {
-  const [model, setModel] = useState(data.config?.model || 'veo-3.1-fast-generate-preview');
+  const [model, setModel] = useState(data.config?.model || 'veo-3.1-fast-generate-001');
   const [aspectRatio, setAspectRatio] = useState(data.config?.aspectRatio || '16:9');
   const [duration, setDuration] = useState(data.config?.duration || 5);
   const [referenceStrength, setReferenceStrength] = useState(data.config?.referenceStrength || 50);
@@ -148,8 +148,8 @@ const ImageToVideoNode = ({ id, data }: any) => {
                 updateNodeData(id, { config: { ...data.config, model: e.target.value } });
               }}
             >
-              <option value="veo-3.1-fast-generate-preview">Veo 3.1 Fast</option>
-              <option value="veo-3.1-generate-preview">Veo 3.1 (High Quality)</option>
+              <option value="veo-3.1-fast-generate-001">Veo 3.1 Fast</option>
+              <option value="veo-3.1-generate-001">Veo 3.1 (High Quality)</option>
             </select>
           </div>
 
