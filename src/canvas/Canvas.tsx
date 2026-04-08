@@ -51,12 +51,19 @@ const CanvasContent = () => {
       try {
         const wfRef = doc(db, 'workflows', activeWorkflowId);
         await updateDoc(wfRef, {
-          nodes: nodes.map(n => ({
-            id: n.id,
-            type: n.type,
-            position: { x: isFinite(n.position.x) ? n.position.x : 0, y: isFinite(n.position.y) ? n.position.y : 0 },
-            data: stripUndefined(n.data),
-          })),
+          nodes: nodes.map(n => {
+            const nodeData = { ...n.data };
+            // Skip transient base64 data URLs — they're replaced by Firebase Storage URLs after upload
+            if (typeof nodeData.output === 'string' && nodeData.output.startsWith('data:')) {
+              delete nodeData.output;
+            }
+            return {
+              id: n.id,
+              type: n.type,
+              position: { x: isFinite(n.position.x) ? n.position.x : 0, y: isFinite(n.position.y) ? n.position.y : 0 },
+              data: stripUndefined(nodeData),
+            };
+          }),
           edges: edges.map(e => ({
             id: e.id,
             source: e.source,
