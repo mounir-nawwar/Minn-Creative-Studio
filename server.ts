@@ -16,10 +16,11 @@ import videoRoutes from './backend/routes/video.ts';
 
 dotenv.config({ override: false });
 
-// Cloud Run injects GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION which cause
-// the @google/genai SDK to attempt Vertex AI auth instead of using the API key.
+// Cloud Run injects env vars that cause the @google/genai SDK to attempt
+// Vertex AI auth instead of using the API key. Delete all of them.
 delete process.env.GOOGLE_CLOUD_PROJECT;
 delete process.env.GOOGLE_CLOUD_LOCATION;
+delete process.env.GOOGLE_GENAI_USE_VERTEXAI;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -280,12 +281,26 @@ async function startServer() {
 
       if (method === 'generateContent') {
         const response = await ai.models.generateContent(params);
-        return res.json({ 
-          success: true, 
+        // Explicitly extract fields — spreading a SDK class instance may miss getter-based properties
+        const candidates = response.candidates ?? [];
+        const hasImage = candidates.some((c: any) =>
+          c?.content?.parts?.some((p: any) => p.inlineData)
+        );
+        if (!hasImage) {
+          const finishReasons = candidates.map((c: any) => c?.finishReason).join(', ');
+          const textParts = candidates.flatMap((c: any) =>
+            (c?.content?.parts ?? []).filter((p: any) => p.text).map((p: any) => p.text)
+          ).join(' ');
+          console.warn(`[Gemini] generateContent returned no image. model=${params.model} finishReasons=${finishReasons || 'none'} text="${textParts.substring(0, 200)}"`);
+        }
+        return res.json({
+          success: true,
           data: {
-            ...response,
+            candidates,
+            promptFeedback: response.promptFeedback,
+            usageMetadata: response.usageMetadata,
             text: response.text
-          } 
+          }
         });
       }
 
