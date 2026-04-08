@@ -9,7 +9,8 @@
       "mcp__ide__getDiagnostics",
       "WebFetch(domain:googleapis.github.io)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "WebFetch(domain:ai.google.dev)"
+      "WebFetch(domain:ai.google.dev)",
+      "WebFetch(domain:docs.cloud.google.com)"
     ]
   }
 }
