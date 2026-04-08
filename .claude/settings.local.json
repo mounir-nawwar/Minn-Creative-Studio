@@ -6,7 +6,10 @@
       "Bash(gcloud run:*)",
       "Bash(python -c \"import sys,json; logs=json.load\\(sys.stdin\\); [print\\(l.get\\(''''textPayload''''\\) or l.get\\(''''jsonPayload'''',{}\\).get\\(''''message'''',''''''''\\)\\) for l in logs]\")",
       "Bash(xargs grep:*)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "WebFetch(domain:googleapis.github.io)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:ai.google.dev)"
     ]
   }
 }

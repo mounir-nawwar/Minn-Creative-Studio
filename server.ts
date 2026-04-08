@@ -19,8 +19,8 @@ dotenv.config({ override: false });
 // Prevent the @google/genai SDK from auto-detecting GCP and routing through Vertex AI.
 // GOOGLE_GENAI_USE_VERTEXAI is explicitly set to "false" in the Cloud Run service config —
 // do NOT delete it here or the SDK will fall back to metadata-server detection.
-delete process.env.GOOGLE_CLOUD_PROJECT;
-delete process.env.GOOGLE_CLOUD_LOCATION;
+// delete process.env.GOOGLE_CLOUD_PROJECT;
+// delete process.env.GOOGLE_CLOUD_LOCATION;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -263,6 +263,8 @@ async function startServer() {
       if (!response.ok) return res.status(502).json({ error: `Failed to fetch image: ${response.status}` });
       const buffer = await response.arrayBuffer();
       const mimeType = response.headers.get('content-type') || 'image/jpeg';
+      const sizeKB = Math.round(buffer.byteLength / 1024);
+      console.log(`[Proxy] Image fetched: ${sizeKB}KB, type=${mimeType}, url=${url.substring(0, 80)}`);
       const data = Buffer.from(buffer).toString('base64');
       res.json({ data, mimeType });
     } catch (err: any) {
@@ -278,10 +280,21 @@ async function startServer() {
     try {
       const { method, params } = req.body;
 
+      // Log payload size to diagnose Cloud Run request size issues
+      const payloadSizeKB = Math.round(JSON.stringify(params || {}).length / 1024);
+      const contentsStr = JSON.stringify(params?.contents || {});
+      const inlineDataCount = (contentsStr.match(/inlineData/g) || []).length;
+      console.log(`[Gemini] Request: method=${method} model=${params?.model} payload=${payloadSizeKB}KB inlineImages=${inlineDataCount}`);
+
       const ai = new GoogleGenAI({ apiKey });
 
       if (method === 'generateContent') {
         const response = await ai.models.generateContent(params);
+
+        const blockReason = (response as any).promptFeedback?.blockReason;
+        const candidatesCount = response.candidates?.length ?? 0;
+        console.log(`[Gemini] Response: candidates=${candidatesCount} blockReason=${blockReason ?? 'none'}`);
+
         const candidates = response.candidates ?? [];
         const computedText = candidates
           .flatMap((c: any) => (c?.content?.parts ?? []).filter((p: any) => p.text).map((p: any) => p.text))
@@ -293,8 +306,9 @@ async function startServer() {
 
         if (promptBlock && !hasImage) {
           const detail = `Prompt blocked: ${promptBlock}${computedText ? ` — ${computedText.substring(0, 200)}` : ''}`;
-          console.warn(`[Gemini] ${detail} model=${params?.model}`);
-          return res.status(422).json({ success: false, error: detail });
+          const fullFeedback = JSON.stringify((response as any).promptFeedback || {}, null, 2);
+          console.warn(`[Gemini] BLOCK: ${detail} model=${params?.model}\nFeedback: ${fullFeedback}`);
+          return res.status(422).json({ success: false, error: detail, feedback: (response as any).promptFeedback });
         }
 
         return res.json({ success: true, data: { candidates, text: computedText, promptFeedback: (response as any).promptFeedback } });
@@ -302,6 +316,7 @@ async function startServer() {
 
       if (method === 'generateImages') {
         const response = await ai.models.generateImages(params);
+        console.log('[Gemini] generateImages success');
         return res.json({ success: true, data: response });
       }
 

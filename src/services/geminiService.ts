@@ -106,7 +106,14 @@ export const generateImage = async (params: {
           ...(seed !== undefined && { seed }),
           ...(guidanceStrength !== undefined && { topP: guidanceStrength / 20 }),
           ...(cfgScale !== undefined && { temperature: cfgScale / 15 }),
-        }
+        },
+        safetySettings: [
+          { category: 'HATE_SPEECH', threshold: 'BLOCK_NONE' },
+          { category: 'SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+          { category: 'HARASSMENT', threshold: 'BLOCK_NONE' },
+          { category: 'DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+          { category: 'CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' }
+        ]
       }, signal);
 
       for (const part of response.candidates?.[0]?.content?.parts || []) {
