@@ -109,7 +109,7 @@ async function getWorkingBucket() {
   // 3. Last Resort: List all buckets and pick the first one
   try {
     console.log('[Storage] ℹ️  Attempting to list all available buckets...');
-    const [buckets] = await storage.getBuckets();
+    const [buckets] = await (storage as any).getBuckets();
     if (buckets.length > 0) {
       const firstBucket = buckets[0];
       console.log(`[Storage] ✅ Using first discovered bucket: ${firstBucket.name}`);
@@ -233,8 +233,8 @@ async function startServer() {
       
       if (adminApp) {
         try {
-          const [buckets] = await getAdminStorage().getBuckets();
-          availableBuckets = buckets.map(b => b.name);
+          const [buckets] = await (getAdminStorage() as any).getBuckets();
+          availableBuckets = buckets.map((b: any) => b.name);
         } catch (e: any) {
           availableBuckets = [`Error listing buckets: ${e.message}`];
         }
@@ -277,22 +277,35 @@ async function startServer() {
 
     try {
       const { method, params } = req.body;
-      const ai = new GoogleGenAI({ apiKey });
+      // Explicitly pass vertexai:false to guarantee the Gemini API endpoint is used,
+      // not Vertex AI — even if Cloud Run ADC or other env vars would normally trigger it.
+      const ai = new GoogleGenAI({ apiKey, vertexai: false } as any);
 
       if (method === 'generateContent') {
         const response = await ai.models.generateContent(params);
-        // Explicitly extract fields — spreading a SDK class instance may miss getter-based properties
         const candidates = response.candidates ?? [];
         const hasImage = candidates.some((c: any) =>
           c?.content?.parts?.some((p: any) => p.inlineData)
         );
+
         if (!hasImage) {
-          const finishReasons = candidates.map((c: any) => c?.finishReason).join(', ');
+          // Gather model's text reply (if any) and finish reason — helps diagnose safety blocks
+          const finishReasons = candidates.map((c: any) => c?.finishReason ?? 'unknown').join(', ');
           const textParts = candidates.flatMap((c: any) =>
             (c?.content?.parts ?? []).filter((p: any) => p.text).map((p: any) => p.text)
           ).join(' ');
-          console.warn(`[Gemini] generateContent returned no image. model=${params.model} finishReasons=${finishReasons || 'none'} text="${textParts.substring(0, 200)}"`);
+          const promptBlock = (response as any).promptFeedback?.blockReason;
+
+          const detail = promptBlock
+            ? `Prompt blocked: ${promptBlock}`
+            : textParts
+              ? `Model returned text instead of image: "${textParts.substring(0, 300)}"`
+              : `No image in response. finishReasons=${finishReasons}, candidates=${candidates.length}`;
+
+          console.warn(`[Gemini] No image returned. model=${params.model} — ${detail}`);
+          return res.status(422).json({ success: false, error: detail });
         }
+
         return res.json({
           success: true,
           data: {
