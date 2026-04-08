@@ -277,45 +277,44 @@ async function startServer() {
 
     try {
       const { method, params } = req.body;
-      // Explicitly pass vertexai:false to guarantee the Gemini API endpoint is used,
-      // not Vertex AI — even if Cloud Run ADC or other env vars would normally trigger it.
-      const ai = new GoogleGenAI({ apiKey, vertexai: false } as any);
-
+      // Use raw fetch for generateContent to guarantee the Gemini Developer API endpoint
+      // is used (generativelanguage.googleapis.com) — never Vertex AI via ADC.
       if (method === 'generateContent') {
-        const response = await ai.models.generateContent(params);
-        const candidates = response.candidates ?? [];
+        const { model, ...rest } = params;
+        const geminiRes = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(rest),
+          }
+        );
+        const data: any = await geminiRes.json();
+
+        if (!geminiRes.ok) {
+          console.error('[Gemini] API error:', JSON.stringify(data));
+          return res.status(geminiRes.status).json({ success: false, error: data?.error?.message || 'Gemini API error' });
+        }
+
+        const candidates = data.candidates ?? [];
+        const promptBlock = data.promptFeedback?.blockReason;
         const hasImage = candidates.some((c: any) =>
           c?.content?.parts?.some((p: any) => p.inlineData)
         );
 
-        if (!hasImage) {
-          // Gather model's text reply (if any) and finish reason — helps diagnose safety blocks
-          const finishReasons = candidates.map((c: any) => c?.finishReason ?? 'unknown').join(', ');
+        if (promptBlock && !hasImage) {
           const textParts = candidates.flatMap((c: any) =>
             (c?.content?.parts ?? []).filter((p: any) => p.text).map((p: any) => p.text)
           ).join(' ');
-          const promptBlock = (response as any).promptFeedback?.blockReason;
-
-          const detail = promptBlock
-            ? `Prompt blocked: ${promptBlock}`
-            : textParts
-              ? `Model returned text instead of image: "${textParts.substring(0, 300)}"`
-              : `No image in response. finishReasons=${finishReasons}, candidates=${candidates.length}`;
-
-          console.warn(`[Gemini] No image returned. model=${params.model} — ${detail}`);
+          const detail = `Prompt blocked: ${promptBlock}${textParts ? ` — ${textParts.substring(0, 200)}` : ''}`;
+          console.warn(`[Gemini] ${detail} model=${model}`);
           return res.status(422).json({ success: false, error: detail });
         }
 
-        return res.json({
-          success: true,
-          data: {
-            candidates,
-            promptFeedback: response.promptFeedback,
-            usageMetadata: response.usageMetadata,
-            text: response.text
-          }
-        });
+        return res.json({ success: true, data });
       }
+
+      const ai = new GoogleGenAI({ apiKey });
 
       if (method === 'generateImages') {
         const response = await ai.models.generateImages(params);
