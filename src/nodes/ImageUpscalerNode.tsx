@@ -1,13 +1,19 @@
 import React, { useState } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
-import { Maximize, Loader2 } from 'lucide-react';
+import { useProjectStore } from '../store/useProjectStore';
+import { useAssets } from '../hooks/useAssets';
+import { Maximize, Loader2, Download } from 'lucide-react';
 import { upscaleImage } from '../services/geminiService';
+import { downloadFile } from '../lib/utils';
 
 const ImageUpscalerNode = ({ id, data }: any) => {
   const [scale, setScale] = useState(data.config?.scale || '2x');
   const [preserveStyle, setPreserveStyle] = useState(data.config?.preserveStyle || true);
+  
   const updateNodeData = useStore((state) => state.updateNodeData);
+  const { currentProject } = useProjectStore();
+  const { addAsset } = useAssets();
 
   const handleRun = async () => {
     const state = useStore.getState();
@@ -30,10 +36,22 @@ const ImageUpscalerNode = ({ id, data }: any) => {
       const upscaledUrl = await upscaleImage({
         imageUrl,
         scale,
-        preserveStyle
+        preserveStyle,
+        projectId: currentProject?.id
       });
       
       updateNodeData(id, { output: upscaledUrl, isRunning: false, progress: 100 });
+
+      // Add to Assets grid
+      if (upscaledUrl) {
+        addAsset({
+          name: `Upscaled Image - ${new Date().toLocaleTimeString()} (${scale})`,
+          type: 'image',
+          url: upscaledUrl,
+          thumbnailUrl: upscaledUrl,
+          tags: ['generated', 'image', 'upscale']
+        });
+      }
     } catch (err: any) {
       updateNodeData(id, { error: err.message, isRunning: false });
     }

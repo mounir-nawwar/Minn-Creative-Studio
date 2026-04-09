@@ -53,9 +53,14 @@ const CanvasContent = () => {
         await updateDoc(wfRef, {
           nodes: nodes.map(n => {
             const nodeData = { ...n.data };
-            // Skip transient base64 data URLs — they're replaced by Firebase Storage URLs after upload
+            // Strip transient base64 data URLs — they exceed Firestore's 1MB/10MB limits
+            // and are replaced by Firebase Storage URLs after server-side upload
             if (typeof nodeData.output === 'string' && nodeData.output.startsWith('data:')) {
               delete nodeData.output;
+            }
+            if (Array.isArray(nodeData.outputs)) {
+              const filtered = nodeData.outputs.filter((u: any) => typeof u !== 'string' || !u.startsWith('data:'));
+              nodeData.outputs = filtered.length ? filtered : undefined;
             }
             return {
               id: n.id,

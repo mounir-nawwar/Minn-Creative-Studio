@@ -56,8 +56,9 @@ export const generateImage = async (params: {
   guidanceStrength?: number;
   cfgScale?: number;
   projectContext?: string;
+  projectId?: string;
 }, signal?: AbortSignal) => {
-  const { prompt, model, aspectRatio, imageSize, referenceImages, seed, guidanceStrength, cfgScale, projectContext } = params;
+  const { prompt, model, aspectRatio, imageSize, referenceImages, seed, guidanceStrength, cfgScale, projectContext, projectId } = params;
 
   const fullPrompt = projectContext 
     ? `Project Context: ${projectContext}\n\nTask: Generate an image based on this prompt: ${prompt}`
@@ -68,13 +69,12 @@ export const generateImage = async (params: {
       const response = await callBackend('generateImages', {
         model: model,
         prompt: fullPrompt,
-        config: {
-          numberOfImages: 1,
-          aspectRatio: aspectRatio as any,
-        },
+        config: { numberOfImages: 1, aspectRatio: aspectRatio as any },
+        projectId,
       }, signal);
-      const base64Image = response.generatedImages[0].image.imageBytes;
-      return `data:image/png;base64,${base64Image}`;
+      const img = response.generatedImages[0].image;
+      if (img.storageUrl) return img.storageUrl;
+      return `data:image/png;base64,${img.imageBytes}`;
     } catch (err) {
       console.error('Gemini API Error:', err);
       throw err;
@@ -110,18 +110,19 @@ export const generateImage = async (params: {
           ...(seed !== undefined && { seed }),
           ...(guidanceStrength !== undefined && { topP: guidanceStrength / 20 }),
           ...(cfgScale !== undefined && { temperature: cfgScale / 15 }),
+          safetySettings: [
+            { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+            { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+            { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+            { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+          ],
         },
-        safetySettings: [
-          { category: 'HATE_SPEECH', threshold: 'BLOCK_NONE' },
-          { category: 'SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-          { category: 'HARASSMENT', threshold: 'BLOCK_NONE' },
-          { category: 'DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-          { category: 'CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' }
-        ]
+        projectId,
       }, signal);
 
       for (const part of response.candidates?.[0]?.content?.parts || []) {
         if (part.inlineData) {
+          if (part.inlineData.storageUrl) return part.inlineData.storageUrl;
           return `data:image/png;base64,${part.inlineData.data}`;
         }
       }
@@ -139,26 +140,39 @@ export const generateVideo = async (params: {
   aspectRatio: string;
   resolution?: string;
   duration?: number;
+  sampleCount?: number;
+  negativePrompt?: string;
+  seed?: number;
+  personGeneration?: string;
+  audio?: boolean;
+  resizeMode?: string;
   startFrameUrl?: string;
   endFrameUrl?: string;
   referenceImages?: { url: string; role: string; strength: number }[];
   motionIntensity?: number;
   videoUrl?: string;
+  projectId?: string;
   projectContext?: string;
   onProgress?: (progress: number) => void;
-}, signal?: AbortSignal) => {
-  const { prompt, model, aspectRatio, resolution, duration, startFrameUrl, endFrameUrl, referenceImages, motionIntensity, videoUrl, projectContext, onProgress } = params;
+}, signal?: AbortSignal): Promise<string[]> => {
+  const { prompt, model, aspectRatio, resolution, duration, sampleCount = 1, negativePrompt, seed, personGeneration, audio, resizeMode, startFrameUrl, endFrameUrl, referenceImages, motionIntensity, videoUrl, projectId, projectContext, onProgress } = params;
 
-  const fullPrompt = projectContext 
+  const fullPrompt = projectContext
     ? `Project Context: ${projectContext}\n\nTask: Generate a video based on this prompt: ${prompt}`
     : prompt;
 
   const videoConfig: any = {
-    numberOfVideos: 1,
+    numberOfVideos: sampleCount,
+    sampleCount: sampleCount,
     aspectRatio: aspectRatio as any,
     resolution: (resolution || '720p') as any,
     duration: duration,
-    motionIntensity: motionIntensity
+    motionIntensity: motionIntensity,
+    ...(negativePrompt && { negativePrompt }),
+    ...(seed !== undefined && { seed }),
+    ...(personGeneration && { personGeneration }),
+    ...(audio !== undefined && { audio }),
+    ...(resizeMode && { resizeMode }),
   };
 
   let startFrameData;
@@ -207,12 +221,23 @@ export const generateVideo = async (params: {
     }
 
     onProgress?.(95);
-    const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-    if (!downloadLink) throw new Error("No video generated");
+    const generatedVideos: any[] = operation.response?.generatedVideos ?? [];
+    if (!generatedVideos.length) throw new Error("No video generated");
 
-    const videoData = await callBackend('fetchVideoFile', { url: downloadLink }, signal);
+    const results = await Promise.all(
+      generatedVideos.map(async (v: any) => {
+        const url = v.video?.uri;
+        if (!url) return null;
+        const videoData = await callBackend('fetchVideoFile', { url, projectId }, signal);
+        // Server uploaded directly to Storage — return permanent URL
+        if (videoData.storageUrl) return videoData.storageUrl;
+        return `data:${videoData.contentType};base64,${videoData.base64}`;
+      })
+    );
+    const videos = results.filter(Boolean) as string[];
+    if (!videos.length) throw new Error("No video generated");
     onProgress?.(100);
-    return `data:${videoData.contentType};base64,${videoData.base64}`;
+    return videos;
   } catch (err) {
     console.error('Gemini API Error:', err);
     throw err;
@@ -265,28 +290,108 @@ export const generateText = async (params: {
 
 export const generateAudio = async (params: {
   prompt: string;
+  model?: string;
   voice?: string;
+  projectId?: string;
+  referenceImages?: { url: string }[];
+  negativePrompt?: string;
+  duration?: number;
+  seed?: number;
+  temperature?: number;
+  topP?: number;
+  topK?: number;
+  onProgress?: (progress: number) => void;
 }, signal?: AbortSignal) => {
-  const { prompt, voice = 'Kore' } = params;
+  const { 
+    prompt, 
+    model = "gemini-2.5-flash-preview-tts", 
+    voice = 'Kore', 
+    projectId,
+    referenceImages,
+    negativePrompt,
+    duration,
+    seed,
+    temperature,
+    topP,
+    topK,
+    onProgress
+  } = params;
+
+  const isLyria = model.includes('lyria');
+  const parts: any[] = [];
+
+  // Add reference images for multimodal Lyria
+  if (isLyria && referenceImages && referenceImages.length > 0) {
+    for (const ref of referenceImages) {
+      if (ref.url.startsWith('http')) {
+        parts.push({ _imageUrl: ref.url });
+      } else {
+        const { data, mimeType } = await urlToBase64(ref.url);
+        parts.push({ inlineData: { data, mimeType } });
+      }
+    }
+  }
+
+  parts.push({ text: prompt });
 
   try {
-    const response = await callBackend('generateContent', {
-      model: "gemini-2.5-flash-preview-tts",
-      contents: [{ parts: [{ text: prompt }] }],
+    onProgress?.(10);
+    let response = await callBackend('generateContent', {
+      model: model,
+      contents: [{ parts }],
       config: {
         responseModalities: ['AUDIO'],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: voice as any },
+        ...(model.includes('tts') && {
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: voice as any },
+            },
           },
-        },
+        }),
+        ...(isLyria && {
+          ...(negativePrompt && { negative_prompt: negativePrompt }),
+          ...(duration && { duration }),
+          ...(seed !== undefined && { seed }),
+          ...(temperature !== undefined && { temperature }),
+          ...(topP !== undefined && { topP }),
+          ...(topK !== undefined && { topK }),
+        }),
+        safetySettings: [
+          { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+          { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+          { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+          { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+        ],
       },
+      projectId,
     }, signal);
 
-    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (!base64Audio) throw new Error("No audio generated");
+    // Handle Long Running Operation (Lyria Pro)
+    if (response.isLro) {
+      let operation = { name: response.operation, done: false };
+      let pollCount = 0;
+      while (!operation.done) {
+        pollCount++;
+        onProgress?.(Math.min(10 + (pollCount * 5), 90));
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        if (signal?.aborted) throw new Error("Audio generation cancelled");
+        operation = await callBackend('getOperation', { operation: operation.name }, signal);
+      }
+      response = operation.response;
+    }
+
+    const inlineData = response.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData)?.inlineData;
+    if (!inlineData) throw new Error("No audio generated");
     
-    return `data:audio/mpeg;base64,${base64Audio}`;
+    // Server-side uploaded result
+    if (inlineData.storageUrl) {
+      onProgress?.(100);
+      return inlineData.storageUrl;
+    }
+
+    // Direct result (base64)
+    onProgress?.(100);
+    return `data:audio/wav;base64,${inlineData.data}`;
   } catch (err) {
     console.error('Gemini API Error:', err);
     throw err;
@@ -340,8 +445,9 @@ export const upscaleImage = async (params: {
   imageUrl: string;
   scale: string;
   preserveStyle: boolean;
+  projectId?: string;
 }, signal?: AbortSignal) => {
-  const { imageUrl, scale, preserveStyle } = params;
+  const { imageUrl, scale, preserveStyle, projectId } = params;
 
   const { data, mimeType } = await urlToBase64(imageUrl);
 
@@ -355,25 +461,19 @@ export const upscaleImage = async (params: {
         ]
       },
       config: {
-        imageConfig: {
-          imageSize: "4K"
-        }
-      }
+        responseModalities: ['IMAGE'],
+        imageConfig: { imageSize: "4K" }
+      },
+      projectId,
     }, signal);
 
-    let upscaledImageUrl = '';
     for (const part of response.candidates?.[0]?.content?.parts || []) {
       if (part.inlineData) {
-        upscaledImageUrl = `data:image/png;base64,${part.inlineData.data}`;
-        break;
+        if (part.inlineData.storageUrl) return part.inlineData.storageUrl;
+        return `data:image/png;base64,${part.inlineData.data}`;
       }
     }
-
-    if (!upscaledImageUrl) {
-      throw new Error("No upscaled image returned from API");
-    }
-
-    return upscaledImageUrl;
+    throw new Error("No upscaled image returned from API");
   } catch (err) {
     console.error('Gemini API Error:', err);
     throw err;
@@ -391,13 +491,13 @@ export const suggestNodeConfig = async (params: {
   try {
     const response = await callBackend('generateContent', {
       model: "gemini-3-flash-preview",
-      contents: `As an AI creative assistant, suggest the best configuration for a ${nodeType} node based on this goal: "${userGoal}".
-      
+      contents: [{ role: 'user', parts: [{ text: `As an AI creative assistant, suggest the best configuration for a ${nodeType} node based on this goal: "${userGoal}".
+
       ${projectContext ? `Project Context: ${projectContext}` : ''}
-      
+
       Current configuration: ${JSON.stringify(currentConfig)}
-      
-      Return ONLY a JSON object representing the updated configuration fields.`,
+
+      Return ONLY a JSON object representing the updated configuration fields.` }] }],
       config: {
         responseMimeType: "application/json",
       }
@@ -416,8 +516,9 @@ export const relightImage = async (params: {
   lightColor: string;
   intensity: number;
   style: string;
+  projectId?: string;
 }, signal?: AbortSignal) => {
-  const { imageUrl, lightDirection, lightColor, intensity, style } = params;
+  const { imageUrl, lightDirection, lightColor, intensity, style, projectId } = params;
 
   const { data, mimeType } = await urlToBase64(imageUrl);
 
@@ -429,22 +530,18 @@ export const relightImage = async (params: {
           { text: `Relight this image with light from ${lightDirection}. Light color: ${lightColor}. Intensity: ${intensity}. Style: ${style}.` },
           { inlineData: { data, mimeType } }
         ]
-      }
+      },
+      config: { responseModalities: ['IMAGE'] },
+      projectId,
     }, signal);
 
-    let relitImageUrl = '';
     for (const part of response.candidates?.[0]?.content?.parts || []) {
       if (part.inlineData) {
-        relitImageUrl = `data:image/png;base64,${part.inlineData.data}`;
-        break;
+        if (part.inlineData.storageUrl) return part.inlineData.storageUrl;
+        return `data:image/png;base64,${part.inlineData.data}`;
       }
     }
-
-    if (!relitImageUrl) {
-      throw new Error("No relit image returned from API");
-    }
-
-    return relitImageUrl;
+    throw new Error("No relit image returned from API");
   } catch (err) {
     console.error('Gemini API Error:', err);
     throw err;
@@ -532,8 +629,9 @@ export const inpaintImage = async (params: {
   maskUrl: string;
   prompt: string;
   mode: 'mask' | 'unmask';
+  projectId?: string;
 }, signal?: AbortSignal) => {
-  const { imageUrl, maskUrl, prompt, mode } = params;
+  const { imageUrl, maskUrl, prompt, mode, projectId } = params;
 
   const { data: imageData, mimeType: imageMimeType } = await urlToBase64(imageUrl);
   const { data: maskData, mimeType: maskMimeType } = await urlToBase64(maskUrl);
@@ -547,22 +645,18 @@ export const inpaintImage = async (params: {
           { inlineData: { data: imageData, mimeType: imageMimeType } },
           { inlineData: { data: maskData, mimeType: maskMimeType } }
         ]
-      }
+      },
+      config: { responseModalities: ['IMAGE'] },
+      projectId,
     }, signal);
 
-    let inpaintedImageUrl = '';
     for (const part of response.candidates?.[0]?.content?.parts || []) {
       if (part.inlineData) {
-        inpaintedImageUrl = `data:image/png;base64,${part.inlineData.data}`;
-        break;
+        if (part.inlineData.storageUrl) return part.inlineData.storageUrl;
+        return `data:image/png;base64,${part.inlineData.data}`;
       }
     }
-
-    if (!inpaintedImageUrl) {
-      throw new Error("No inpainted image returned from API");
-    }
-
-    return inpaintedImageUrl;
+    throw new Error("No inpainted image returned from API");
   } catch (err) {
     console.error('Gemini API Error:', err);
     throw err;
@@ -574,8 +668,9 @@ export const transferStyle = async (params: {
   styleUrl: string;
   strength: number;
   preserveStructure: boolean;
+  projectId?: string;
 }, signal?: AbortSignal) => {
-  const { contentUrl, styleUrl, strength, preserveStructure } = params;
+  const { contentUrl, styleUrl, strength, preserveStructure, projectId } = params;
 
   const { data: contentData, mimeType: contentMimeType } = await urlToBase64(contentUrl);
   const { data: styleData, mimeType: styleMimeType } = await urlToBase64(styleUrl);
@@ -589,22 +684,18 @@ export const transferStyle = async (params: {
           { inlineData: { data: contentData, mimeType: contentMimeType } },
           { inlineData: { data: styleData, mimeType: styleMimeType } }
         ]
-      }
+      },
+      config: { responseModalities: ['IMAGE'] },
+      projectId,
     }, signal);
 
-    let styledImageUrl = '';
     for (const part of response.candidates?.[0]?.content?.parts || []) {
       if (part.inlineData) {
-        styledImageUrl = `data:image/png;base64,${part.inlineData.data}`;
-        break;
+        if (part.inlineData.storageUrl) return part.inlineData.storageUrl;
+        return `data:image/png;base64,${part.inlineData.data}`;
       }
     }
-
-    if (!styledImageUrl) {
-      throw new Error("No styled image returned from API");
-    }
-
-    return styledImageUrl;
+    throw new Error("No styled image returned from API");
   } catch (err) {
     console.error('Gemini API Error:', err);
     throw err;

@@ -7,23 +7,27 @@ import ParameterSlider from '../components/ParameterSlider';
 import ReferenceStrip from '../components/ReferenceStrip';
 import { Video, Loader2, AlertCircle, XCircle, Download } from 'lucide-react';
 import { generateVideo } from '../services/geminiService';
-import { useAssets } from '../hooks/useAssets';
 import { downloadFile } from '../lib/utils';
+import { useAssets } from '../hooks/useAssets';
 
 const VeoNode = ({ id, data }: any) => {
   const [model, setModel] = useState(data.config?.model || 'veo-3.1-fast-generate-001');
   const [aspectRatio, setAspectRatio] = useState(data.config?.aspectRatio || '16:9');
   const [resolution, setResolution] = useState(data.config?.resolution || '720p');
-  const [duration, setDuration] = useState(data.config?.duration || 5);
+  const [duration, setDuration] = useState(data.config?.duration || 8);
+  const [sampleCount, setSampleCount] = useState(data.config?.sampleCount || 1);
   const [style, setStyle] = useState(data.config?.style || 'Cinematic');
   const [referenceStrength, setReferenceStrength] = useState(data.config?.referenceStrength || 50);
+  const [negativePrompt, setNegativePrompt] = useState(data.config?.negativePrompt || '');
+  const [personGeneration, setPersonGeneration] = useState(data.config?.personGeneration || 'allow_adult');
+  const [audio, setAudio] = useState<boolean>(data.config?.audio ?? true);
+  const [resizeMode, setResizeMode] = useState(data.config?.resizeMode || 'crop');
   
   const updateNodeData = useStore((state) => state.updateNodeData);
   const edges = useStore((state) => state.edges);
   const nodes = useStore((state) => state.nodes);
   const { currentProject } = useProjectStore();
-  const { uploadBase64 } = useAssets();
-  
+  const { addAsset } = useAssets();
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const referenceImages = useMemo(() => {
@@ -125,12 +129,18 @@ const VeoNode = ({ id, data }: any) => {
 
     try {
       const finalPrompt = `${prompt} in ${style} style.`;
-      const videoUrl = await generateVideo({
+      const videos = await generateVideo({
         prompt: finalPrompt,
         model,
         aspectRatio,
         resolution,
         duration,
+        sampleCount,
+        negativePrompt: negativePrompt || undefined,
+        seed: parameters.seed !== undefined ? Number(parameters.seed) : undefined,
+        personGeneration,
+        audio,
+        resizeMode,
         startFrameUrl: startFrame,
         endFrameUrl: endFrame,
         referenceImages: referenceImages.map(ref => ({
@@ -140,23 +150,26 @@ const VeoNode = ({ id, data }: any) => {
         })),
         motionIntensity: parameters.motionIntensity,
         videoUrl: inputVideo,
+        projectId: currentProject?.id,
         projectContext,
         onProgress: (p) => updateNodeData(id, { progress: p })
       }, abortControllerRef.current.signal);
 
-      // Show immediately to the user
-      updateNodeData(id, { output: videoUrl, progress: 95 });
+      // Server already uploaded to Storage — URLs are permanent
+      updateNodeData(id, { output: videos[0], outputs: videos, isRunning: false, progress: 100 });
 
-      // Upload to Storage in the background to get a permanent URL and avoid Firestore size limits
-      const fileName = `Generated Video - ${new Date().toLocaleTimeString()}.mp4`;
-      uploadBase64(videoUrl, fileName, 'video')
-        .then(asset => {
-          updateNodeData(id, { output: asset.url, isRunning: false, progress: 100 });
-        })
-        .catch(err => {
-          console.error("Background upload failed:", err);
-          updateNodeData(id, { isRunning: false, progress: 100 });
-        });
+      // Add to Assets grid
+      videos.forEach((url, i) => {
+        if (url) {
+          addAsset({
+            name: `Generated Video - ${new Date().toLocaleTimeString()} (${i + 1})`,
+            type: 'video',
+            url: url,
+            thumbnailUrl: startFrame || url,
+            tags: ['generated', 'video', 'veo']
+          });
+        }
+      });
 
     } catch (err: any) {
       if (err.name === 'AbortError') {
@@ -230,11 +243,8 @@ const VeoNode = ({ id, data }: any) => {
                 updateNodeData(id, { config: { ...data.config, aspectRatio: e.target.value } });
               }}
             >
-              <option value="16:9">16:9 Wide</option>
-              <option value="9:16">9:16 Tall</option>
-              <option value="1:1">1:1 Square</option>
-              <option value="4:3">4:3 Photo</option>
-              <option value="21:9">21:9 Cinema</option>
+              <option value="16:9">16:9 Landscape</option>
+              <option value="9:16">9:16 Portrait</option>
             </select>
           </div>
           
@@ -282,16 +292,93 @@ const VeoNode = ({ id, data }: any) => {
                 updateNodeData(id, { config: { ...data.config, duration: Number(e.target.value) } });
               }}
             >
-              {[2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20, 30].map(d => (
+              {[4, 6, 8].map(d => (
                 <option key={d} value={d}>{d} seconds</option>
               ))}
             </select>
             {!isDurationSupported && (
               <div className="flex items-center gap-1 text-[8px] text-orange-400 font-bold mt-1">
                 <AlertCircle className="w-2 h-2" />
-                <span>Model max is {model.includes('fast') ? 10 : 30}s, clamping on run.</span>
+                <span>Valid durations: 4s, 6s, 8s</span>
               </div>
             )}
+          </div>
+
+          <div className="space-y-1 col-span-2">
+            <label className="text-[10px] text-gray-500 uppercase font-bold">Output Videos</label>
+            <select
+              className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-1.5 text-[10px] text-gray-400 focus:outline-none"
+              value={sampleCount}
+              onChange={(e) => {
+                setSampleCount(Number(e.target.value));
+                updateNodeData(id, { config: { ...data.config, sampleCount: Number(e.target.value) } });
+              }}
+            >
+              <option value={1}>1 Video</option>
+              <option value={2}>2 Videos</option>
+              <option value={3}>3 Videos</option>
+              <option value={4}>4 Videos</option>
+            </select>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] text-gray-500 uppercase font-bold">Person Generation</label>
+            <select
+              className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-1.5 text-[10px] text-gray-400 focus:outline-none"
+              value={personGeneration}
+              onChange={(e) => {
+                setPersonGeneration(e.target.value);
+                updateNodeData(id, { config: { ...data.config, personGeneration: e.target.value } });
+              }}
+            >
+              <option value="allow_adult">Allow Adults</option>
+              <option value="disallow">Disallow All</option>
+            </select>
+          </div>
+
+          {startFrame && (
+            <div className="space-y-1">
+              <label className="text-[10px] text-gray-500 uppercase font-bold">Resize Mode</label>
+              <select
+                className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-1.5 text-[10px] text-gray-400 focus:outline-none"
+                value={resizeMode}
+                onChange={(e) => {
+                  setResizeMode(e.target.value);
+                  updateNodeData(id, { config: { ...data.config, resizeMode: e.target.value } });
+                }}
+              >
+                <option value="crop">Crop to fit</option>
+                <option value="pad">Pad to fit</option>
+              </select>
+            </div>
+          )}
+
+          <div className="col-span-2 flex items-center justify-between py-1 px-2 bg-[#111] rounded-lg border border-[#2a2a2a]">
+            <label className="text-[10px] text-gray-500 uppercase font-bold">Native Audio</label>
+            <button
+              onClick={() => {
+                const next = !audio;
+                setAudio(next);
+                updateNodeData(id, { config: { ...data.config, audio: next } });
+              }}
+              className={`relative w-8 h-4 rounded-full transition-colors ${audio ? 'bg-[#FF5722]' : 'bg-[#2a2a2a]'}`}
+            >
+              <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform ${audio ? 'translate-x-4' : 'translate-x-0.5'}`} />
+            </button>
+          </div>
+
+          <div className="space-y-1 col-span-2">
+            <label className="text-[10px] text-gray-500 uppercase font-bold">Negative Prompt</label>
+            <input
+              type="text"
+              className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-1.5 text-[10px] text-gray-300 focus:outline-none focus:border-[#FF5722]"
+              placeholder="Avoid (e.g. blur, distorted, text)..."
+              value={negativePrompt}
+              onChange={(e) => {
+                setNegativePrompt(e.target.value);
+                updateNodeData(id, { config: { ...data.config, negativePrompt: e.target.value } });
+              }}
+            />
           </div>
         </div>
 
@@ -363,25 +450,24 @@ const VeoNode = ({ id, data }: any) => {
 
         {data.output && (
           <div className="mt-2 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Result Video</span>
-              <button 
-                onClick={handleDownload}
-                className="p-1.5 bg-[#1a1a1a] hover:bg-[#FF5722] text-gray-400 hover:text-white rounded-lg transition-all border border-[#2a2a2a]"
-              >
-                <Download className="w-3 h-3" />
-              </button>
-            </div>
-            <div className="rounded-xl overflow-hidden border border-[#2a2a2a] bg-[#0a0a0a]">
-              <video 
-                src={data.output} 
-                className="w-full h-auto"
-                controls
-                loop
-                autoPlay
-                muted
-              />
-            </div>
+            {(data.outputs && data.outputs.length > 1 ? data.outputs : [data.output]).map((url: string, i: number) => (
+              <div key={i} className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">
+                    {data.outputs?.length > 1 ? `Video ${i + 1}` : 'Result Video'}
+                  </span>
+                  <button
+                    onClick={() => downloadFile(url, `generated-video-${i + 1}-${Date.now()}.mp4`)}
+                    className="p-1.5 bg-[#1a1a1a] hover:bg-[#FF5722] text-gray-400 hover:text-white rounded-lg transition-all border border-[#2a2a2a]"
+                  >
+                    <Download className="w-3 h-3" />
+                  </button>
+                </div>
+                <div className="rounded-xl overflow-hidden border border-[#2a2a2a] bg-[#0a0a0a]">
+                  <video src={url} className="w-full h-auto" controls loop autoPlay muted />
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>

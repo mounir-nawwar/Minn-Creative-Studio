@@ -1,16 +1,22 @@
 import React, { useState } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
-import { Sun, Loader2 } from 'lucide-react';
+import { useProjectStore } from '../store/useProjectStore';
+import { useAssets } from '../hooks/useAssets';
+import { Sun, Loader2, Download } from 'lucide-react';
 import ParameterSlider from '../components/ParameterSlider';
 import { relightImage } from '../services/geminiService';
+import { downloadFile } from '../lib/utils';
 
 const RelightNode = ({ id, data }: any) => {
   const [lightDirection, setLightDirection] = useState(data.config?.lightDirection || 'top');
   const [lightColor, setLightColor] = useState(data.config?.lightColor || '#ffffff');
   const [intensity, setIntensity] = useState(data.config?.intensity || 50);
   const [style, setStyle] = useState(data.config?.style || 'Natural');
+  
   const updateNodeData = useStore((state) => state.updateNodeData);
+  const { currentProject } = useProjectStore();
+  const { addAsset } = useAssets();
 
   const directions = [
     { id: 'top-left', label: '↖' }, { id: 'top', label: '↑' }, { id: 'top-right', label: '↗' },
@@ -41,10 +47,22 @@ const RelightNode = ({ id, data }: any) => {
         lightDirection,
         lightColor,
         intensity,
-        style
+        style,
+        projectId: currentProject?.id
       });
       
       updateNodeData(id, { output: relitUrl, isRunning: false, progress: 100 });
+
+      // Add to Assets grid
+      if (relitUrl) {
+        addAsset({
+          name: `Relit Image - ${new Date().toLocaleTimeString()}`,
+          type: 'image',
+          url: relitUrl,
+          thumbnailUrl: relitUrl,
+          tags: ['generated', 'image', 'relighting']
+        });
+      }
     } catch (err: any) {
       updateNodeData(id, { error: err.message, isRunning: false });
     }

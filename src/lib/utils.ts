@@ -34,28 +34,52 @@ export function stripUndefined<T>(obj: T): T {
 
 /**
  * Robustly downloads a file by fetching it as a blob.
- * Bypasses browser restrictions on cross-origin "download" attribute.
+ * Firebase Storage URLs are proxied through the backend to avoid CORS restrictions.
  */
 export async function downloadFile(url: string, filename: string) {
   try {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`Fetch failed with status ${response.status}`);
-    
-    const blob = await response.blob();
+    let blob: Blob;
+
+    // data: URLs — decode directly, no fetch needed
+    if (url.startsWith('data:')) {
+      const [header, b64] = url.split(',');
+      const mime = header.split(':')[1].split(';')[0];
+      const bytes = atob(b64);
+      const arr = new Uint8Array(bytes.length);
+      for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+      blob = new Blob([arr], { type: mime });
+    } else if (
+      url.includes('firebasestorage.googleapis.com') ||
+      url.includes('storage.googleapis.com')
+    ) {
+      // Firebase Storage URLs have CORS restrictions — proxy through backend
+      const res = await fetch('/api/proxy-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      if (!res.ok) throw new Error(`Proxy failed: ${res.status}`);
+      const { data, mimeType } = await res.json();
+      const bytes = atob(data);
+      const arr = new Uint8Array(bytes.length);
+      for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+      blob = new Blob([arr], { type: mimeType });
+    } else {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
+      blob = await response.blob();
+    }
+
     const blobUrl = window.URL.createObjectURL(blob);
-    
     const link = document.createElement('a');
     link.href = blobUrl;
     link.download = filename;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
-    // Clean up
     setTimeout(() => window.URL.revokeObjectURL(blobUrl), 100);
   } catch (err) {
     console.error('Download failed:', err);
-    // Fallback: try opening in new tab if blob download fails
     window.open(url, '_blank');
   }
 }

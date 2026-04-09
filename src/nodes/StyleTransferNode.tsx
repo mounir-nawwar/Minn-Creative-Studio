@@ -1,58 +1,88 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Handle, Position } from 'reactflow';
-import { Palette, Loader2, Sparkles, Sliders, Image as ImageIcon } from 'lucide-react';
+import { Palette, Loader2, Sparkles, Sliders, Image as ImageIcon, Download } from 'lucide-react';
 import { transferStyle } from '../services/geminiService';
+import BaseNode from './BaseNode';
+import { useStore } from '../store/useStore';
+import { useProjectStore } from '../store/useProjectStore';
+import { useAssets } from '../hooks/useAssets';
+import { downloadFile } from '../lib/utils';
 
 const StyleTransferNode = ({ data, id }: any) => {
-  const [strength, setStrength] = useState(0.5);
-  const [preserveStructure, setPreserveStructure] = useState(true);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [outputUrl, setOutputUrl] = useState<string | null>(null);
+  const [strength, setStrength] = useState(data.config?.strength || 0.5);
+  const [preserveStructure, setPreserveStructure] = useState(data.config?.preserveStructure ?? true);
+  
+  const updateNodeData = useStore((state) => state.updateNodeData);
+  const { currentProject } = useProjectStore();
+  const { addAsset } = useAssets();
 
-  const handleGenerate = async () => {
-    if (!data.contentUrl || !data.styleUrl) return;
-    setIsGenerating(true);
+  const contentUrl = useMemo(() => {
+    const edge = useStore.getState().edges.find(e => e.target === id && e.targetHandle === 'contentUrl');
+    const node = useStore.getState().nodes.find(n => n.id === edge?.source);
+    return node?.data?.output;
+  }, [id]);
+
+  const styleUrl = useMemo(() => {
+    const edge = useStore.getState().edges.find(e => e.target === id && e.targetHandle === 'styleUrl');
+    const node = useStore.getState().nodes.find(n => n.id === edge?.source);
+    return node?.data?.output;
+  }, [id]);
+
+  const handleRun = async () => {
+    if (!contentUrl || !styleUrl) {
+      updateNodeData(id, { error: "Content and Style inputs required" });
+      return;
+    }
+
+    updateNodeData(id, { isRunning: true, error: undefined, progress: 10 });
+    
     try {
+      updateNodeData(id, { progress: 30 });
       const resultUrl = await transferStyle({
-        contentUrl: data.contentUrl,
-        styleUrl: data.styleUrl,
+        contentUrl,
+        styleUrl,
         strength,
-        preserveStructure
+        preserveStructure,
+        projectId: currentProject?.id
       });
-      setOutputUrl(resultUrl);
-    } catch (err) {
+
+      updateNodeData(id, { output: resultUrl, isRunning: false, progress: 100 });
+
+      // Add to Assets grid
+      if (resultUrl) {
+        addAsset({
+          name: `Style Transferred - ${new Date().toLocaleTimeString()}`,
+          type: 'image',
+          url: resultUrl,
+          thumbnailUrl: resultUrl,
+          tags: ['generated', 'image', 'style-transfer']
+        });
+      }
+    } catch (err: any) {
       console.error('Style Transfer Error:', err);
-    } finally {
-      setIsGenerating(false);
+      updateNodeData(id, { error: err.message, isRunning: false });
     }
   };
 
   return (
-    <div className="bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden min-w-[320px] shadow-2xl">
-      <div className="bg-zinc-900/50 p-3 border-b border-zinc-800 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Palette className="w-4 h-4 text-indigo-500" />
-          <span className="text-xs font-medium text-zinc-200 uppercase tracking-wider">Style Transfer</span>
-        </div>
-      </div>
-
-      <div className="p-4 space-y-4">
+    <BaseNode id={id} data={data} onRun={handleRun} color="#6366f1">
+      <div className="space-y-4">
         <div className="grid grid-cols-2 gap-2">
           <div className="space-y-1">
-            <label className="text-[10px] text-zinc-500 uppercase tracking-tighter">Content</label>
-            <div className="aspect-square bg-zinc-900 rounded-lg overflow-hidden border border-zinc-800 flex items-center justify-center">
-              {data.contentUrl ? (
-                <img src={data.contentUrl} alt="Content" className="w-full h-full object-cover" />
+            <label className="text-[10px] text-zinc-500 uppercase font-bold">Content</label>
+            <div className="aspect-square bg-black/40 rounded-lg overflow-hidden border border-white/10 flex items-center justify-center">
+              {contentUrl ? (
+                <img src={contentUrl} alt="Content" className="w-full h-full object-cover" />
               ) : (
                 <ImageIcon className="w-6 h-6 text-zinc-700" />
               )}
             </div>
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] text-zinc-500 uppercase tracking-tighter">Style</label>
-            <div className="aspect-square bg-zinc-900 rounded-lg overflow-hidden border border-zinc-800 flex items-center justify-center">
-              {data.styleUrl ? (
-                <img src={data.styleUrl} alt="Style" className="w-full h-full object-cover" />
+            <label className="text-[10px] text-zinc-500 uppercase font-bold">Style</label>
+            <div className="aspect-square bg-black/40 rounded-lg overflow-hidden border border-white/10 flex items-center justify-center">
+              {styleUrl ? (
+                <img src={styleUrl} alt="Style" className="w-full h-full object-cover" />
               ) : (
                 <Palette className="w-6 h-6 text-zinc-700" />
               )}
@@ -62,7 +92,7 @@ const StyleTransferNode = ({ data, id }: any) => {
 
         <div className="space-y-3">
           <div className="space-y-1">
-            <label className="text-[10px] text-zinc-500 uppercase tracking-tighter flex items-center gap-1">
+            <label className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-1">
               <Sliders className="w-3 h-3" /> Strength: {strength}
             </label>
             <input
@@ -71,46 +101,52 @@ const StyleTransferNode = ({ data, id }: any) => {
               max="1"
               step="0.1"
               value={strength}
-              onChange={(e) => setStrength(parseFloat(e.target.value))}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                setStrength(v);
+                updateNodeData(id, { config: { ...data.config, strength: v } });
+              }}
               className="w-full accent-indigo-500"
             />
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 py-2 px-3 bg-black/40 rounded-lg border border-white/5">
             <input
               type="checkbox"
-              id="preserveStructure"
+              id={`preserve-${id}`}
               checked={preserveStructure}
-              onChange={(e) => setPreserveStructure(e.target.checked)}
+              onChange={(e) => {
+                const v = e.target.checked;
+                setPreserveStructure(v);
+                updateNodeData(id, { config: { ...data.config, preserveStructure: v } });
+              }}
               className="w-4 h-4 rounded border-zinc-800 bg-zinc-900 text-indigo-500 focus:ring-indigo-500/50"
             />
-            <label htmlFor="preserveStructure" className="text-xs text-zinc-400">Preserve Structure</label>
+            <label htmlFor={`preserve-${id}`} className="text-[10px] text-zinc-400 font-bold uppercase">Preserve Structure</label>
           </div>
         </div>
 
-        <button
-          onClick={handleGenerate}
-          disabled={isGenerating || !data.contentUrl || !data.styleUrl}
-          className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-800 disabled:text-zinc-600 rounded-lg text-white text-xs font-bold uppercase transition-all flex items-center justify-center gap-2"
-        >
-          {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-          {isGenerating ? 'Generating...' : 'Transfer Style'}
-        </button>
-
-        {outputUrl && (
-          <div className="pt-4 border-t border-zinc-800">
-            <label className="text-[10px] text-zinc-500 uppercase tracking-tighter">Result</label>
-            <div className="mt-2 aspect-square bg-zinc-900 rounded-lg overflow-hidden border border-zinc-800">
-              <img src={outputUrl} alt="Style Transfer Result" className="w-full h-full object-cover" />
+        {data.output && (
+          <div className="pt-2 border-t border-white/5 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Result Image</span>
+              <button 
+                onClick={() => downloadFile(data.output, `styled-${Date.now()}.png`)}
+                className="p-1.5 bg-[#1a1a1a] hover:bg-[#6366f1] text-gray-400 hover:text-white rounded-lg transition-all border border-white/10"
+              >
+                <Download className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="aspect-square bg-black rounded-lg overflow-hidden border border-white/10">
+              <img src={data.output} alt="Style Result" className="w-full h-full object-cover" />
             </div>
           </div>
         )}
       </div>
 
-      <Handle type="target" position={Position.Left} id="contentUrl" style={{ top: '30%', background: '#6366f1' }} />
-      <Handle type="target" position={Position.Left} id="styleUrl" style={{ top: '70%', background: '#6366f1' }} />
-      <Handle type="source" position={Position.Right} id="output" style={{ background: '#6366f1' }} />
-    </div>
+      <Handle type="target" position={Position.Left} id="contentUrl" className="w-3 h-3 !bg-[#6366f1] border-2 border-[#0a0a0a]" style={{ top: '30%' }} />
+      <Handle type="target" position={Position.Left} id="styleUrl" className="w-3 h-3 !bg-[#6366f1] border-2 border-[#0a0a0a]" style={{ top: '70%' }} />
+    </BaseNode>
   );
 };
 

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
+import { useProjectStore } from '../store/useProjectStore';
 import { Handle, Position } from 'reactflow';
 import ParameterSlider from '../components/ParameterSlider';
 import ReferenceStrip from '../components/ReferenceStrip';
@@ -10,12 +11,13 @@ import { generateVideo } from '../services/geminiService';
 const ImageToVideoNode = ({ id, data }: any) => {
   const [model, setModel] = useState(data.config?.model || 'veo-3.1-fast-generate-001');
   const [aspectRatio, setAspectRatio] = useState(data.config?.aspectRatio || '16:9');
-  const [duration, setDuration] = useState(data.config?.duration || 5);
+  const [duration, setDuration] = useState(data.config?.duration || 8);
   const [referenceStrength, setReferenceStrength] = useState(data.config?.referenceStrength || 50);
-  
+
   const updateNodeData = useStore((state) => state.updateNodeData);
   const edges = useStore((state) => state.edges);
   const nodes = useStore((state) => state.nodes);
+  const { currentProject } = useProjectStore();
 
   const referenceImages = useMemo(() => {
     const refEdges = edges.filter(e => e.target === id && e.targetHandle === 'reference');
@@ -85,7 +87,7 @@ const ImageToVideoNode = ({ id, data }: any) => {
     updateNodeData(id, { isRunning: true, error: undefined, progress: 10 });
 
     try {
-      const videoUrl = await generateVideo({
+      const videos = await generateVideo({
         prompt: prompt || 'Animate this image',
         model,
         aspectRatio,
@@ -97,10 +99,11 @@ const ImageToVideoNode = ({ id, data }: any) => {
           role: ref.role,
           strength: ref.strength
         })),
-        motionIntensity: parameters.motionIntensity
+        motionIntensity: parameters.motionIntensity,
+        projectId: currentProject?.id,
       });
 
-      updateNodeData(id, { output: videoUrl, isRunning: false, progress: 100 });
+      updateNodeData(id, { output: videos[0], isRunning: false, progress: 100 });
     } catch (err: any) {
       updateNodeData(id, { error: err.message, isRunning: false });
     }
@@ -178,7 +181,7 @@ const ImageToVideoNode = ({ id, data }: any) => {
                 updateNodeData(id, { config: { ...data.config, duration: Number(e.target.value) } });
               }}
             >
-              {[2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20, 30].map(d => (
+              {[4, 6, 8].map(d => (
                 <option key={d} value={d}>{d} seconds</option>
               ))}
             </select>

@@ -13,7 +13,8 @@ import {
   Trash2,
   Maximize2,
   Upload,
-  Plus
+  Plus,
+  Play
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Asset, AssetType } from '../types/project.types';
@@ -211,7 +212,20 @@ export default function AssetGrid({ onAssetClick, isPicker = false }: AssetGridP
                   className={`group relative aspect-square bg-[#111111] border border-white/5 overflow-hidden cursor-pointer hover:border-[#0097A7]/50 transition-all ${isPicker ? 'rounded-xl' : 'rounded-2xl'}`}
                   onClick={() => onAssetClick?.(asset)}
                 >
-                  {asset.type === 'image' || asset.type === 'video' ? (
+                  {asset.type === 'video' ? (
+                    <div className="w-full h-full relative">
+                      <video 
+                        src={asset.url + "#t=0.1"} 
+                        className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity" 
+                        preload="metadata"
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="w-8 h-8 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30 group-hover:scale-110 group-hover:bg-[#0097A7]/40 transition-all">
+                          <Play className="w-3 h-3 text-white fill-white" />
+                        </div>
+                      </div>
+                    </div>
+                  ) : asset.type === 'image' ? (
                     <img 
                       src={asset.thumbnailUrl || asset.url} 
                       alt={asset.name} 

@@ -7,8 +7,8 @@ import ParameterSlider from '../components/ParameterSlider';
 import ReferenceStrip from '../components/ReferenceStrip';
 import { ImageIcon, Loader2, Download, XCircle } from 'lucide-react';
 import { generateImage } from '../services/geminiService';
-import { useAssets } from '../hooks/useAssets';
 import { downloadFile } from '../lib/utils';
+import { useAssets } from '../hooks/useAssets';
 
 const ImagenNode = ({ id, data }: any) => {
   const [model, setModel] = useState(data.config?.model || 'gemini-3.1-flash-image-preview');
@@ -22,8 +22,7 @@ const ImagenNode = ({ id, data }: any) => {
   const edges = useStore((state) => state.edges);
   const nodes = useStore((state) => state.nodes);
   const { currentProject } = useProjectStore();
-  const { uploadBase64 } = useAssets();
-  
+  const { addAsset } = useAssets();
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const isNanoBanana = model.includes('flash') || model.includes('pro');
@@ -105,11 +104,18 @@ const ImagenNode = ({ id, data }: any) => {
       Style Keywords: ${currentProject.styleKeywords}
     `.trim() : undefined;
 
+    // Fake progress ticker: increments 20 → 78% while waiting for the API
+    let tickerProgress = 20;
+    const progressTicker = setInterval(() => {
+      tickerProgress = Math.min(tickerProgress + 3, 78);
+      updateNodeData(id, { progress: tickerProgress });
+    }, 800);
+
     try {
       const finalPrompt = isNanoBanana ? prompt : `${prompt} in ${style} style. ${negativePrompt ? `Avoid: ${negativePrompt}` : ''}`;
-      
+
       updateNodeData(id, { progress: 20 });
-      
+
       const imageUrl = await generateImage({
         prompt: finalPrompt,
         model,
@@ -123,32 +129,34 @@ const ImagenNode = ({ id, data }: any) => {
         seed: parameters.seed,
         guidanceStrength: parameters.guidanceStrength,
         cfgScale: parameters.cfgScale,
-        projectContext
+        projectContext,
+        projectId: currentProject?.id,
       }, abortControllerRef.current.signal);
 
-      updateNodeData(id, { progress: 80 });
+      clearInterval(progressTicker);
+      // Server already uploaded to Storage — URL is permanent
+      updateNodeData(id, { output: imageUrl, isRunning: false, progress: 100 });
 
-      // Show immediately to the user
-      updateNodeData(id, { output: imageUrl, progress: 90 });
-
-      // Upload to Storage in the background to get a permanent URL and avoid Firestore size limits
-      const fileName = `Generated Image - ${new Date().toLocaleTimeString()}.png`;
-      uploadBase64(imageUrl, fileName, 'image')
-        .then(asset => {
-          updateNodeData(id, { output: asset.url, isRunning: false, progress: 100 });
-        })
-        .catch(err => {
-          console.error("Background upload failed:", err);
-          updateNodeData(id, { isRunning: false, progress: 100 }); // Still stop running even if upload fails
+      // Add to Assets grid
+      if (imageUrl) {
+        addAsset({
+          name: `Generated Image - ${new Date().toLocaleTimeString()}`,
+          type: 'image',
+          url: imageUrl,
+          thumbnailUrl: imageUrl,
+          tags: ['generated', 'image', 'imagen']
         });
+      }
 
     } catch (err: any) {
+      clearInterval(progressTicker);
       if (err.name === 'AbortError') {
         console.log('Generation aborted');
       } else {
         updateNodeData(id, { error: err.message, isRunning: false });
       }
     } finally {
+      clearInterval(progressTicker);
       abortControllerRef.current = null;
     }
   };
@@ -233,16 +241,11 @@ const ImagenNode = ({ id, data }: any) => {
                   updateNodeData(id, { config: { ...data.config, imageSize: e.target.value } });
                 }}
               >
-                <option value="512px">512px</option>
-                <option value="768px">768px</option>
-                <option value="1024px">1024px</option>
+                <option value="512">512px</option>
+                <option value="768">768px</option>
                 <option value="1K">1K (Standard)</option>
                 <option value="2K">2K (High)</option>
                 <option value="4K">4K (Ultra)</option>
-                <option value="720p">720p HD</option>
-                <option value="1080p">1080p Full HD</option>
-                <option value="1440p">1440p QHD</option>
-                <option value="2160p">2160p 4K UHD</option>
               </select>
             ) : (
               <select 
