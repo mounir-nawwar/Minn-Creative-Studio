@@ -99,14 +99,20 @@ export function useProject() {
 
   const updateCurrentProject = async (updates: Partial<Project>) => {
     if (!currentProject) return;
-    const projectRef = doc(db, 'projects', currentProject.id);
+    await updateProjectById(currentProject.id, updates);
+  };
+
+  const updateProjectById = async (projectId: string, updates: Partial<Project>) => {
+    const projectRef = doc(db, 'projects', projectId);
     const now = serverTimestamp();
     const fullUpdates = { ...updates, updatedAt: now };
     try {
       await updateDoc(projectRef, fullUpdates);
-      updateProject(fullUpdates);
+      if (currentProject?.id === projectId) {
+        updateProject(fullUpdates);
+      }
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `projects/${currentProject.id}`);
+      handleFirestoreError(error, OperationType.UPDATE, `projects/${projectId}`);
     }
   };
 
@@ -128,6 +134,7 @@ export function useProject() {
     createProject,
     selectProject,
     updateCurrentProject,
+    updateProjectById,
     deleteProject,
     clearProject
   };

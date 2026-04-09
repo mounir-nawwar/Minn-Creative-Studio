@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 import { API_BASE } from '../constants';
 import MinnLogo from '../assets/Minn.svg';
+import AuthLayout, { SF } from './AuthLayout';
 
 interface CustomLoginPageProps {
   onLoginSuccess: () => void;
@@ -18,7 +19,6 @@ export default function CustomLoginPage({ onLoginSuccess }: CustomLoginPageProps
     setLoading(true);
     setError(null);
 
-    console.time("LoginRequest");
     try {
       const response = await fetch(`${API_BASE}/login`, {
         method: 'POST',
@@ -27,7 +27,6 @@ export default function CustomLoginPage({ onLoginSuccess }: CustomLoginPageProps
       });
 
       const data = await response.json();
-      console.timeEnd("LoginRequest");
       if (data.success) {
         onLoginSuccess();
       } else {
@@ -41,73 +40,134 @@ export default function CustomLoginPage({ onLoginSuccess }: CustomLoginPageProps
   };
 
   return (
-    <div className="h-screen w-screen bg-black flex flex-col items-center justify-center p-6">
-      <div className="max-w-md w-full space-y-8 text-center">
-        <div className="space-y-4 flex flex-col items-center">
-          <img src={MinnLogo} alt="MINN STUDIO" className="h-16 w-auto" />
-          <p className="text-gray-500 text-sm font-medium">Restricted Access</p>
-        </div>
-        
-        <div className="p-8 bg-[#111111] border border-[#1a1a1a] rounded-3xl space-y-6 shadow-2xl">
-          <div className="flex justify-center">
-            <div className="p-4 bg-[#0097A7]/10 rounded-full">
-              <ShieldCheck className="w-12 h-12 text-[#0097A7]" />
-            </div>
-          </div>
-          
-          <div className="space-y-2">
-            <h2 className="text-xl font-bold text-white">Admin Login</h2>
-            <p className="text-gray-500 text-xs">Enter your credentials to access the studio.</p>
-          </div>
+    <AuthLayout>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-1 text-left">
-              <label className="text-[10px] text-gray-500 uppercase font-bold tracking-widest ml-1">Username</label>
+        .login-field-label {
+          display: block;
+          font-size: clamp(10px, 0.72vw, 12px);
+          font-weight: 500;
+          color: rgba(255,255,255,0.36);
+          letter-spacing: 0.07em;
+          text-transform: uppercase;
+          margin-bottom: clamp(6px, 0.5vw, 8px);
+          margin-left: 1px;
+          font-family: ${SF};
+        }
+        .login-field-input {
+          width: 100%;
+          box-sizing: border-box;
+          background: rgba(255,255,255,0.06);
+          border: 1px solid rgba(255,255,255,0.08);
+          border-radius: clamp(10px, 0.85vw, 13px);
+          padding: clamp(11px, 0.95vw, 14px) clamp(13px, 1.1vw, 16px);
+          color: #fff;
+          font-size: clamp(13px, 1vw, 15px);
+          font-family: ${SF};
+          outline: none;
+          transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+          -webkit-appearance: none;
+          caret-color: #0097A7;
+        }
+        .login-field-input::placeholder { color: rgba(255,255,255,0.2); }
+        .login-field-input:focus {
+          border-color: rgba(0,151,167,0.7);
+          background: rgba(0,151,167,0.05);
+          box-shadow: 0 0 0 3px rgba(0,151,167,0.14);
+        }
+        .login-field-input:-webkit-autofill,
+        .login-field-input:-webkit-autofill:focus {
+          -webkit-box-shadow: 0 0 0 1000px #0a1a1b inset, 0 0 0 3px rgba(0,151,167,0.14);
+          -webkit-text-fill-color: #fff;
+          border-color: rgba(0,151,167,0.7);
+          caret-color: #0097A7;
+          transition: background-color 5000s ease-in-out 0s;
+        }
+      `}</style>
+
+      {/* LOGO */}
+      <div className="a0" style={{ marginBottom: 'clamp(24px, 2.2vw, 36px)' }}>
+        <img src={MinnLogo} alt="Minn Studio" style={{ height: 'clamp(30px, 2.6vw, 40px)', width: 'auto', display: 'block' }} />
+      </div>
+
+      {/* CARD */}
+      <div className="auth-card a1">
+
+        {/* HEADING */}
+        <div className="a2" style={{ marginBottom: 'clamp(26px, 2.4vw, 38px)', textAlign: 'center' }}>
+          <h1 className="auth-heading">Sign In</h1>
+          <p className="auth-subtext">Use your Minn Studio credentials</p>
+        </div>
+
+        {/* FORM */}
+        <form onSubmit={handleSubmit}>
+          <div className="a3" style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(12px, 1vw, 16px)', marginBottom: 'clamp(10px, 0.9vw, 14px)' }}>
+            <div>
+              <label className="login-field-label">Username</label>
               <input
+                className="login-field-input"
                 type="text"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full bg-black border border-[#2a2a2a] rounded-xl p-3 text-white focus:outline-none focus:border-[#0097A7] transition-all"
-                placeholder="Admin username"
+                onChange={e => setUsername(e.target.value)}
+                placeholder="Enter username"
                 required
+                autoComplete="username"
               />
             </div>
-            
-            <div className="space-y-1 text-left">
-              <label className="text-[10px] text-gray-500 uppercase font-bold tracking-widest ml-1">Password</label>
+            <div>
+              <label className="login-field-label">Password</label>
               <input
+                className="login-field-input"
                 type="password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-black border border-[#2a2a2a] rounded-xl p-3 text-white focus:outline-none focus:border-[#0097A7] transition-all"
+                onChange={e => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
+                autoComplete="current-password"
               />
             </div>
+          </div>
 
-            {error && (
-              <div className="flex items-center gap-2 p-3 bg-red-950/20 border border-red-500/30 rounded-xl text-red-500 text-xs">
-                <AlertCircle className="w-4 h-4" />
-                {error}
-              </div>
-            )}
+          {error && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: 'clamp(9px, 0.75vw, 12px) clamp(11px, 1vw, 14px)',
+              marginBottom: 'clamp(10px, 0.9vw, 14px)',
+              background: 'rgba(239,68,68,0.07)',
+              border: '1px solid rgba(239,68,68,0.18)',
+              borderRadius: 'clamp(10px, 0.8vw, 12px)',
+              color: 'rgba(252,165,165,0.88)',
+              fontSize: 'clamp(11px, 0.82vw, 13px)',
+              lineHeight: 1.45,
+            }}>
+              <AlertCircle size={13} style={{ flexShrink: 0, opacity: 0.75 }} />
+              {error}
+            </div>
+          )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-4 bg-[#0097A7] hover:bg-[#00838F] text-white font-black rounded-2xl flex items-center justify-center gap-3 transition-all transform hover:scale-[1.02] disabled:opacity-50"
-            >
-              {loading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                'SIGN IN'
-              )}
+          <div className="a4">
+            <button type="submit" disabled={loading} className="auth-btn-white">
+              {loading
+                ? <Loader2 size={15} style={{ animation: 'spin 0.75s linear infinite' }} />
+                : 'Sign In'
+              }
             </button>
-          </form>
-        </div>
-        
-        <p className="text-[10px] text-gray-700 uppercase font-bold tracking-widest">Authorized Personnel Only</p>
+          </div>
+        </form>
       </div>
-    </div>
+
+      {/* FOOTER */}
+      <p className="a4" style={{
+        marginTop: 'clamp(20px, 1.8vw, 30px)',
+        fontSize: 'clamp(9px, 0.65vw, 11px)',
+        color: 'rgba(255,255,255,0.15)',
+        letterSpacing: '0.12em',
+        textTransform: 'uppercase',
+        fontWeight: 500,
+      }}>
+        Authorized Personnel Only
+      </p>
+    </AuthLayout>
   );
 }

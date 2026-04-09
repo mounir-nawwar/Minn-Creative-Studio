@@ -10,7 +10,8 @@
       "WebFetch(domain:googleapis.github.io)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:ai.google.dev)",
-      "WebFetch(domain:docs.cloud.google.com)"
+      "WebFetch(domain:docs.cloud.google.com)",
+      "WebFetch(domain:cdn.jsdelivr.net)"
     ]
   }
 }

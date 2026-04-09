@@ -4,14 +4,17 @@ import { Plus, Search, Filter, LayoutGrid, List, Sparkles, LogOut } from 'lucide
 import { useProject } from '../hooks/useProject';
 import ProjectCard from '../components/ProjectCard';
 import ProjectCreationOverlay from '../components/ProjectCreationOverlay';
+import { Project } from '../types/project.types';
 import { auth, signOut } from '../firebase';
 import MinnLogo from '../assets/Minn.svg';
 
 export default function ProjectPicker() {
-  const { projects, loading, createProject, selectProject, deleteProject } = useProject();
+  const { projects, loading, createProject, selectProject, updateProjectById, deleteProject } = useProject();
   const [isOverlayOpen, setIsOverlayOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filter, setFilter] = useState<'all' | 'active' | 'archived' | 'completed'>('all');
+  const [filter, setFilter] = useState<'all' | 'active' | 'archived' | 'completed'>('active');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   const filteredProjects = projects.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -22,7 +25,7 @@ export default function ProjectPicker() {
 
   if (loading) {
     return (
-      <div className="h-screen w-screen bg-black flex flex-col items-center justify-center gap-6">
+      <div className="h-screen w-screen bg-transparent flex flex-col items-center justify-center gap-6">
         <div className="w-16 h-16 border-4 border-[#0097A7] border-t-transparent rounded-full animate-spin shadow-[0_0_30px_rgba(0,151,167,0.2)]" />
         <div className="space-y-4 text-center flex flex-col items-center">
           <img src={MinnLogo} alt="MINN STUDIO" className="h-10 w-auto" />
@@ -33,9 +36,9 @@ export default function ProjectPicker() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white selection:bg-[#0097A7]/30">
+    <div className="min-h-screen bg-transparent text-white selection:bg-[#0097A7]/30 relative z-10">
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 h-24 bg-black/80 backdrop-blur-xl border-b border-white/5 z-50 px-12 flex items-center justify-between">
+      <header className="fixed top-0 left-0 right-0 h-24 bg-black/60 backdrop-blur-xl border-b border-white/5 z-50 px-12 flex items-center justify-between">
         <div className="flex items-center gap-8">
           <div className="space-y-1">
             <img src={MinnLogo} alt="MINN STUDIO" className="h-7 w-auto mb-2" />
@@ -105,12 +108,22 @@ export default function ProjectPicker() {
           </div>
           
           <div className="flex items-center gap-2 p-1 bg-[#111111] rounded-xl border border-white/5">
-            <button className="p-2 bg-white/10 rounded-lg text-white"><LayoutGrid className="w-4 h-4" /></button>
-            <button className="p-2 text-gray-600 hover:text-white transition-colors"><List className="w-4 h-4" /></button>
+            <button 
+              onClick={() => setViewMode('grid')}
+              className={`p-2 rounded-lg transition-colors ${viewMode === 'grid' ? 'bg-white/10 text-white' : 'text-gray-600 hover:text-white'}`}
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={() => setViewMode('list')}
+              className={`p-2 rounded-lg transition-colors ${viewMode === 'list' ? 'bg-white/10 text-white' : 'text-gray-600 hover:text-white'}`}
+            >
+              <List className="w-4 h-4" />
+            </button>
           </div>
         </div>
 
-        {/* Project Grid */}
+        {/* Project Grid / List */}
         <AnimatePresence mode="popLayout">
           {filteredProjects.length === 0 ? (
             <motion.div
@@ -141,15 +154,21 @@ export default function ProjectPicker() {
           ) : (
             <motion.div 
               layout
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8"
+              className={viewMode === 'grid' 
+                ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8"
+                : "flex flex-col gap-4"
+              }
             >
               {filteredProjects.map((project) => (
                 <ProjectCard
                   key={project.id}
                   project={project}
+                  layout={viewMode}
                   isShared={project.userId !== auth.currentUser?.uid}
                   onClick={() => selectProject(project)}
+                  onEdit={() => setEditingProject(project)}
                   onDelete={() => deleteProject(project.id)}
+                  onStatusChange={(status) => updateProjectById(project.id, { status })}
                 />
               ))}
             </motion.div>
@@ -159,13 +178,23 @@ export default function ProjectPicker() {
 
       {/* Creation Overlay */}
       <AnimatePresence>
-        {isOverlayOpen && (
+        {(isOverlayOpen || editingProject) && (
           <ProjectCreationOverlay
-            isOpen={isOverlayOpen}
-            onClose={() => setIsOverlayOpen(false)}
+            isOpen={isOverlayOpen || !!editingProject}
+            mode={editingProject ? 'edit' : 'create'}
+            existingProject={editingProject}
+            onClose={() => {
+              setIsOverlayOpen(false);
+              setEditingProject(null);
+            }}
             onCreate={async (data) => {
-              const newProject = await createProject(data);
-              selectProject(newProject);
+              if (editingProject) {
+                await updateProjectById(editingProject.id, data);
+                setEditingProject(null);
+              } else {
+                const newProject = await createProject(data);
+                selectProject(newProject);
+              }
             }}
           />
         )}

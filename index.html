@@ -1,10 +1,19 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" style="background:#000;">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- Early connections to external services -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Preload the scene so it's ready when UnicornStudio initialises -->
+    <link rel="preload" href="/scene.json" as="fetch" crossorigin />
     <title>Minn Studio</title>
+
   </head>
   <body>
     <div id="root"></div>

@@ -364,6 +364,25 @@ export default function ProjectCreationOverlay({
                     </div>
                   </div>
 
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Project Status</label>
+                    <div className="flex gap-2">
+                      {['active', 'archived', 'completed'].map((status) => (
+                        <button
+                          key={status}
+                          onClick={() => updateFormData({ status: status as ProjectStatus })}
+                          className={`px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all border ${
+                            formData.status === status 
+                            ? 'bg-[#0097A7] border-[#0097A7] text-white' 
+                            : 'bg-[#111111] border-white/5 text-gray-500 hover:text-white'
+                          }`}
+                        >
+                          {status}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-6">
                     <div className="space-y-3">
                       <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Project Name *</label>
