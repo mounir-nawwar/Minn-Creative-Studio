@@ -21,8 +21,14 @@ export default defineConfig(({mode}) => {
       rollupOptions: {
         output: {
           manualChunks(id) {
-            if (id.includes('node_modules/react-dom/') || (id.includes('node_modules/react/') && !id.includes('reactflow'))) return 'vendor-react';
-            if (id.includes('node_modules/firebase/')) return 'vendor-firebase';
+            // React family must stay together — react-dom depends on scheduler,
+            // splitting them causes circular chunk errors at runtime
+            if (
+              id.includes('node_modules/react/') ||
+              id.includes('node_modules/react-dom/') ||
+              id.includes('node_modules/scheduler/') ||
+              id.includes('node_modules/react-is/')
+            ) return 'vendor-react';
             if (id.includes('node_modules/reactflow/') || id.includes('node_modules/@reactflow/')) return 'vendor-flow';
             if (id.includes('node_modules/motion/') || id.includes('node_modules/framer-motion/')) return 'vendor-motion';
             if (id.includes('node_modules/')) return 'vendor-misc';
