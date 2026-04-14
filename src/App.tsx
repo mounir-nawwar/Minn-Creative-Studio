@@ -11,6 +11,7 @@ const ChatDrawer          = lazy(() => import('./components/ChatDrawer'));
 const ProjectPicker       = lazy(() => import('./pages/ProjectPicker'));
 const ProjectCreationOverlay = lazy(() => import('./components/ProjectCreationOverlay'));
 import { motion, AnimatePresence } from 'motion/react';
+import type { Easing } from 'motion/react';
 import { auth, signInWithGoogle, signOut as firebaseLogOut, db } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { getDocFromServer, doc } from 'firebase/firestore';
@@ -22,6 +23,7 @@ import { isAuthorized, API_BASE } from './constants';
 import MinnLogo from './assets/Minn.svg';
 import AuthLayout, { SF } from './components/AuthLayout';
 import { UnicornScene } from 'unicornstudio-react';
+import { perfMonitor } from './services/performance';
 
 declare global {
   interface Window {
@@ -45,7 +47,7 @@ const fade = {
   initial: { opacity: 0 },
   animate: { opacity: 1 },
   exit:    { opacity: 0 },
-  transition: { duration: 0.22, ease: 'easeInOut' },
+  transition: { duration: 0.22, ease: 'easeInOut' as Easing },
 };
 
 export default function App() {
@@ -57,6 +59,9 @@ export default function App() {
   const { updateCurrentProject } = useProject();
   const setNodes = useStore((state) => state.setNodes);
   const setEdges = useStore((state) => state.setEdges);
+  
+  // Track app renders for performance monitoring
+  perfMonitor.incrementRenderCount();
 
   useEffect(() => {
     setNodes([]);

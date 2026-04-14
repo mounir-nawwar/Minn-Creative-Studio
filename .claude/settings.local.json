@@ -11,7 +11,11 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:ai.google.dev)",
       "WebFetch(domain:docs.cloud.google.com)",
-      "WebFetch(domain:cdn.jsdelivr.net)"
+      "WebFetch(domain:cdn.jsdelivr.net)",
+      "Bash(npx tsc:*)",
+      "Bash(sed 's/\\(.*$//')",
+      "Bash(ls -la *.ts *.tsx)",
+      "Bash(awk -F':' '{print $1\":\"$2}')"
     ]
   }
 }

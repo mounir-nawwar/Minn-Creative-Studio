@@ -83,3 +83,29 @@ export async function downloadFile(url: string, filename: string) {
     window.open(url, '_blank');
   }
 }
+
+/**
+ * Calculates the CSS top position for a handle based on its index and total handles.
+ * This encapsulates the handle positioning math for cleaner UI components.
+ * 
+ * @param index - Zero-based index of the handle
+ * @param total - Total number of handles
+ * @returns CSS top value as percentage string
+ * 
+ * @example
+ * ```typescript
+ * // Single handle at 50%
+ * calcHandlePosition(0, 1) // "50%"
+ * 
+ * // First of 3 handles at 20%
+ * calcHandlePosition(0, 3) // "20%"
+ * 
+ * // Middle of 3 handles at 50%
+ * calcHandlePosition(1, 3) // "50%"
+ * ```
+ */
+export function calcHandlePosition(index: number, total: number): string {
+  return total > 1 
+    ? `${20 + (index * 60 / (total - 1))}%` 
+    : '50%';
+}

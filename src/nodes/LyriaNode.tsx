@@ -234,7 +234,7 @@ const LyriaNode = ({ id, data }: any) => {
 
             <ReferenceStrip 
               nodeId={id} 
-              references={referenceImages.map(r => ({ edgeId: r.edgeId, url: r.url, role: 'mood' }))} 
+              references={referenceImages.map(r => ({ edgeId: r.edgeId, url: r.url, role: 'style' as const, strength: 0.5 }))} 
               onUpdateRole={() => {}} 
             />
           </>
@@ -260,7 +260,7 @@ const LyriaNode = ({ id, data }: any) => {
                 <Download className="w-3 h-3" />
               </button>
             </div>
-            <AudioPreview src={data.output} />
+            <AudioPreview url={data.output} />
           </div>
         )}
       </div>

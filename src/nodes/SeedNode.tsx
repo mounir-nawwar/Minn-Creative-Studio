@@ -1,36 +1,103 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
 import { RefreshCw, Lock, Unlock } from 'lucide-react';
 
-const SeedNode = ({ id, data }: any) => {
-  const [seed, setSeed] = useState(data.config?.seed || Math.floor(Math.random() * 1000000));
-  const [isLocked, setIsLocked] = useState(data.config?.isLocked || false);
-  const [isRandom, setIsRandom] = useState(data.config?.isRandom || false);
+interface SeedNodeProps {
+  id: string;
+  data: {
+    label: string;
+    config?: {
+      seed?: number;
+      isLocked?: boolean;
+      isRandom?: boolean;
+    };
+  };
+}
+
+const SeedNode: React.FC<SeedNodeProps> = ({ id, data }) => {
+  const [seed, setSeed] = useState<number>(data.config?.seed ?? Math.floor(Math.random() * 1000000));
+  const [isLocked, setIsLocked] = useState<boolean>(data.config?.isLocked ?? false);
+  const [isRandom, setIsRandom] = useState<boolean>(data.config?.isRandom ?? false);
   const updateNodeData = useStore((state) => state.updateNodeData);
 
-  const handleRun = () => {
+  // Deep comparison helper to prevent unnecessary updates
+  const configsAreEqual = useCallback((a: any, b: any): boolean => {
+    if (a === b) return true;
+    if (!a || !b) return false;
+    return a.seed === b.seed && a.isLocked === b.isLocked && a.isRandom === b.isRandom;
+  }, []);
+
+  // Sync local state with prop changes
+  useEffect(() => {
+    setSeed(prevSeed => {
+      const newSeed = data.config?.seed ?? Math.floor(Math.random() * 1000000);
+      return prevSeed !== newSeed ? newSeed : prevSeed;
+    });
+    
+    setIsLocked(prevLocked => {
+      const newLocked = data.config?.isLocked ?? false;
+      return prevLocked !== newLocked ? newLocked : prevLocked;
+    });
+    
+    setIsRandom(prevRandom => {
+      const newRandom = data.config?.isRandom ?? false;
+      return prevRandom !== newRandom ? newRandom : prevRandom;
+    });
+  }, [data.config, configsAreEqual]);
+
+  const handleRun = useCallback(() => {
     const finalSeed = isRandom ? Math.floor(Math.random() * 1000000) : seed;
     updateNodeData(id, { output: finalSeed, isRunning: false });
-  };
+  }, [id, isRandom, seed, updateNodeData]);
 
-  const randomize = () => {
+  const randomize = useCallback(() => {
     if (isLocked) return;
     const newSeed = Math.floor(Math.random() * 1000000);
     setSeed(newSeed);
-    updateNodeData(id, { config: { ...data.config, seed: newSeed } });
-  };
+    
+    // Guard against infinite loops - only update if value actually changed
+    if (data.config?.seed !== newSeed) {
+      updateNodeData(id, { config: { ...data.config, seed: newSeed } });
+    }
+  }, [id, isLocked, data.config, updateNodeData]);
+
+  const handleRandomToggle = useCallback(() => {
+    const newRandom = !isRandom;
+    setIsRandom(newRandom);
+    
+    // Guard against infinite loops
+    if (data.config?.isRandom !== newRandom) {
+      updateNodeData(id, { config: { ...data.config, isRandom: newRandom } });
+    }
+  }, [id, isRandom, data.config, updateNodeData]);
+
+  const handleSeedChange = useCallback((newSeed: number) => {
+    setSeed(newSeed);
+    
+    // Guard against infinite loops
+    if (data.config?.seed !== newSeed) {
+      updateNodeData(id, { config: { ...data.config, seed: newSeed } });
+    }
+  }, [id, data.config, updateNodeData]);
+
+  const handleLockToggle = useCallback(() => {
+    const newLocked = !isLocked;
+    setIsLocked(newLocked);
+    
+    // Guard against infinite loops
+    if (data.config?.isLocked !== newLocked) {
+      updateNodeData(id, { config: { ...data.config, isLocked: newLocked } });
+    }
+  }, [id, isLocked, data.config, updateNodeData]);
 
   return (
-    <BaseNode id={id} data={data} inputs={false} onRun={handleRun} color="#2196F3">
+    <BaseNode id={id} data={data} inputs={true} onRun={handleRun}>
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <label className="text-[10px] text-gray-500 uppercase font-bold">Random Toggle</label>
           <button 
-            onClick={() => {
-              setIsRandom(!isRandom);
-              updateNodeData(id, { config: { ...data.config, isRandom: !isRandom } });
-            }}
+            onClick={handleRandomToggle}
             className={`w-8 h-4 rounded-full transition-all relative ${isRandom ? 'bg-[#2196F3]' : 'bg-[#1a1a1a]'}`}
           >
             <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${isRandom ? 'left-4.5' : 'left-0.5'}`} />
@@ -43,10 +110,7 @@ const SeedNode = ({ id, data }: any) => {
             <input 
               type="number" value={seed}
               disabled={isLocked || isRandom}
-              onChange={(e) => {
-                setSeed(Number(e.target.value));
-                updateNodeData(id, { config: { ...data.config, seed: Number(e.target.value) } });
-              }}
+              onChange={(e) => handleSeedChange(Number(e.target.value))}
               className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-1.5 text-xs text-gray-300 focus:outline-none disabled:opacity-50"
             />
           </div>
@@ -59,10 +123,7 @@ const SeedNode = ({ id, data }: any) => {
               <RefreshCw className="w-3 h-3" />
             </button>
             <button 
-              onClick={() => {
-                setIsLocked(!isLocked);
-                updateNodeData(id, { config: { ...data.config, isLocked: !isLocked } });
-              }}
+              onClick={handleLockToggle}
               className={`p-1.5 border rounded-lg transition-all ${isLocked ? 'bg-red-500/10 border-red-500/50 text-red-500' : 'bg-[#1a1a1a] border-[#2a2a2a] text-gray-500'}`}
             >
               {isLocked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
@@ -85,4 +146,4 @@ const SeedNode = ({ id, data }: any) => {
   );
 };
 
-export default SeedNode;
+export default React.memo(SeedNode);

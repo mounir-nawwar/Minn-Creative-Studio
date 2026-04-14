@@ -1,0 +1,55 @@
+/* src/styles/design.tokens.css */
+:root {
+  /* Colors */
+  --color-node-bg: #111111;
+  --color-node-border: #1a1a1a;
+  --color-node-error: #ef4444;
+  --color-node-loading: #0097a7;
+  --color-handle-default: #0097a7;
+  --color-handle-hover: #00bcd4;
+  --color-handle-valid: #22c55e;
+  --color-handle-invalid: #ef4444;
+  --color-handle-focus: #3b82f6;
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #9ca3af;
+  --color-text-error: #ef4444;
+  --color-text-success: #22c55e;
+  --color-progress-bar: #0097a7;
+  --color-progress-glow: rgba(0, 151, 167, 0.5);
+  --color-delete-hover: #ffffff;
+  --color-label-bg: rgba(0, 0, 0, 0.8);
+  --color-error-bg: rgba(239, 68, 68, 0.3);
+  --color-error-border: rgba(239, 68, 68, 0.3);
+  --color-error-text: rgb(239, 68, 68);
+  --color-header-bg: #1a1a1a;
+  --color-button-primary: #0097a7;
+  --color-button-primary-hover: #00838f;
+  --color-button-secondary-bg: #1a1a1a;
+  --color-button-secondary-hover: #222222;
+  --color-input-bg: #0a0a0a;
+  --color-input-border: #2a2a2a;
+  --color-input-text: #9ca3af;
+  --color-input-focus: #00bcd4;
+  --color-toggle-active: #2196f3;
+  --color-toggle-inactive: #1a1a1a;
+  
+  /* Spacing */
+  --spacing-handle: 0.75rem; /* 12px */
+  --spacing-handle-label: 1rem; /* 16px */
+  --spacing-node-padding: 1rem; /* 16px */
+  --spacing-progress-thickness: 2px;
+  
+  /* Shadows */
+  --shadow-handle-hover: 0 0 8px #00bcd4;
+  --shadow-handle-valid: 0 0 8px #22c55e;
+  --shadow-handle-invalid: 0 0 8px #ef4444;
+  --shadow-node-loading: 0 0 15px rgba(0, 151, 167, 0.3);
+  --shadow-node-error: 0 0 15px rgba(239, 68, 68, 0.3);
+  --shadow-progress-glow: 0 0 10px rgba(0, 151, 167, 0.5);
+  --shadow-node: 0 0 15px rgba(0, 0, 0, 0.5);
+  
+  /* Transitions */
+  --transition-fast: 150ms;
+  --transition-medium: 300ms;
+  --transition-slow: 500ms;
+}

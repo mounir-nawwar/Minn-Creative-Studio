@@ -52,8 +52,10 @@ export type NodeType =
 export interface WorkflowNodeData {
   label: string;
   type: NodeType;
-  config: any;
+  config?: any;
   output?: any;
+  outputs?: any[];
+  uploadEnabled?: boolean;
   error?: string;
   isRunning?: boolean;
   triggerRun?: number;

@@ -368,7 +368,7 @@ export const generateAudio = async (params: {
 
     // Handle Long Running Operation (Lyria Pro)
     if (response.isLro) {
-      let operation = { name: response.operation, done: false };
+      let operation: { name: any; done: boolean; response?: any } = { name: response.operation, done: false };
       let pollCount = 0;
       while (!operation.done) {
         pollCount++;
