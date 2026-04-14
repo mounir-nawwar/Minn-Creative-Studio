@@ -105,7 +105,33 @@ export async function downloadFile(url: string, filename: string) {
  * ```
  */
 export function calcHandlePosition(index: number, total: number): string {
-  return total > 1 
-    ? `${20 + (index * 60 / (total - 1))}%` 
-    : '50%';
+  if (total === 1) return '50%';
+  
+  // Distribute handles evenly from 20% to 80% (leaving space at top/bottom)
+  const start = 20;
+  const end = 80;
+  const range = end - start;
+  
+  if (total === 2) {
+    // Two handles at 33% and 66% for balanced spacing
+    const positions = ['33.33%', '66.66%'];
+    return positions[index];
+  }
+  
+  if (total === 3) {
+    // Three handles at 25%, 50%, 75%
+    const positions = ['25%', '50%', '75%'];
+    return positions[index];
+  }
+  
+  if (total === 4) {
+    // Four handles at 20%, 40%, 60%, 80% (with rounding)
+    const positions = ['20%', '40%', '60%', '80%'];
+    return positions[index];
+  }
+  
+  // For 5+ handles, use linear distribution
+  const step = range / (total - 1);
+  const position = start + (index * step);
+  return `${position}%`;
 }

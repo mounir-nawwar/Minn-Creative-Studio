@@ -24,6 +24,7 @@ import MinnLogo from './assets/Minn.svg';
 import AuthLayout, { SF } from './components/AuthLayout';
 import { UnicornScene } from 'unicornstudio-react';
 import { perfMonitor } from './services/performance';
+import { ConnectionProvider } from './contexts/ConnectionContext';
 
 declare global {
   interface Window {
@@ -299,7 +300,9 @@ export default function App() {
               <div className="flex-1 flex flex-col min-w-0">
                 <ProjectContextBar />
                 <Toolbar user={user!} onLogout={handleCustomLogout} />
-                <Canvas />
+                <ConnectionProvider>
+                  <Canvas />
+                </ConnectionProvider>
                 <ChatDrawer />
                 <AnimatePresence>
                   {isSettingsOpen && (

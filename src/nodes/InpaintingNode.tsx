@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Handle, Position } from 'reactflow';
-import { Eraser, Loader2, Sparkles, MousePointer2, Undo2, Square, Download } from 'lucide-react';
+import { MousePointer2, Undo2, Square, Download } from 'lucide-react';
 import { inpaintImage } from '../services/geminiService';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
@@ -131,7 +130,7 @@ const InpaintingNode = ({ data, id }: any) => {
   };
 
   return (
-    <BaseNode id={id} data={data} onRun={handleRun} color="#ec4899">
+    <BaseNode id={id} data={data} inputs={true} onRun={handleRun} className="border-pink-500">
       <div className="space-y-4">
         <div className="relative aspect-video bg-black rounded-lg overflow-hidden cursor-crosshair group border border-white/10">
           <canvas
@@ -206,8 +205,6 @@ const InpaintingNode = ({ data, id }: any) => {
           </div>
         )}
       </div>
-
-      <Handle type="target" position={Position.Left} id="imageUrl" className="w-3 h-3 !bg-[#ec4899] border-2 border-[#0a0a0a]" />
     </BaseNode>
   );
 };

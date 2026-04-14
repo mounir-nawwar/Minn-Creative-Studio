@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Handle, Position } from 'reactflow';
-import { Maximize2, Minimize2, Split } from 'lucide-react';
+import { Split } from 'lucide-react';
+import BaseNode from './BaseNode';
 
-const CompareNode = ({ data }: any) => {
+const CompareNode = ({ id, data }: any) => {
   const [sliderPos, setSliderPos] = useState(50);
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -48,15 +48,8 @@ const CompareNode = ({ data }: any) => {
   };
 
   return (
-    <div className="bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden min-w-[320px] shadow-2xl">
-      <div className="bg-zinc-900/50 p-3 border-b border-zinc-800 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Split className="w-4 h-4 text-orange-500" />
-          <span className="text-xs font-medium text-zinc-200 uppercase tracking-wider">Compare</span>
-        </div>
-      </div>
-
-      <div className="p-4 space-y-4">
+    <BaseNode id={id} data={{ ...data, label: 'Compare' }} inputs={true} outputs={false} className="border-orange-500">
+      <div className="space-y-4">
         <div 
           ref={containerRef}
           className="relative aspect-video bg-black rounded-lg overflow-hidden cursor-col-resize select-none"
@@ -77,7 +70,6 @@ const CompareNode = ({ data }: any) => {
             style={{ width: `${sliderPos}%` }}
           >
             <div className="absolute inset-0 w-[320px] aspect-video">
-               {/* We need to ensure the inner content doesn't shrink with the container */}
                <div style={{ width: containerRef.current?.clientWidth || 320, height: containerRef.current?.clientHeight || 180 }}>
                 {renderMedia(data.inputA, 'A')}
                </div>
@@ -101,10 +93,7 @@ const CompareNode = ({ data }: any) => {
            <div className="text-[10px] text-zinc-500 uppercase tracking-tighter text-right">Input B (Right)</div>
         </div>
       </div>
-
-      <Handle type="target" position={Position.Left} id="inputA" style={{ top: '40%', background: '#f97316' }} />
-      <Handle type="target" position={Position.Left} id="inputB" style={{ top: '60%', background: '#71717a' }} />
-    </div>
+    </BaseNode>
   );
 };
 

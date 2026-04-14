@@ -4,26 +4,36 @@ import { useStore } from '../store/useStore';
 import { checkConnection } from '../store/connection-validator';
 import { perfMonitor } from '../services/performance';
 
+export interface SourceInfo {
+  nodeId: string;
+  handleId: string;
+  handleType: 'source' | 'target';
+}
+
+interface HoveredTargetInfo {
+  nodeId: string;
+  handleId: string;
+  validation: { valid: boolean; message: string } | null;
+}
+
 interface ConnectionContextType {
   isConnecting: boolean;
-  currentConnection: Partial<Connection> | null;
-  hoveredHandle: string | null;
+  sourceInfo: SourceInfo | null;
+  hoveredTargetInfo: HoveredTargetInfo | null;
   connectionValidation: { valid: boolean; message: string } | null;
-  startConnection: (connection: Partial<Connection>) => void;
-  updateConnection: (connection: Partial<Connection>) => void;
+  startConnection: (sourceInfo: SourceInfo) => void;
+  setHoveredTarget: (hoveredInfo: HoveredTargetInfo | null) => void;
   endConnection: () => void;
-  setHoveredHandle: (handleId: string | null) => void;
 }
 
 const ConnectionContext = createContext<ConnectionContextType>({
   isConnecting: false,
-  currentConnection: null,
-  hoveredHandle: null,
+  sourceInfo: null,
+  hoveredTargetInfo: null,
   connectionValidation: null,
   startConnection: () => {},
-  updateConnection: () => {},
+  setHoveredTarget: () => {},
   endConnection: () => {},
-  setHoveredHandle: () => {},
 });
 
 export const useConnectionContext = () => useContext(ConnectionContext);
@@ -34,66 +44,64 @@ interface ConnectionProviderProps {
 
 export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({ children }) => {
   const [isConnecting, setIsConnecting] = useState(false);
-  const [currentConnection, setCurrentConnection] = useState<Partial<Connection> | null>(null);
-  const [hoveredHandle, setHoveredHandleState] = useState<string | null>(null);
+  const [sourceInfo, setSourceInfo] = useState<SourceInfo | null>(null);
+  const [hoveredTargetInfo, setHoveredTargetInfoState] = useState<HoveredTargetInfo | null>(null);
   const [connectionValidation, setConnectionValidation] = useState<{ valid: boolean; message: string } | null>(null);
   
   const nodes = useStore((state) => state.nodes);
 
-  const startConnection = useCallback((connection: Partial<Connection>) => {
+  const startConnection = useCallback((newSourceInfo: SourceInfo) => {
     setIsConnecting(true);
-    setCurrentConnection(connection);
+    setSourceInfo(newSourceInfo);
+    setHoveredTargetInfoState(null);
     setConnectionValidation(null);
-    setHoveredHandle(null);
   }, []);
 
-  const updateConnection = useCallback((connection: Partial<Connection>) => {
-    setCurrentConnection(connection);
+  const setHoveredTarget = useCallback((hoveredInfo: HoveredTargetInfo | null) => {
+    setHoveredTargetInfoState(hoveredInfo);
     
-    // Validate current connection attempt with performance measurement
-    if (connection.source && connection.target) {
+    // Validate the connection when hovering over a target
+    if (hoveredInfo && sourceInfo) {
+      const connection: Connection = {
+        source: sourceInfo.nodeId,
+        sourceHandle: sourceInfo.handleId,
+        target: hoveredInfo.nodeId,
+        targetHandle: hoveredInfo.handleId,
+      };
+      
       const validation = perfMonitor.measureValidation(() => 
-        checkConnection(
-          connection as Connection, 
-          nodes
-        ),
+        checkConnection(connection, nodes),
         'connection-validation'
       );
-      setConnectionValidation(
-        { valid: validation.valid, message: validation.message }
-      );
+      setConnectionValidation(validation);
+    } else {
+      setConnectionValidation(null);
     }
-  }, [nodes]);
+  }, [sourceInfo, nodes]);
 
   const endConnection = useCallback(() => {
     setIsConnecting(false);
-    setCurrentConnection(null);
-    setHoveredHandleState(null);
+    setSourceInfo(null);
+    setHoveredTargetInfoState(null);
     setConnectionValidation(null);
-  }, []);
-
-  const setHoveredHandle = useCallback((handleId: string | null) => {
-    setHoveredHandleState(handleId);
   }, []);
 
   const value = useMemo(() => ({
     isConnecting,
-    currentConnection,
-    hoveredHandle,
+    sourceInfo,
+    hoveredTargetInfo,
     connectionValidation,
     startConnection,
-    updateConnection,
+    setHoveredTarget,
     endConnection,
-    setHoveredHandle,
   }), [
     isConnecting,
-    currentConnection,
-    hoveredHandle,
+    sourceInfo,
+    hoveredTargetInfo,
     connectionValidation,
     startConnection,
-    updateConnection,
+    setHoveredTarget,
     endConnection,
-    setHoveredHandle,
   ]);
 
   return (

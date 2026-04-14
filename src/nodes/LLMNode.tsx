@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
 import { useProjectStore } from '../store/useProjectStore';
-import { Handle, Position } from 'reactflow';
 import { generateText } from '../services/geminiService';
 
 const LLMNode = ({ id, data }: any) => {
@@ -60,10 +59,7 @@ const LLMNode = ({ id, data }: any) => {
   };
 
   return (
-    <BaseNode id={id} data={data} inputs={false} onRun={handleRun}>
-      <Handle type="target" position={Position.Left} id="text" style={{ top: '30%', background: '#0097A7' }} />
-      <Handle type="target" position={Position.Left} id="image" style={{ top: '70%', background: 'purple' }} />
-
+    <BaseNode id={id} data={data} inputs={true} onRun={handleRun} className="border-blue-500">
       <div className="space-y-3">
         <div className="space-y-1">
           <label className="text-[10px] text-gray-500 uppercase font-bold">Model</label>
@@ -95,7 +91,7 @@ const LLMNode = ({ id, data }: any) => {
         <button
           onClick={handleRun}
           disabled={data.isRunning}
-          className="w-full py-2 bg-[#0097A7] hover:bg-[#00838F] text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50"
+          className="w-full py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50"
         >
           {data.isRunning ? "RUNNING..." : "RUN LLM"}
         </button>

@@ -1,7 +1,6 @@
 import React, { useState, useRef } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
-import { Handle, Position } from 'reactflow';
 
 const CompositorNode = ({ id, data }: any) => {
   const [opacity, setOpacity] = useState(data.config?.opacity || 100);
@@ -74,13 +73,7 @@ const CompositorNode = ({ id, data }: any) => {
   };
 
   return (
-    <BaseNode id={id} data={data} onRun={handleRun} customHandles={
-      <>
-        <Handle type="target" position={Position.Left} id="background" style={{ top: '30%', background: '#444' }} />
-        <Handle type="target" position={Position.Left} id="foreground" style={{ top: '70%', background: '#0097A7' }} />
-        <Handle type="source" position={Position.Right} />
-      </>
-    }>
+    <BaseNode id={id} data={data} inputs={true} onRun={handleRun} className="border-indigo-500">
       <div className="space-y-3">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">

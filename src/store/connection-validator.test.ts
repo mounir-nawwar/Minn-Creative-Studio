@@ -138,13 +138,14 @@ describe('Connection Validator', () => {
     });
   });
 
+  describe('buildValidationCache (edge cases)', () => {
     it('should return null for empty nodes array', () => {
-      const result = isValidConnection('prompt-1', null, []);
+      const result = buildValidationCache('prompt-1', null, []);
       expect(result).toBeNull();
     });
 
     it('should return null for non-existent source node', () => {
-      const result = isValidConnection('non-existent', null, mockNodes);
+      const result = buildValidationCache('non-existent', null, mockNodes);
       expect(result).toBeNull();
     });
 
@@ -181,6 +182,8 @@ describe('Connection Validator', () => {
       const result = checkConnection({
         source: 'prompt-1',
         target: 'llm-1',
+        sourceHandle: null,
+        targetHandle: null,
       }, mockNodes);
       expect(result).toEqual({
         valid: true,
@@ -192,6 +195,8 @@ describe('Connection Validator', () => {
       const result = checkConnection({
         source: 'imageUpload-1',
         target: 'seed-1',
+        sourceHandle: null,
+        targetHandle: null,
       }, mockNodes);
       expect(result).toEqual({
         valid: false,
@@ -203,6 +208,8 @@ describe('Connection Validator', () => {
       const result = checkConnection({
         source: 'videoUpload-1',
         target: 'seed-1',
+        sourceHandle: null,
+        targetHandle: null,
       }, mockNodes);
       expect(result).toEqual({
         valid: false,
@@ -214,6 +221,8 @@ describe('Connection Validator', () => {
       const result = checkConnection({
         source: 'prompt-1',
         target: 'prompt-1',
+        sourceHandle: null,
+        targetHandle: null,
       }, mockNodes);
       expect(result).toEqual({
         valid: false,
@@ -225,6 +234,8 @@ describe('Connection Validator', () => {
       const result = checkConnection({
         source: 'non-existent',
         target: 'llm-1',
+        sourceHandle: null,
+        targetHandle: null,
       }, mockNodes);
       expect(result).toEqual({
         valid: false,
@@ -236,6 +247,8 @@ describe('Connection Validator', () => {
       const result = checkConnection({
         source: 'prompt-1',
         target: 'non-existent',
+        sourceHandle: null,
+        targetHandle: null,
       }, mockNodes);
       expect(result).toEqual({
         valid: false,
@@ -247,6 +260,8 @@ describe('Connection Validator', () => {
       const result = checkConnection({
         source: 'imageUpload-1',
         target: 'resize-1',
+        sourceHandle: null,
+        targetHandle: null,
       }, mockNodes);
       expect(result).toEqual({
         valid: true,
@@ -258,6 +273,8 @@ describe('Connection Validator', () => {
       const result = checkConnection({
         source: 'imageUpload-1',
         target: 'blur-1',
+        sourceHandle: null,
+        targetHandle: null,
       }, mockNodes);
       expect(result).toEqual({
         valid: true,
@@ -269,6 +286,8 @@ describe('Connection Validator', () => {
       const result = checkConnection({
         source: 'number-1',
         target: 'seed-1',
+        sourceHandle: null,
+        targetHandle: null,
       }, mockNodes);
       expect(result).toEqual({
         valid: true,
@@ -280,6 +299,8 @@ describe('Connection Validator', () => {
       const result = checkConnection({
         source: 'toggle-1',
         target: 'llm-1',
+        sourceHandle: null,
+        targetHandle: null,
       }, mockNodes);
       expect(result).toEqual({
         valid: false,
@@ -288,8 +309,9 @@ describe('Connection Validator', () => {
     });
   });
 
+  describe('checkConnection (with explicit handle IDs)', () => {
     it('should block imageUpload to seed connection', () => {
-      const result = isValidConnection({
+      const result = checkConnection({
         source: 'imageUpload-1',
         target: 'seed-1',
         sourceHandle: 'image',
@@ -303,7 +325,7 @@ describe('Connection Validator', () => {
     });
 
     it('should block videoUpload to seed connection', () => {
-      const result = isValidConnection({
+      const result = checkConnection({
         source: 'videoUpload-1',
         target: 'seed-1',
         sourceHandle: 'video',
@@ -319,7 +341,7 @@ describe('Connection Validator', () => {
     });
 
     it('should block self-connections', () => {
-      const result = isValidConnection({
+      const result = checkConnection({
         source: 'prompt-1',
         target: 'prompt-1',
         sourceHandle: 'prompt',
@@ -333,7 +355,7 @@ describe('Connection Validator', () => {
     });
 
     it('should return error for missing source node', () => {
-      const result = isValidConnection({
+      const result = checkConnection({
         source: 'non-existent',
         target: 'llm-1',
         sourceHandle: 'prompt',
@@ -347,7 +369,7 @@ describe('Connection Validator', () => {
     });
 
     it('should return error for missing target node', () => {
-      const result = isValidConnection({
+      const result = checkConnection({
         source: 'prompt-1',
         target: 'non-existent',
         sourceHandle: 'prompt',
@@ -361,7 +383,7 @@ describe('Connection Validator', () => {
     });
 
     it('should allow image to resize connection', () => {
-      const result = isValidConnection({
+      const result = checkConnection({
         source: 'imageUpload-1',
         target: 'resize-1',
         sourceHandle: 'image',
@@ -372,7 +394,7 @@ describe('Connection Validator', () => {
     });
 
     it('should allow image to blur connection', () => {
-      const result = isValidConnection({
+      const result = checkConnection({
         source: 'imageUpload-1',
         target: 'blur-1',
         sourceHandle: 'image',
@@ -383,7 +405,7 @@ describe('Connection Validator', () => {
     });
 
     it('should allow number to seed connection', () => {
-      const result = isValidConnection({
+      const result = checkConnection({
         source: 'number-1',
         target: 'seed-1',
         sourceHandle: 'number',
@@ -394,7 +416,7 @@ describe('Connection Validator', () => {
     });
 
     it('should block incompatible type connections', () => {
-      const result = isValidConnection({
+      const result = checkConnection({
         source: 'toggle-1',
         target: 'llm-1',
         sourceHandle: 'boolean',
@@ -700,7 +722,7 @@ describe('Connection Validator', () => {
         position: { x: 0, y: 0 }
       };
 
-      const result = isValidConnection({
+      const result = checkConnection({
         source: 'prompt-1',
         target: 'empty-1',
         sourceHandle: 'prompt',
@@ -716,7 +738,7 @@ describe('Connection Validator', () => {
     });
 
     it('should handle invalid handle IDs', () => {
-      const result = isValidConnection({
+      const result = checkConnection({
         source: 'prompt-1',
         target: 'llm-1',
         sourceHandle: 'invalid-handle',
@@ -732,7 +754,7 @@ describe('Connection Validator', () => {
     });
 
     it('should handle missing nodes gracefully', () => {
-      const result = isValidConnection({
+      const result = checkConnection({
         source: 'missing-1',
         target: 'llm-1',
         sourceHandle: 'prompt',
@@ -746,7 +768,7 @@ describe('Connection Validator', () => {
     });
 
     it('should handle undefined handles gracefully', () => {
-      const result = isValidConnection({
+      const result = checkConnection({
         source: 'prompt-1',
         target: 'llm-1',
         sourceHandle: 'prompt',
@@ -769,7 +791,7 @@ describe('Connection Validator', () => {
         position: { x: 0, y: 0 }
       };
 
-      const result = isValidConnection({
+      const result = checkConnection({
         source: 'prompt-1',
         target: 'unknown-1',
         sourceHandle: 'prompt',
@@ -789,7 +811,7 @@ describe('Connection Validator', () => {
     it('should validate connections in under 1ms for small datasets', () => {
       const start = performance.now();
       
-      isValidConnection({
+      checkConnection({
         source: 'prompt-1',
         target: 'llm-1',
         sourceHandle: 'output',
@@ -879,7 +901,7 @@ describe('Connection Validator', () => {
   describe('Complex Scenarios', () => {
     it('should handle multi-step validation chains', () => {
       // Test: prompt → imagen → resize → blur (valid chain)
-      const promptToImagen = isValidConnection({
+      const promptToImagen = checkConnection({
         source: 'prompt-1',
         target: 'llm-1',
         sourceHandle: 'prompt',
@@ -892,7 +914,7 @@ describe('Connection Validator', () => {
       const imagenNode = { ...mockNodes[1], id: 'imagen-output' }; // Simulate imagen output
       const nodesWithOutput = [...mockNodes, imagenNode];
       
-      const imagenToResize = isValidConnection({
+      const imagenToResize = checkConnection({
         source: 'imagen-output',
         target: 'resize-1',
         sourceHandle: 'image',
@@ -902,7 +924,7 @@ describe('Connection Validator', () => {
         expect(imagenToResize.valid).toBe(true);
       }
 
-      const resizeToBlur = isValidConnection({
+      const resizeToBlur = checkConnection({
         source: 'resize-1',
         target: 'blur-1',
         sourceHandle: 'image',
@@ -922,7 +944,7 @@ describe('Connection Validator', () => {
         position: { x: 0, y: 0 }
       };
 
-      const result = isValidConnection({
+      const result = checkConnection({
         source: 'imagen-1',
         target: 'seed-1',
         sourceHandle: 'image',
@@ -939,7 +961,7 @@ describe('Connection Validator', () => {
 
     it('should validate mask workflow correctly', () => {
       // Test: image → maskExtractor → matteAdjust (valid mask workflow)
-      const imageToMask = isValidConnection({
+      const imageToMask = checkConnection({
         source: 'imageUpload-1',
         target: 'maskExtractor-1',
         sourceHandle: 'image',
@@ -959,7 +981,7 @@ describe('Connection Validator', () => {
         position: { x: 0, y: 0 }
       };
       
-      const maskToMatte = isValidConnection({
+      const maskToMatte = checkConnection({
         source: 'mask-output',
         target: 'matteAdjust-1',
         sourceHandle: 'mask',

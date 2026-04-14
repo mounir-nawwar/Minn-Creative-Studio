@@ -291,3 +291,42 @@ For questions or issues with the connection validation system, check:
 - `NODE_HANDLES` configuration
 - `CONNECTION_VALIDATION_RULES` for blocked pairs
 - ReactFlow documentation for handle positioning
+
+## Handle Positioning Fix (Empty Nodes Issue)
+
+### Problem
+When nodes were empty (no output content), connection lines didn't snap to handle dots correctly. This was caused by ReactFlow caching node dimensions during the initial render/animation, before content was fully laid out.
+
+### Solution (BaseNode.tsx)
+1. **`useUpdateNodeInternals()`** - ReactFlow hook to force re-measurement of handle positions
+2. **`ResizeObserver`** - Detects when node dimensions change (empty → has content)
+3. **`useLayoutEffect` + `requestAnimationFrame`** - Forces re-measurement right after initial render
+4. **`onAnimationComplete`** - Triggers re-measurement after motion.div animation finishes
+
+```typescript
+const updateNodeInternals = useUpdateNodeInternals();
+const nodeRef = useRef<HTMLDivElement>(null);
+
+// Re-measure after initial render
+useIsomorphicLayoutEffect(() => {
+  const timer = requestAnimationFrame(() => {
+    updateNodeInternals(id);
+  });
+  return () => cancelAnimationFrame(timer);
+}, [id, updateNodeInternals]);
+
+// Re-measure when node resizes
+useEffect(() => {
+  const node = nodeRef.current;
+  if (!node) return;
+  
+  const observer = new ResizeObserver(() => {
+    updateNodeInternals(id);
+  });
+  observer.observe(node);
+  
+  return () => observer.disconnect();
+}, [id, updateNodeInternals]);
+```
+
+This ensures handles are always positioned correctly regardless of node content state.

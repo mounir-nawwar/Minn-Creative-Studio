@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
-import { Handle, Position } from 'reactflow';
 
 const PromptConcatenatorNode = ({ id, data }: any) => {
   const [separator, setSeparator] = useState(data.config?.separator || ', ');
@@ -28,12 +27,7 @@ const PromptConcatenatorNode = ({ id, data }: any) => {
   };
 
   return (
-    <BaseNode id={id} data={data} inputs={false} onRun={handleRun}>
-      <Handle type="target" position={Position.Left} id="in1" style={{ top: '20%', background: '#0097A7' }} />
-      <Handle type="target" position={Position.Left} id="in2" style={{ top: '40%', background: '#0097A7' }} />
-      <Handle type="target" position={Position.Left} id="in3" style={{ top: '60%', background: '#0097A7' }} />
-      <Handle type="target" position={Position.Left} id="in4" style={{ top: '80%', background: '#0097A7' }} />
-
+    <BaseNode id={id} data={data} inputs={true} onRun={handleRun} className="border-teal-500">
       <div className="space-y-3">
         <div className="space-y-1">
           <label className="text-[10px] text-gray-500 uppercase font-bold">Separator</label>

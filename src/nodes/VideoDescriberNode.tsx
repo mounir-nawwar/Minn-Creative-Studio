@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
-import { Handle, Position } from 'reactflow';
 import { generateText } from '../services/geminiService';
 
 const VideoDescriberNode = ({ id, data }: any) => {
@@ -41,9 +40,7 @@ const VideoDescriberNode = ({ id, data }: any) => {
   };
 
   return (
-    <BaseNode id={id} data={data} inputs={false} onRun={handleRun}>
-      <Handle type="target" position={Position.Left} id="video" style={{ top: '50%', background: 'orange' }} />
-
+    <BaseNode id={id} data={data} inputs={true} onRun={handleRun} className="border-orange-500">
       <div className="space-y-3">
         <div className="space-y-1">
           <label className="text-[10px] text-gray-500 uppercase font-bold">Model</label>

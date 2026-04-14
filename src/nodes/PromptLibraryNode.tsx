@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Handle, Position } from 'reactflow';
-import { Library, Search, Tag, Plus, Save, Loader2, Trash2 } from 'lucide-react';
+import { Search, Tag, Plus, Loader2 } from 'lucide-react';
 import { API_BASE } from '../constants';
+import BaseNode from './BaseNode';
 
 const PromptLibraryNode = ({ data, id }: any) => {
   const [prompts, setPrompts] = useState<any[]>([]);
@@ -37,15 +37,8 @@ const PromptLibraryNode = ({ data, id }: any) => {
   );
 
   return (
-    <div className="bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden min-w-[320px] shadow-2xl">
-      <div className="bg-zinc-900/50 p-3 border-b border-zinc-800 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Library className="w-4 h-4 text-amber-500" />
-          <span className="text-xs font-medium text-zinc-200 uppercase tracking-wider">Prompt Library</span>
-        </div>
-      </div>
-
-      <div className="p-4 space-y-4">
+    <BaseNode id={id} data={{ ...data, label: 'Prompt Library' }} inputs={false} outputs={true} className="border-amber-500">
+      <div className="space-y-4">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-zinc-500" />
           <input
@@ -94,9 +87,7 @@ const PromptLibraryNode = ({ data, id }: any) => {
           </button>
         </div>
       </div>
-
-      <Handle type="source" position={Position.Right} id="prompt" style={{ background: '#f59e0b' }} />
-    </div>
+    </BaseNode>
   );
 };
 

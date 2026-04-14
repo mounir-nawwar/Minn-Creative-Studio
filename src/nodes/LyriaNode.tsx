@@ -5,8 +5,7 @@ import { useProjectStore } from '../store/useProjectStore';
 import { generateAudio } from '../services/geminiService';
 import AudioPreview from '../components/AudioPreview';
 import { useAssets } from '../hooks/useAssets';
-import { Music, Mic2, Image as ImageIcon, Settings2, Sparkles, Loader2, Download } from 'lucide-react';
-import { Handle, Position } from 'reactflow';
+import { Music, Mic2, Sparkles, Loader2, Download } from 'lucide-react';
 import ReferenceStrip from '../components/ReferenceStrip';
 import ParameterSlider from '../components/ParameterSlider';
 import { downloadFile } from '../lib/utils';
@@ -88,10 +87,7 @@ const LyriaNode = ({ id, data }: any) => {
   };
 
   return (
-    <BaseNode id={id} data={data} onRun={handleRun} color="#0097A7" icon={isLyria ? Music : Mic2}>
-      <Handle type="target" position={Position.Left} id="prompt" className="w-3 h-3 !bg-[#0097A7] border-2 border-[#0a0a0a]" style={{ top: '20%' }} />
-      <Handle type="target" position={Position.Left} id="reference" className="w-3 h-3 !bg-orange-500 border-2 border-[#0a0a0a]" style={{ top: '50%' }} />
-
+    <BaseNode id={id} data={data} inputs={true} onRun={handleRun} className="border-[#0097A7]">
       <div className="space-y-3">
         <div className="space-y-1">
           <label className="text-[10px] text-gray-500 uppercase font-bold">Model</label>
@@ -245,7 +241,7 @@ const LyriaNode = ({ id, data }: any) => {
           disabled={data.isRunning}
           className="w-full py-2 bg-[#0097A7] hover:bg-[#00838F] text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
         >
-          {data.isRunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+          {data.isRunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Music className="w-3 h-3" />}
           {data.isRunning ? "GENERATING..." : `GENERATE ${isLyria ? 'MUSIC' : 'AUDIO'}`}
         </button>
 

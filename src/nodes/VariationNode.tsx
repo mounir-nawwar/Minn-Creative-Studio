@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Handle, Position } from 'reactflow';
 import { Copy, Loader2, Sparkles, Sliders, Grid } from 'lucide-react';
 import { generateVariations } from '../services/geminiService';
+import BaseNode from './BaseNode';
 
 const VariationNode = ({ data, id }: any) => {
   const [prompt, setPrompt] = useState(data.prompt || '');
@@ -29,15 +29,8 @@ const VariationNode = ({ data, id }: any) => {
   };
 
   return (
-    <div className="bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden min-w-[320px] shadow-2xl">
-      <div className="bg-zinc-900/50 p-3 border-b border-zinc-800 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Copy className="w-4 h-4 text-emerald-500" />
-          <span className="text-xs font-medium text-zinc-200 uppercase tracking-wider">Variations</span>
-        </div>
-      </div>
-
-      <div className="p-4 space-y-4">
+    <BaseNode id={id} data={{ ...data, label: 'Variations' }} inputs={true} outputs={false} className="border-emerald-500">
+      <div className="space-y-4">
         <div className="space-y-1">
           <label className="text-[10px] text-zinc-500 uppercase tracking-tighter">Variation Prompt (Optional)</label>
           <textarea
@@ -103,9 +96,7 @@ const VariationNode = ({ data, id }: any) => {
           </div>
         )}
       </div>
-
-      <Handle type="target" position={Position.Left} id="imageUrl" style={{ background: '#10b981' }} />
-    </div>
+    </BaseNode>
   );
 };
 

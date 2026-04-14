@@ -1,7 +1,6 @@
 import React, { useRef } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
-import { Handle, Position } from 'reactflow';
 
 const MergeAlphaNode = ({ id, data }: any) => {
   const updateNodeData = useStore((state) => state.updateNodeData);
@@ -11,11 +10,11 @@ const MergeAlphaNode = ({ id, data }: any) => {
     const state = useStore.getState();
     const incomingEdges = state.edges.filter(e => e.target === id);
     
-    const rgbEdge = incomingEdges.find(e => e.targetHandle === 'rgb');
-    const alphaEdge = incomingEdges.find(e => e.targetHandle === 'alpha');
+    const rgbEdge = incomingEdges.find(e => e.targetHandle === 'image');
+    const alphaEdge = incomingEdges.find(e => e.targetHandle === 'mask');
 
     if (!rgbEdge || !alphaEdge) {
-      updateNodeData(id, { error: "Both RGB and Alpha inputs must be connected" });
+      updateNodeData(id, { error: "Both Image and Mask inputs must be connected" });
       return;
     }
 
@@ -87,22 +86,16 @@ const MergeAlphaNode = ({ id, data }: any) => {
   };
 
   return (
-    <BaseNode id={id} data={data} onRun={handleRun} customHandles={
-      <>
-        <Handle type="target" position={Position.Left} id="rgb" style={{ top: '30%', background: '#0097A7' }} />
-        <Handle type="target" position={Position.Left} id="alpha" style={{ top: '70%', background: '#gray' }} />
-        <Handle type="source" position={Position.Right} />
-      </>
-    }>
+    <BaseNode id={id} data={data} inputs={true} onRun={handleRun} className="border-pink-500">
       <div className="space-y-3">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-[#0097A7]" />
-            <span className="text-[10px] text-gray-500 font-bold uppercase">RGB Input</span>
+            <span className="text-[10px] text-gray-500 font-bold uppercase">Image (RGB)</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-gray-500" />
-            <span className="text-[10px] text-gray-500 font-bold uppercase">Alpha Input (Grayscale)</span>
+            <span className="text-[10px] text-gray-500 font-bold uppercase">Mask (Alpha)</span>
           </div>
         </div>
 

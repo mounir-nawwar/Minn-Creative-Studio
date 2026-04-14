@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
 import { useProjectStore } from '../store/useProjectStore';
-import { Handle, Position } from 'reactflow';
 import ParameterSlider from '../components/ParameterSlider';
 import ReferenceStrip from '../components/ReferenceStrip';
 import { Video, Loader2, AlertCircle } from 'lucide-react';
@@ -110,35 +109,7 @@ const ImageToVideoNode = ({ id, data }: any) => {
   };
 
   return (
-    <BaseNode id={id} data={data} inputs={false} onRun={handleRun} color="#FF5722">
-      {/* Input Handles */}
-      <div className="absolute -left-3 top-0 bottom-0 flex flex-col justify-around py-4">
-        <div className="relative group">
-          <Handle type="target" position={Position.Left} id="start" className="w-3 h-3 !bg-[#FF5722] border-2 border-[#0a0a0a]" />
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[8px] text-gray-500 uppercase font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Start Frame</span>
-        </div>
-        <div className="relative group">
-          <Handle type="target" position={Position.Left} id="end" className="w-3 h-3 !bg-red-500 border-2 border-[#0a0a0a]" />
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[8px] text-gray-500 uppercase font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">End Frame</span>
-        </div>
-        <div className="relative group">
-          <Handle type="target" position={Position.Left} id="reference" className="w-3 h-3 !bg-orange-500 border-2 border-[#0a0a0a]" />
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[8px] text-gray-500 uppercase font-bold opacity-0 group-hover:opacity-100 transition-opacity">References</span>
-        </div>
-        <div className="relative group">
-          <Handle type="target" position={Position.Left} id="prompt" className="w-3 h-3 !bg-teal-500 border-2 border-[#0a0a0a]" />
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[8px] text-gray-500 uppercase font-bold opacity-0 group-hover:opacity-100 transition-opacity">Prompt</span>
-        </div>
-        <div className="relative group">
-          <Handle type="target" position={Position.Left} id="motion" className="w-3 h-3 !bg-blue-400 border-2 border-[#0a0a0a]" />
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[8px] text-gray-500 uppercase font-bold opacity-0 group-hover:opacity-100 transition-opacity">Motion</span>
-        </div>
-        <div className="relative group">
-          <Handle type="target" position={Position.Left} id="seed" className="w-3 h-3 !bg-blue-500 border-2 border-[#0a0a0a]" />
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[8px] text-gray-500 uppercase font-bold opacity-0 group-hover:opacity-100 transition-opacity">Seed</span>
-        </div>
-      </div>
-
+    <BaseNode id={id} data={data} inputs={true} onRun={handleRun} className="border-[#FF5722]">
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-2">
           <div className="space-y-1 col-span-2">

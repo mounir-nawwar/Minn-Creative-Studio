@@ -78,6 +78,7 @@ export type HandleType =
   | 'boolean'    // True/false toggles
   | 'json'       // Structured data (arrays, objects)
   | 'array'      // Array of items
+  | 'motion'     // Motion/intensity data for video generation
   | 'unknown';   // Default for generic connections
 
 /**
@@ -219,8 +220,10 @@ export const NODE_HANDLES: Record<NodeType | 'default', {
   },
   promptConcatenator: {
     inputs: [
-      { id: 'prompt1', type: 'prompt', label: 'Prompt 1' },
-      { id: 'prompt2', type: 'prompt', label: 'Prompt 2' }
+      { id: 'in1', type: 'prompt', label: 'Prompt 1' },
+      { id: 'in2', type: 'prompt', label: 'Prompt 2' },
+      { id: 'in3', type: 'prompt', label: 'Prompt 3' },
+      { id: 'in4', type: 'prompt', label: 'Prompt 4' }
     ],
     outputs: [{ id: 'prompt', type: 'prompt', label: 'Combined Prompt' }]
   },
@@ -232,24 +235,30 @@ export const NODE_HANDLES: Record<NodeType | 'default', {
   // 4. MODEL/GENERATION nodes
   llm: {
     inputs: [
-      { id: 'prompt', type: 'prompt', label: 'Prompt' },
-      { id: 'seed', type: 'seed', label: 'Seed (Optional)' }
+      { id: 'text', type: 'text', label: 'Input Text' },
+      { id: 'image', type: 'image', label: 'Input Image (Optional)' }
     ],
     outputs: [{ id: 'text', type: 'text', label: 'Generated Text' }]
   },
   imagen: {
     inputs: [
       { id: 'prompt', type: 'prompt', label: 'Prompt' },
+      { id: 'reference', type: 'image', label: 'Reference Image (Optional)' },
       { id: 'seed', type: 'seed', label: 'Seed (Optional)' },
-      { id: 'image', type: 'image', label: 'Reference Image (Optional)' }
+      { id: 'guidance', type: 'number', label: 'Guidance Strength' },
+      { id: 'cfg', type: 'number', label: 'CFG Scale' }
     ],
     outputs: [{ id: 'image', type: 'image', label: 'Generated Image' }]
   },
   veo: {
     inputs: [
       { id: 'prompt', type: 'prompt', label: 'Prompt' },
-      { id: 'seed', type: 'seed', label: 'Seed (Optional)' },
-      { id: 'image', type: 'image', label: 'Reference Image (Optional)' }
+      { id: 'startFrame', type: 'image', label: 'Start Frame (Optional)' },
+      { id: 'endFrame', type: 'image', label: 'End Frame (Optional)' },
+      { id: 'reference', type: 'image', label: 'Reference Images' },
+      { id: 'video', type: 'video', label: 'Input Video (Optional)' },
+      { id: 'motion', type: 'motion', label: 'Motion Data (Optional)' },
+      { id: 'seed', type: 'seed', label: 'Seed (Optional)' }
     ],
     outputs: [{ id: 'video', type: 'video', label: 'Generated Video' }]
   },
@@ -262,15 +271,20 @@ export const NODE_HANDLES: Record<NodeType | 'default', {
   },
   lyria: {
     inputs: [
-      { id: 'prompt', type: 'prompt', label: 'Prompt' },
+      { id: 'prompt', type: 'text', label: 'Text Prompt' },
+      { id: 'reference', type: 'image', label: 'Reference (Optional)' },
       { id: 'seed', type: 'seed', label: 'Seed (Optional)' }
     ],
     outputs: [{ id: 'audio', type: 'audio', label: 'Generated Audio' }]
   },
   imageToVideo: {
     inputs: [
-      { id: 'image', type: 'image', label: 'Image' },
-      { id: 'prompt', type: 'prompt', label: 'Prompt (Optional)' }
+      { id: 'start', type: 'image', label: 'Start Image' },
+      { id: 'end', type: 'image', label: 'End Image (Optional)' },
+      { id: 'reference', type: 'image', label: 'Reference Images' },
+      { id: 'prompt', type: 'prompt', label: 'Prompt (Optional)' },
+      { id: 'motion', type: 'motion', label: 'Motion Data (Optional)' },
+      { id: 'seed', type: 'seed', label: 'Seed (Optional)' }
     ],
     outputs: [{ id: 'video', type: 'video', label: 'Video' }]
   },
@@ -315,6 +329,13 @@ export const NODE_HANDLES: Record<NodeType | 'default', {
   imageUpscaler: {
     inputs: [{ id: 'image', type: 'image', label: 'Image' }],
     outputs: [{ id: 'image', type: 'image', label: 'Upscaled Image' }]
+  },
+  styleTransfer: {
+    inputs: [
+      { id: 'contentUrl', type: 'image', label: 'Content Image' },
+      { id: 'styleUrl', type: 'image', label: 'Style Image' }
+    ],
+    outputs: [{ id: 'image', type: 'image', label: 'Styled Image' }]
   },
 
   // 6. MASK nodes
@@ -454,13 +475,10 @@ export const NODE_HANDLES: Record<NodeType | 'default', {
   // 13. UTILITY nodes
   compare: {
     inputs: [
-      { id: 'item1', type: 'unknown', label: 'Item 1' },
-      { id: 'item2', type: 'unknown', label: 'Item 2' }
+      { id: 'inputA', type: 'image', label: 'Input A' },
+      { id: 'inputB', type: 'image', label: 'Input B' }
     ],
-    outputs: [
-      { id: 'result', type: 'boolean', label: 'Comparison Result' },
-      { id: 'diff', type: 'number', label: 'Difference' }
-    ]
+    outputs: [{ id: 'comparison', type: 'image', label: 'Comparison' }]
   },
   stickyNote: {
     inputs: [],
@@ -482,6 +500,10 @@ export const NODE_HANDLES: Record<NodeType | 'default', {
       { id: 'prompt', type: 'prompt', label: 'Painting Instructions' }
     ],
     outputs: [{ id: 'image', type: 'image', label: 'Painted Image' }]
+  },
+  batchOutputSizer: {
+    inputs: [{ id: 'imageUrl', type: 'image', label: 'Image' }],
+    outputs: [{ id: 'image', type: 'image', label: 'Resized Image' }]
   }
 };
 
@@ -541,8 +563,32 @@ export const CONNECTION_VALIDATION_RULES: Record<string, {
 
   // IMAGE GENERATION NODES
   imagen: {
-    allowedInputs: ['prompt', 'seed'],
+    allowedInputs: ['prompt', 'seed', 'image', 'number'],
     allowedOutputs: ['image']
+  },
+
+  // VIDEO GENERATION NODES
+  veo: {
+    allowedInputs: ['prompt', 'image', 'seed', 'video', 'motion'],
+    allowedOutputs: ['video']
+  },
+
+  // TEXT GENERATION NODES
+  llm: {
+    allowedInputs: ['text', 'image'],
+    allowedOutputs: ['text']
+  },
+
+  // AUDIO GENERATION NODES
+  lyria: {
+    allowedInputs: ['text', 'image', 'seed'],
+    allowedOutputs: ['audio']
+  },
+
+  // VIDEO PROCESSING NODES
+  imageToVideo: {
+    allowedInputs: ['image', 'prompt', 'motion', 'seed'],
+    allowedOutputs: ['video']
   },
 
   // IMAGE PROCESSING - Accept images only
@@ -652,5 +698,21 @@ export const CONNECTION_VALIDATION_RULES: Record<string, {
   toggle: {
     allowedInputs: [],
     allowedOutputs: ['boolean']
+  },
+
+  // NEW NODE VALIDATION RULES
+  styleTransfer: {
+    allowedInputs: ['image'],
+    allowedOutputs: ['image']
+  },
+
+  compare: {
+    allowedInputs: ['image'],
+    allowedOutputs: ['image']
+  },
+
+  batchOutputSizer: {
+    allowedInputs: ['image'],
+    allowedOutputs: ['image']
   }
 };

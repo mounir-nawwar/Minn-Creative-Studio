@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Handle, Position } from 'reactflow';
-import { Palette, Loader2, Sparkles, Sliders, Image as ImageIcon, Download } from 'lucide-react';
+import { Palette, Sliders, Image as ImageIcon, Download } from 'lucide-react';
 import { transferStyle } from '../services/geminiService';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
@@ -65,7 +64,7 @@ const StyleTransferNode = ({ data, id }: any) => {
   };
 
   return (
-    <BaseNode id={id} data={data} onRun={handleRun} color="#6366f1">
+    <BaseNode id={id} data={data} inputs={true} onRun={handleRun} className="border-[#6366f1]">
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-2">
           <div className="space-y-1">
@@ -143,9 +142,6 @@ const StyleTransferNode = ({ data, id }: any) => {
           </div>
         )}
       </div>
-
-      <Handle type="target" position={Position.Left} id="contentUrl" className="w-3 h-3 !bg-[#6366f1] border-2 border-[#0a0a0a]" style={{ top: '30%' }} />
-      <Handle type="target" position={Position.Left} id="styleUrl" className="w-3 h-3 !bg-[#6366f1] border-2 border-[#0a0a0a]" style={{ top: '70%' }} />
     </BaseNode>
   );
 };

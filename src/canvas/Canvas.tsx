@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useEffect, useState } from 'react';
+import React, { useCallback, useRef, useEffect, useState, useMemo } from 'react';
 import ReactFlow, {
   Background,
   Controls,
@@ -8,9 +8,10 @@ import ReactFlow, {
   useReactFlow,
   ReactFlowProvider,
   OnConnectStartParams,
+  Connection,
+  type OnConnectStart
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { NodeType } from '../types';
 import { useStore } from '../store/useStore';
 import { useProjectStore } from '../store/useProjectStore';
 import { nodeTypes } from '../utils/nodeTypes';
@@ -18,11 +19,10 @@ import { motion, AnimatePresence } from 'motion/react';
 import { db, updateDoc, doc } from '../firebase';
 import { stripUndefined } from '../lib/utils';
 import { Loader2, CloudCheck, CloudOff } from 'lucide-react';
+import { useConnectionContext } from '../contexts/ConnectionContext';
+import { type SourceInfo } from '../contexts/ConnectionContext';
 import { checkConnection } from '../store/connection-validator';
-import { ConnectionProvider, useConnectionContext } from '../contexts/ConnectionContext';
-import { ErrorBoundary } from '../components/ErrorBoundary';
-import { PerfHUD } from '../components/PerfHUD';
-import { perfMonitor } from '../services/performance';
+import { type WorkflowNodeData } from '../types';
 
 const CanvasContent = () => {
   const {
@@ -38,73 +38,17 @@ const CanvasContent = () => {
   } = useStore();
 
   const { activeWorkflowId, uploadEnabled } = useProjectStore();
-  const { screenToFlowPosition } = useReactFlow();
+  const { isConnecting, connectionValidation, startConnection, endConnection, setHoveredTarget, sourceInfo } = useConnectionContext();
+  const { screenToFlowPosition, getNodes, getViewport } = useReactFlow();
   const [ghostPos, setGhostPos] = useState({ x: 0, y: 0 });
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const wrapperRef = useRef<HTMLDivElement>(null);
   const pendingRef = useRef<string | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
-  const { startConnection, endConnection } = useConnectionContext();
-
-  // Canvas initialization performance measurement
-  useEffect(() => {
-    perfMonitor.mark('canvas-init-start');
-    
-    return () => {
-      const duration = perfMonitor.measure('canvas-init', 'canvas-init-start', 'canvas-init-end');
-      if (duration > 100) {
-        console.warn(`[Performance Monitor] Slow canvas initialization: ${duration.toFixed(2)}ms`);
-      }
-    };
-  }, [])
-
-  // Simple toast notification system (production would use react-hot-toast or similar)
-  const showToast = (message: string, type: 'error' | 'success', action?: { label: string; onClick: () => void }) => {
-    // Create toast element
-    const toast = document.createElement('div');
-    toast.className = `fixed top-4 right-4 ${type === 'error' ? 'bg-red-500' : 'bg-green-500'} text-white p-3 rounded-lg shadow-lg z-50`;
-    toast.textContent = message;
-    
-    if (action) {
-      const button = document.createElement('button');
-      button.className = 'ml-3 bg-white text-red-500 px-2 py-1 rounded text-sm';
-      button.textContent = action.label;
-      button.onclick = () => {
-        action.onClick();
-        toast.remove();
-      };
-      toast.appendChild(button);
-    }
-    
-    document.body.appendChild(toast);
-    
-    // Auto-remove after 5 seconds if not already removed
-    const timeoutId = setTimeout(() => {
-      if (toast.parentNode) {
-        toast.remove();
-      }
-    }, 5000);
-    
-    // Store timeout ID on the element for manual cleanup if needed
-    (toast as any)._timeoutId = timeoutId;
-  };
 
   useEffect(() => {
     pendingRef.current = pendingNodeType;
   }, [pendingNodeType]);
-
-  // ReactFlow event handlers that integrate with connection context
-  const handleConnectStart = useCallback((event: React.MouseEvent | React.TouchEvent, params: OnConnectStartParams) => {
-    startConnection({
-      source: params.nodeId,
-      sourceHandle: params.handleId,
-    });
-  }, [startConnection]);
-
-  const handleConnectEnd = useCallback(() => {
-    endConnection();
-  }, [endConnection]);
 
   // Auto-save logic
   useEffect(() => {
@@ -123,7 +67,7 @@ const CanvasContent = () => {
               delete nodeData.output;
             }
             if (Array.isArray(nodeData.outputs)) {
-              const filtered = nodeData.outputs.filter((u: unknown) => typeof u !== 'string' || !u.startsWith('data:'));
+              const filtered = nodeData.outputs.filter((u: any) => typeof u !== 'string' || !u.startsWith('data:'));
               nodeData.outputs = filtered.length ? filtered : undefined;
             }
             return {
@@ -148,24 +92,8 @@ const CanvasContent = () => {
         setSaveStatus('saved');
         setTimeout(() => setSaveStatus('idle'), 2000);
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
         console.error('Failed to save workflow:', err);
         setSaveStatus('error');
-        
-        showToast(
-          `Save failed: ${errorMessage}`,
-          'error',
-          {
-            label: 'Retry',
-            onClick: () => {
-              setSaveStatus('saving');
-              saveWorkflow(); // Retry
-            }
-          }
-        );
-        
-        // Log to Sentry in production
-        // Sentry.captureException(err);
       }
     };
 
@@ -178,33 +106,90 @@ const CanvasContent = () => {
     };
   }, [nodes, edges, activeWorkflowId]);
 
-  // Only track mouse position when placing nodes (pendingNodeType is active)
   useEffect(() => {
-    if (!pendingNodeType) return;
-    
     const handleMouseMove = (e: MouseEvent) => {
       setGhostPos({ x: e.clientX, y: e.clientY });
     };
-    
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, [pendingNodeType, setGhostPos]);
-
-  // Always listen for Escape key to cancel node placement
-  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && pendingRef.current) {
         setPendingNodeType(null);
       }
     };
-    
+    window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [setPendingNodeType, pendingRef]);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [setPendingNodeType]);
 
+  // Global mouse move handler for connection drag hover detection.
+  // Uses proximity detection (radius-based) instead of exact elementFromPoint so
+  // the handle highlights as soon as the dragged line endpoint is near the dot,
+  // not only when the cursor is pixel-perfect on the 12px circle.
   useEffect(() => {
-    perfMonitor.mark('canvas-init-end');
-  }, []);
+    const handleConnectionMouseMove = (e: MouseEvent) => {
+      if (!isConnecting || !sourceInfo) return;
+
+      // Scale the hit radius with zoom: zoomed-in = larger handles on screen = bigger snap zone.
+      // 28 canvas units * zoom → screen pixels. Clamped between 14px (zoomed out) and 56px (zoomed in).
+      const { zoom } = getViewport();
+      const HIT_RADIUS = Math.min(56, Math.max(14, 28 * zoom));
+
+      // Find the closest handle within HIT_RADIUS of the cursor
+      const allHandles = document.querySelectorAll<Element>('.react-flow__handle');
+      let closestHandle: Element | null = null;
+      let closestDist = Infinity;
+
+      for (const handle of allHandles) {
+        const rect = handle.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        const dist = Math.hypot(e.clientX - cx, e.clientY - cy);
+        if (dist < HIT_RADIUS && dist < closestDist) {
+          closestDist = dist;
+          closestHandle = handle;
+        }
+      }
+
+      if (!closestHandle) {
+        setHoveredTarget(null);
+        return;
+      }
+
+      const nodeElement = closestHandle.closest('.react-flow__node');
+      if (!nodeElement) {
+        setHoveredTarget(null);
+        return;
+      }
+
+      const nodeId = nodeElement.getAttribute('data-id');
+      const handleId = closestHandle.getAttribute('data-handleid');
+
+      if (!nodeId || !handleId || nodeId === sourceInfo.nodeId) {
+        setHoveredTarget(null);
+        return;
+      }
+
+      const nodes = getNodes();
+      const validation = checkConnection(
+        {
+          source: sourceInfo.nodeId,
+          sourceHandle: sourceInfo.handleId,
+          target: nodeId,
+          targetHandle: handleId,
+        },
+        nodes
+      );
+
+      setHoveredTarget({ nodeId, handleId, validation });
+    };
+
+    if (isConnecting) {
+      window.addEventListener('mousemove', handleConnectionMouseMove);
+      return () => window.removeEventListener('mousemove', handleConnectionMouseMove);
+    }
+  }, [isConnecting, sourceInfo, setHoveredTarget, getNodes]);
 
   const handleWrapperClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -212,9 +197,9 @@ const CanvasContent = () => {
       e.stopPropagation();
       const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
       const nodeType = pendingRef.current;
-      const nodeData = pendingNodeData || {
+      const nodeData: WorkflowNodeData = pendingNodeData || {
         label: nodeType,
-        type: nodeType as NodeType,
+        type: nodeType as any,
         config: {},
       };
       if (nodeType === 'imageUpload' || nodeType === 'videoUpload') {
@@ -224,12 +209,53 @@ const CanvasContent = () => {
         id: `${nodeType}-${Date.now()}`,
         type: nodeType,
         position,
-        data: nodeData as import('../types').WorkflowNodeData,
+        data: nodeData,
       });
       setPendingNodeType(null);
     },
-    [screenToFlowPosition, pendingNodeData, addNode, setPendingNodeType]
+    [screenToFlowPosition, pendingNodeData, addNode, setPendingNodeType, uploadEnabled]
   );
+
+  const handleConnectStart = useCallback<OnConnectStart>((event, params) => {
+    if (params.nodeId && params.handleId && params.handleType) {
+      console.log('[Connection Debug] Connect start:', {
+        nodeId: params.nodeId,
+        handleId: params.handleId,
+        handleType: params.handleType,
+        eventTarget: event.target
+      });
+      
+      const sourceInfo: SourceInfo = {
+        nodeId: params.nodeId,
+        handleId: params.handleId,
+        handleType: params.handleType as 'source' | 'target',
+      };
+      startConnection(sourceInfo);
+    }
+  }, [startConnection]);
+
+  const handleConnectEnd = useCallback(() => {
+    endConnection();
+  }, [endConnection]);
+
+  // Dynamic connection line styling based on validation
+  const connectionLineStyle = useMemo(() => {
+    if (!isConnecting) {
+      // Default cyan color when not hovering over a target
+      return { stroke: '#0097A7', strokeWidth: 2 };
+    }
+    
+    if (connectionValidation) {
+      // Green for valid, red for invalid
+      return {
+        stroke: connectionValidation.valid ? '#10b981' : '#ef4444',
+        strokeWidth: 3,
+      };
+    }
+    
+    // During drag but not hovering over any target
+    return { stroke: '#0097A7', strokeWidth: 2 };
+  }, [isConnecting, connectionValidation]);
 
   return (
     <div
@@ -239,32 +265,26 @@ const CanvasContent = () => {
         pendingNodeType ? 'cursor-crosshair' : ''
       }`}
     >
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
-        onConnectStart={handleConnectStart}
-        onConnectEnd={handleConnectEnd}
-        isValidConnection={(connection) => {
-          const validation = perfMonitor.measureValidation(() =>
-            checkConnection(connection, nodes),
-            'canvas-connection-validation'
-          );
-          return !!validation && validation.valid;
-        }}
-        nodeTypes={nodeTypes}
-        fitView
-        snapToGrid
-        snapGrid={[15, 15]}
-        panOnDrag={!pendingNodeType}
-        style={{ background: '#050505' }}
-        defaultEdgeOptions={{
-          style: { stroke: '#0097A7', strokeWidth: 2 },
-          animated: true,
-        }}
-      >
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          onConnectStart={handleConnectStart}
+          onConnectEnd={handleConnectEnd}
+          nodeTypes={nodeTypes}
+          fitView
+          snapToGrid
+          snapGrid={[15, 15]}
+          panOnDrag={!pendingNodeType}
+          style={{ background: '#050505' }}
+          defaultEdgeOptions={{
+            style: { stroke: '#0097A7', strokeWidth: 2 },
+            animated: true,
+          }}
+          connectionLineStyle={connectionLineStyle}
+        >
         <Background color="#1a1a1a" gap={30} size={1} variant={BackgroundVariant.Dots} />
         <Controls
           className="bg-[#111111] border border-[#1a1a1a] rounded-lg overflow-hidden fill-gray-400"
@@ -280,6 +300,7 @@ const CanvasContent = () => {
         />
         <Panel
           position="bottom-left"
+          style={{ marginLeft: '52px' }}
           className="bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-4"
         >
           <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">
@@ -316,8 +337,6 @@ const CanvasContent = () => {
           </div>
         </Panel>
       </ReactFlow>
-
-      {process.env.NODE_ENV === 'development' && <PerfHUD />}
 
       <AnimatePresence>
         {pendingNodeType && (
@@ -360,16 +379,11 @@ const CanvasContent = () => {
       </AnimatePresence>
     </div>
   );
-
 };
 
 const Canvas = () => (
   <ReactFlowProvider>
-    <ErrorBoundary fallback={<div className="text-red-500 p-4">An error occurred. Please reload the page.</div>}>
-      <ConnectionProvider>
-        <CanvasContent />
-      </ConnectionProvider>
-    </ErrorBoundary>
+    <CanvasContent />
   </ReactFlowProvider>
 );
 

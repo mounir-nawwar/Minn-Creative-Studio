@@ -2,7 +2,6 @@ import React, { useState, useMemo, useRef } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
 import { useProjectStore } from '../store/useProjectStore';
-import { Handle, Position } from 'reactflow';
 import ParameterSlider from '../components/ParameterSlider';
 import ReferenceStrip from '../components/ReferenceStrip';
 import { ImageIcon, Loader2, Download, XCircle } from 'lucide-react';
@@ -162,31 +161,7 @@ const ImagenNode = ({ id, data }: any) => {
   };
 
   return (
-    <BaseNode id={id} data={{ ...data, label: 'Image Generator' }} inputs={false} onRun={handleRun} color="#0097A7">
-      {/* Input Handles */}
-      <div className="absolute -left-3 top-0 bottom-0 flex flex-col justify-around py-4">
-        <div className="relative group">
-          <Handle type="target" position={Position.Left} id="prompt" className="w-3 h-3 !bg-[#0097A7] border-2 border-[#0a0a0a]" />
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[8px] text-gray-500 uppercase font-bold opacity-0 group-hover:opacity-100 transition-opacity">Prompt</span>
-        </div>
-        <div className="relative group">
-          <Handle type="target" position={Position.Left} id="reference" className="w-3 h-3 !bg-orange-500 border-2 border-[#0a0a0a]" />
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[8px] text-gray-500 uppercase font-bold opacity-0 group-hover:opacity-100 transition-opacity">References</span>
-        </div>
-        <div className="relative group">
-          <Handle type="target" position={Position.Left} id="seed" className="w-3 h-3 !bg-blue-500 border-2 border-[#0a0a0a]" />
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[8px] text-gray-500 uppercase font-bold opacity-0 group-hover:opacity-100 transition-opacity">Seed</span>
-        </div>
-        <div className="relative group">
-          <Handle type="target" position={Position.Left} id="guidance" className="w-3 h-3 !bg-blue-400 border-2 border-[#0a0a0a]" />
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[8px] text-gray-500 uppercase font-bold opacity-0 group-hover:opacity-100 transition-opacity">Guidance</span>
-        </div>
-        <div className="relative group">
-          <Handle type="target" position={Position.Left} id="cfg" className="w-3 h-3 !bg-blue-300 border-2 border-[#0a0a0a]" />
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[8px] text-gray-500 uppercase font-bold opacity-0 group-hover:opacity-100 transition-opacity">CFG</span>
-        </div>
-      </div>
-
+    <BaseNode id={id} data={{ ...data, label: 'Image Generator' }} inputs={true} onRun={handleRun} className="border-[#0097A7]">
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-2">
           <div className="space-y-1 col-span-2">

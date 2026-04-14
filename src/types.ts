@@ -39,6 +39,8 @@ export type NodeType =
   | 'videoUpscaler'
   | 'frameInterpolator'
   | 'relight'
+  | 'styleTransfer'
+  | 'batchOutputSizer'
   | 'guidanceStrength'
   | 'motionIntensity'
   | 'cfgScale'
