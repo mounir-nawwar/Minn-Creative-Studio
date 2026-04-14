@@ -88,8 +88,12 @@ const VideoUploadNode = ({ id, data }: any) => {
         config: { ...data.config, fileName: file.name } 
       });
       
-      // Cleanup local URL (delayed slightly to avoid flicker if video is playing)
-      setTimeout(() => URL.revokeObjectURL(localUrl), 1000);
+      // Cleanup local URL (delayed slightly to avoid flicker if video is playing or re-rendering)
+      setTimeout(() => {
+        URL.revokeObjectURL(localUrl);
+        // Ensure store is updated to permanent URL after revocation to prevent race condition
+        updateNodeData(id, { output: asset.url });
+      }, 2000);
     } catch (error: any) {
       console.error('Video upload error:', error);
       // Keep local copy usable

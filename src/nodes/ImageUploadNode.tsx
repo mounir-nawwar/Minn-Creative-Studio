@@ -106,6 +106,8 @@ const ImageUploadNode = ({ id, data }: any) => {
       
       // Cleanup local URL
       URL.revokeObjectURL(localUrl);
+      // Ensure state is updated to permanent URL after revocation to prevent race condition
+      setImageUrl(asset.url);
     } catch (err: any) {
       console.error('Upload error:', err);
       // Keep the local URL usable even if upload fails, but show error

@@ -6,6 +6,8 @@ import cookieParser from 'cookie-parser';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 import multer from 'multer';
+import { Readable } from 'stream';
+import { pipeline } from 'stream/promises';
 import { initializeApp, cert, getApps, App } from 'firebase-admin/app';
 import { getStorage as getAdminStorage } from 'firebase-admin/storage';
 import { GoogleGenAI } from '@google/genai';
@@ -430,6 +432,10 @@ async function startServer() {
     const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
     if (!USE_VERTEX_AI && !apiKey) return res.status(500).json({ error: 'API key not configured' });
 
+    // Internal timeout to prevent 504 Gateway Timeout from Cloud Run/Load Balancer
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 58000); // 58 seconds
+
     try {
       const { method } = req.body;
       let params = req.body.params;
@@ -465,6 +471,8 @@ async function startServer() {
             response = await vertexPredict(sdkParams);
           }
         } else {
+          // Pass signal to AI client calls if supported, but SDK doesn't always expose it.
+          // For now, the AbortController will cancel any underlying fetch calls if they use native fetch.
           response = await ai(sdkParams.model).models.generateContent(sdkParams);
         }
 
@@ -518,7 +526,63 @@ async function startServer() {
       if (method === 'fetchVideoFile') {
         const { url, projectId } = params;
 
-        // Step 1: resolve URL → base64
+        // Step 1: if projectId provided, stream directly to Firebase Storage — skip buffering in memory
+        if (projectId && adminApp) {
+          try {
+            const bucket = await getWorkingBucket();
+            const dest = `projects/${projectId}/assets/${Date.now()}-generated-video.mp4`;
+            const file = bucket.file(dest);
+
+            let contentType: string;
+            let resStream: any;
+
+            if (url?.startsWith('data:')) {
+              const [header, b64] = url.split(',');
+              contentType = header.split(':')[1]?.split(';')[0] || 'video/mp4';
+              const buf = Buffer.from(b64, 'base64');
+              await file.save(buf, { metadata: { contentType }, public: true });
+              return res.json({ success: true, data: { storageUrl: `https://storage.googleapis.com/${bucket.name}/${dest}` } });
+            } 
+            
+            // GS or HTTP stream
+            if (USE_VERTEX_AI && url?.startsWith('gs://')) {
+              const withoutScheme = url.replace('gs://', '');
+              const slashIdx = withoutScheme.indexOf('/');
+              const b = withoutScheme.slice(0, slashIdx);
+              const o = encodeURIComponent(withoutScheme.slice(slashIdx + 1));
+              const token = await vertexAuth.getAccessToken();
+              const fetchUrl = `https://storage.googleapis.com/download/storage/v1/b/${b}/o/${o}?alt=media`;
+              console.log(`[Veo] Streaming from GCS: ${url}`);
+              const r = await fetch(fetchUrl, { headers: { 'Authorization': `Bearer ${token}` }, signal: controller.signal });
+              if (!r.ok) throw new Error(`GCS fetch failed: ${r.status}`);
+              contentType = r.headers.get('content-type') || 'video/mp4';
+              resStream = r.body;
+            } else {
+              const headers: Record<string, string> = {};
+              if (apiKey) headers['x-goog-api-key'] = apiKey;
+              console.log(`[Veo] Streaming from HTTP: ${url}`);
+              const r = await fetch(url, { headers, signal: controller.signal });
+              if (!r.ok) throw new Error(`Fetch failed: ${r.status}`);
+              contentType = r.headers.get('content-type') || 'video/mp4';
+              resStream = r.body;
+            }
+
+            if (resStream) {
+              const writeStream = file.createWriteStream({ metadata: { contentType }, public: true });
+              // Node native fetch body is a Web ReadableStream
+              await pipeline(Readable.fromWeb(resStream), writeStream);
+              const storageUrl = `https://storage.googleapis.com/${bucket.name}/${dest}`;
+              console.log(`[Veo] Streamed to Storage: ${storageUrl}`);
+              return res.json({ success: true, data: { storageUrl } });
+            }
+          } catch (uploadErr: any) {
+            console.error('[Veo] Streaming upload failed:', uploadErr.message);
+            if (uploadErr.name === 'AbortError') return res.status(504).json({ success: false, error: 'Request timed out during video transfer.' });
+            throw uploadErr; // Fallback to generic error handler
+          }
+        }
+
+        // Legacy non-streaming path (if no projectId or fallback)
         let base64: string;
         let contentType: string;
 
@@ -531,24 +595,9 @@ async function startServer() {
         } else {
           const headers: Record<string, string> = {};
           if (apiKey) headers['x-goog-api-key'] = apiKey;
-          const r = await fetch(url, { headers });
+          const r = await fetch(url, { headers, signal: controller.signal });
           base64 = Buffer.from(await r.arrayBuffer()).toString('base64');
           contentType = r.headers.get('content-type') || 'video/mp4';
-        }
-
-        // Step 2: if projectId provided, upload directly to Firebase Storage — skip the browser round-trip
-        if (projectId && adminApp) {
-          try {
-            const bucket = await getWorkingBucket();
-            const buf = Buffer.from(base64, 'base64');
-            const dest = `projects/${projectId}/assets/${Date.now()}-generated-video.mp4`;
-            await bucket.file(dest).save(buf, { metadata: { contentType }, public: true });
-            const storageUrl = `https://storage.googleapis.com/${bucket.name}/${dest}`;
-            console.log(`[Veo] Uploaded to Storage: ${storageUrl}`);
-            return res.json({ success: true, data: { storageUrl } });
-          } catch (uploadErr: any) {
-            console.error('[Veo] Storage upload failed, falling back to base64:', uploadErr.message);
-          }
         }
 
         return res.json({ success: true, data: { base64, contentType } });
@@ -557,7 +606,10 @@ async function startServer() {
       return res.status(400).json({ error: `Unknown method: ${method}` });
     } catch (err: any) {
       console.error('Gemini proxy error:', err);
+      if (err.name === 'AbortError') return res.status(504).json({ error: 'Upstream request timed out (504).' });
       return res.status(500).json({ error: err.message || 'Internal server error' });
+    } finally {
+      clearTimeout(timeoutId);
     }
   });
 
