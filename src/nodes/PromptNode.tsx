@@ -59,4 +59,4 @@ const PromptNode = ({ id, data }: any) => {
   );
 };
 
-export default PromptNode;
+export default React.memo(PromptNode);

@@ -6,7 +6,6 @@ import ReactFlow, {
   BackgroundVariant,
   Panel,
   useReactFlow,
-  ReactFlowProvider,
   OnConnectStartParams,
   Connection,
   type OnConnectStart
@@ -35,6 +34,10 @@ const CanvasContent = () => {
     pendingNodeData,
     setPendingNodeType,
     addNode,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
   } = useStore();
 
   const { activeWorkflowId, uploadEnabled } = useProjectStore();
@@ -114,6 +117,50 @@ const CanvasContent = () => {
       if (e.key === 'Escape' && pendingRef.current) {
         setPendingNodeType(null);
       }
+      
+      const target = e.target as HTMLElement;
+      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+      if (isInput) return;
+      
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        const selectedNodes = getNodes().filter(n => n.selected);
+        if (selectedNodes.length > 0) {
+          const nodeIds = selectedNodes.map(n => n.id);
+          onNodesChange(nodeIds.map(id => ({ type: 'remove', id })));
+        }
+      }
+      
+      if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+        e.preventDefault();
+        const selectedNodes = getNodes().filter(n => n.selected);
+        if (selectedNodes.length > 0) {
+          selectedNodes.forEach(node => {
+            const newNodeId = `${node.id}-${Date.now()}`;
+            const newNode = {
+              ...node,
+              id: newNodeId,
+              position: {
+                x: node.position.x + 50,
+                y: node.position.y + 50,
+              },
+              data: { ...node.data },
+              selected: false,
+            };
+            addNode(newNode);
+          });
+        }
+      }
+      
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        if (canUndo()) undo();
+      }
+      
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        e.preventDefault();
+        if (canRedo()) redo();
+      }
     };
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('keydown', handleKeyDown);
@@ -121,7 +168,7 @@ const CanvasContent = () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [setPendingNodeType]);
+  }, [setPendingNodeType, getNodes, onNodesChange, addNode, undo, redo, canUndo, canRedo]);
 
   // Global mouse move handler for connection drag hover detection.
   // Uses proximity detection (radius-based) instead of exact elementFromPoint so
@@ -218,12 +265,13 @@ const CanvasContent = () => {
 
   const handleConnectStart = useCallback<OnConnectStart>((event, params) => {
     if (params.nodeId && params.handleId && params.handleType) {
-      console.log('[Connection Debug] Connect start:', {
-        nodeId: params.nodeId,
-        handleId: params.handleId,
-        handleType: params.handleType,
-        eventTarget: event.target
-      });
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Connection Debug] Connect start:', {
+          nodeId: params.nodeId,
+          handleId: params.handleId,
+          handleType: params.handleType,
+        });
+      }
       
       const sourceInfo: SourceInfo = {
         nodeId: params.nodeId,
@@ -381,10 +429,6 @@ const CanvasContent = () => {
   );
 };
 
-const Canvas = () => (
-  <ReactFlowProvider>
-    <CanvasContent />
-  </ReactFlowProvider>
-);
+const Canvas = CanvasContent;
 
 export default Canvas;

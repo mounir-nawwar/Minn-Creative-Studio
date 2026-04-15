@@ -16,7 +16,7 @@ const InpaintingNode = ({ data, id }: any) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
   const updateNodeData = useStore((state) => state.updateNodeData);
-  const { currentProject } = useProjectStore();
+  const { currentProject, uploadEnabled } = useProjectStore();
   const { addAsset } = useAssets();
   const { setExpandedAsset } = useAssetExpand();
 
@@ -111,7 +111,7 @@ const InpaintingNode = ({ data, id }: any) => {
         maskUrl: maskData,
         prompt,
         mode,
-        projectId: currentProject?.id
+        projectId: uploadEnabled ? currentProject?.id : undefined
       });
 
       updateNodeData(id, { output: resultUrl, isRunning: false, progress: 100 });

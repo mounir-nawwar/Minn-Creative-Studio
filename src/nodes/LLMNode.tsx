@@ -107,4 +107,4 @@ const LLMNode = ({ id, data }: any) => {
   );
 };
 
-export default LLMNode;
+export default React.memo(LLMNode);

@@ -8,25 +8,76 @@ import dotenv from 'dotenv';
 import multer from 'multer';
 import { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
+import { timingSafeEqual } from 'crypto';
 import { initializeApp, cert, getApps, App } from 'firebase-admin/app';
 import { getStorage as getAdminStorage } from 'firebase-admin/storage';
 import { GoogleGenAI } from '@google/genai';
 import { GoogleAuth } from 'google-auth-library';
+import helmet from 'helmet';
+import cors from 'cors';
+import rateLimit from 'express-rate-limit';
+import { validateBody, proxyImageSchema, loginSchema } from './backend/middleware/validation.ts';
+import { AUTH_CONFIG } from './backend/config/auth.ts';
 import firebaseConfig from './firebase-applet-config.json';
 import upscaleRoutes from './backend/routes/upscale.ts';
 import interpolateRoutes from './backend/routes/interpolate.ts';
 import videoRoutes from './backend/routes/video.ts';
 
 dotenv.config({ path: '.env.local' });
+
+function isValidImageUrl(urlString: string): { valid: boolean; error?: string } {
+  try {
+    const parsed = new URL(urlString);
+    
+    // Only allow http and https schemes
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return { valid: false, error: 'Only HTTP and HTTPS URLs are allowed' };
+    }
+    
+    const hostname = parsed.hostname.toLowerCase();
+    
+    // Block localhost and loopback
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '0.0.0.0') {
+      return { valid: false, error: 'Localhost URLs are not allowed' };
+    }
+    
+    // Block private IP ranges
+    const privateIpPatterns = [
+      /^10\./,                                           // 10.0.0.0/8
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./,                // 172.16.0.0/12
+      /^192\.168\./,                                     // 192.168.0.0/16
+      /^169\.254\./,                                     // Link-local (cloud metadata)
+      /^192\.0\.0\./,                                    // IANA reserved
+      /^192\.0\.2\./,                                    // TEST-NET-1
+      /^198\.51\.100\./,                                 // TEST-NET-2
+      /^203\.0\.113\./,                                  // TEST-NET-3
+      /^198\.18\./,                                      // Benchmark testing
+      /^fc00:/i,                                         // IPv6 ULA
+      /^fe80:/i,                                         // IPv6 link-local
+    ];
+    
+    for (const pattern of privateIpPatterns) {
+      if (pattern.test(hostname)) {
+        return { valid: false, error: 'Private IP addresses are not allowed' };
+      }
+    }
+    
+    // Block cloud metadata endpoints
+    if (hostname === 'metadata.google.internal' || hostname.endsWith('.internal')) {
+      return { valid: false, error: 'Internal hostnames are not allowed' };
+    }
+    
+    return { valid: true };
+  } catch {
+    return { valid: false, error: 'Invalid URL format' };
+  }
+}
 dotenv.config({ override: false });
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const SESSION_SECRET = process.env.SESSION_SECRET || 'default-secret';
-const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin';
-const IS_PRODUCTION = process.env.NODE_ENV === 'production' || !!process.env.K_SERVICE;
+const IS_PRODUCTION = AUTH_CONFIG.isProduction;
 // Always use Vertex AI for all AI calls (local and production behave identically)
 const USE_VERTEX_AI = true;
 
@@ -88,7 +139,10 @@ async function resolveImageUrls(contents: any): Promise<any> {
   return contents;
 }
 
-const VERTEX_PROJECT = process.env.GOOGLE_CLOUD_PROJECT || 'gen-lang-client-0639313445';
+const VERTEX_PROJECT = process.env.GOOGLE_CLOUD_PROJECT || 
+  (process.env.NODE_ENV === 'production' 
+    ? (() => { throw new Error('GOOGLE_CLOUD_PROJECT environment variable is required in production'); })() 
+    : 'gen-lang-client-0639313445');
 console.log(`[Vertex] Active Project: ${VERTEX_PROJECT}`);
 const vertexAuth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] });
 
@@ -353,6 +407,56 @@ async function startServer() {
   const app = express();
   const PORT = parseInt(process.env.PORT || '3000');
 
+  // Security middleware
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "blob:", "https:"],
+        connectSrc: ["'self'", "https://firestore.googleapis.com", "https://firebasestorage.googleapis.com", "https://storage.googleapis.com"],
+        fontSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        upgradeInsecureRequests: [],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+  }));
+
+  // CORS configuration
+  const allowedOrigins = IS_PRODUCTION
+    ? ['https://studio.minnagency.com', 'https://minn-creative-studio-491780181711.europe-west1.run.app']
+    : ['http://localhost:5173', 'http://localhost:3000'];
+  
+  app.use(cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
+  }));
+
+  // Rate limiting
+  const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5, // 5 attempts per window
+    message: { error: 'Too many login attempts, please try again later' },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  const apiLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: 100, // 100 requests per minute
+    message: { error: 'Too many requests, please slow down' },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ extended: true, limit: '50mb' }));
   app.use(cookieParser());
@@ -360,7 +464,20 @@ async function startServer() {
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
   const apiRouter = express.Router();
 
-  apiRouter.post('/upload', upload.single('file'), async (req, res) => {
+  // Authentication middleware for production
+  const requireAuth = (req: any, res: any, next: any) => {
+    if (!IS_PRODUCTION) return next(); // Skip in development
+    const token = req.cookies.session;
+    if (!token) return res.status(401).json({ error: 'Authentication required' });
+    try {
+      jwt.verify(token, AUTH_CONFIG.sessionSecret);
+      next();
+    } catch {
+      res.status(401).json({ error: 'Invalid or expired session' });
+    }
+  };
+
+  apiRouter.post('/upload', requireAuth, upload.single('file'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file provided' });
     try {
       if (!adminApp) throw new Error('Firebase Admin is not initialized.');
@@ -374,11 +491,19 @@ async function startServer() {
     }
   });
 
-  apiRouter.post('/login', (req, res) => {
+  apiRouter.post('/login', loginLimiter, validateBody(loginSchema), (req, res) => {
     const { username, password } = req.body;
-    if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
-      const token = jwt.sign({ username }, SESSION_SECRET, { expiresIn: '30d' });
-      res.cookie('session', token, { httpOnly: true, secure: true, sameSite: 'none', maxAge: 30 * 24 * 60 * 60 * 1000 });
+    
+    const usernameMatch = username && AUTH_CONFIG.adminUsername && 
+      username.length === AUTH_CONFIG.adminUsername.length &&
+      timingSafeEqual(Buffer.from(username), Buffer.from(AUTH_CONFIG.adminUsername));
+    const passwordMatch = password && AUTH_CONFIG.adminPassword &&
+      password.length === AUTH_CONFIG.adminPassword.length &&
+      timingSafeEqual(Buffer.from(password), Buffer.from(AUTH_CONFIG.adminPassword));
+    
+    if (usernameMatch && passwordMatch) {
+      const token = jwt.sign({ username }, AUTH_CONFIG.sessionSecret, { expiresIn: '30d' });
+      res.cookie('session', token, { httpOnly: true, secure: true, sameSite: 'none', maxAge: AUTH_CONFIG.cookieMaxAge });
       return res.json({ success: true });
     }
     res.status(401).json({ success: false, message: 'Invalid credentials' });
@@ -393,7 +518,7 @@ async function startServer() {
     const token = req.cookies.session;
     if (!token) return res.status(401).json({ authenticated: false });
     try {
-      res.json({ authenticated: true, user: jwt.verify(token, SESSION_SECRET) });
+      res.json({ authenticated: true, user: jwt.verify(token, AUTH_CONFIG.sessionSecret) });
     } catch {
       res.status(401).json({ authenticated: false });
     }
@@ -417,18 +542,27 @@ async function startServer() {
     } catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
-  apiRouter.post('/proxy-image', async (req, res) => {
+  apiRouter.post('/proxy-image', requireAuth, async (req, res) => {
     const { url } = req.body;
     if (!url) return res.status(400).json({ error: 'url required' });
+    
+    const validation = isValidImageUrl(url);
+    if (!validation.valid) {
+      return res.status(400).json({ error: validation.error });
+    }
+    
     try {
       const response = await fetch(url);
       if (!response.ok) return res.status(502).json({ error: `Failed to fetch image: ${response.status}` });
       const buffer = await response.arrayBuffer();
       res.json({ data: Buffer.from(buffer).toString('base64'), mimeType: response.headers.get('content-type') || 'image/jpeg' });
-    } catch (err: any) { res.status(500).json({ error: err.message }); }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      res.status(500).json({ error: message });
+    }
   });
 
-  apiRouter.post('/gemini/proxy', async (req, res) => {
+  apiRouter.post('/gemini/proxy', requireAuth, apiLimiter, async (req, res) => {
     const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
     if (!USE_VERTEX_AI && !apiKey) return res.status(500).json({ error: 'API key not configured' });
 

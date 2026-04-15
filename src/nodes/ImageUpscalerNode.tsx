@@ -14,7 +14,7 @@ const ImageUpscalerNode = ({ id, data }: any) => {
   const [preserveStyle, setPreserveStyle] = useState(data.config?.preserveStyle || true);
   
   const updateNodeData = useStore((state) => state.updateNodeData);
-  const { currentProject } = useProjectStore();
+  const { currentProject, uploadEnabled } = useProjectStore();
   const { addAsset } = useAssets();
   const { setExpandedAsset } = useAssetExpand();
 
@@ -40,7 +40,7 @@ const ImageUpscalerNode = ({ id, data }: any) => {
         imageUrl,
         scale,
         preserveStyle,
-        projectId: currentProject?.id
+        projectId: uploadEnabled ? currentProject?.id : undefined
       });
       
       updateNodeData(id, { output: upscaledUrl, isRunning: false, progress: 100 });

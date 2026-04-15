@@ -16,7 +16,7 @@ const ImageToVideoNode = ({ id, data }: any) => {
   const updateNodeData = useStore((state) => state.updateNodeData);
   const edges = useStore((state) => state.edges);
   const nodes = useStore((state) => state.nodes);
-  const { currentProject } = useProjectStore();
+  const { currentProject, uploadEnabled } = useProjectStore();
 
   const referenceImages = useMemo(() => {
     const refEdges = edges.filter(e => e.target === id && e.targetHandle === 'reference');
@@ -99,12 +99,16 @@ const ImageToVideoNode = ({ id, data }: any) => {
           strength: ref.strength
         })),
         motionIntensity: parameters.motionIntensity,
-        projectId: currentProject?.id,
+        projectId: uploadEnabled ? currentProject?.id : undefined,
       });
 
       updateNodeData(id, { output: videos[0], isRunning: false, progress: 100 });
-    } catch (err: any) {
-      updateNodeData(id, { error: err.message, isRunning: false });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      const displayMessage = message.includes('timed out') 
+        ? 'Video generation timed out after 10 minutes. Try a shorter duration.'
+        : message;
+      updateNodeData(id, { error: displayMessage, isRunning: false });
     }
   };
 
@@ -228,4 +232,4 @@ const ImageToVideoNode = ({ id, data }: any) => {
   );
 };
 
-export default ImageToVideoNode;
+export default React.memo(ImageToVideoNode);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Layout,
   MessageSquare,
@@ -31,6 +31,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { useProjectStore } from '../store/useProjectStore';
 import { useStore } from '../store/useStore';
+import { Node, Edge } from 'reactflow';
 import {
   db,
   auth,
@@ -48,6 +49,8 @@ import {
 import AssetGrid from './AssetGrid';
 import AssetPreviewModal from './AssetPreviewModal';
 import { Asset } from '../types/project.types';
+import { validateWorkflow } from '../lib/workflowValidation';
+import { Skeleton, WorkflowSkeleton } from './Skeleton';
 
 type Tab = 'nodes' | 'workflows' | 'chats' | 'assets';
 
@@ -58,8 +61,11 @@ export default function ProjectSidebar() {
   const [workflows, setWorkflows] = useState<any[]>([]);
   const [chats, setChats] = useState<any[]>([]);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
+  const [isLoadingWorkflows, setIsLoadingWorkflows] = useState(true);
+  const [isLoadingChats, setIsLoadingChats] = useState(true);
+  const [nodeSearch, setNodeSearch] = useState('');
 
-  const nodeCategories = [
+  const nodeCategories = useMemo(() => [
     {
       label: 'Text / Prompt',
       nodes: [
@@ -148,7 +154,19 @@ export default function ProjectSidebar() {
         { type: 'output', label: 'Output Collector', icon: FileDown, color: 'text-[#0097A7]' },
       ]
     }
-  ];
+  ], []);
+
+  const filteredCategories = useMemo(() => {
+    if (!nodeSearch.trim()) return nodeCategories;
+    const search = nodeSearch.toLowerCase();
+    return nodeCategories.map(category => ({
+      ...category,
+      nodes: category.nodes.filter(node => 
+        node.label.toLowerCase().includes(search) || 
+        node.type.toLowerCase().includes(search)
+      ),
+    })).filter(category => category.nodes.length > 0);
+  }, [nodeCategories, nodeSearch]);
 
   const handleAddNode = (type: string, label: string) => {
     setPendingNodeType(type, { label, type: type as any, config: {} });
@@ -156,7 +174,11 @@ export default function ProjectSidebar() {
 
   // Fetch Workflows
   useEffect(() => {
-    if (!currentProject || !auth.currentUser) return;
+    if (!currentProject || !auth.currentUser) {
+      setIsLoadingWorkflows(false);
+      return;
+    }
+    setIsLoadingWorkflows(true);
     const q = query(
       collection(db, 'workflows'),
       where('projectId', '==', currentProject.id),
@@ -164,12 +186,17 @@ export default function ProjectSidebar() {
     );
     return onSnapshot(q, (snapshot) => {
       setWorkflows(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setIsLoadingWorkflows(false);
     });
   }, [currentProject]);
 
   // Fetch Chats
   useEffect(() => {
-    if (!currentProject || !auth.currentUser) return;
+    if (!currentProject || !auth.currentUser) {
+      setIsLoadingChats(false);
+      return;
+    }
+    setIsLoadingChats(true);
     const q = query(
       collection(db, 'chats'),
       where('projectId', '==', currentProject.id),
@@ -177,6 +204,7 @@ export default function ProjectSidebar() {
     );
     return onSnapshot(q, (snapshot) => {
       setChats(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setIsLoadingChats(false);
     });
   }, [currentProject]);
 
@@ -282,30 +310,50 @@ export default function ProjectSidebar() {
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -10 }}
-              className="flex-1 overflow-y-auto p-4 space-y-8 custom-scrollbar"
+              className="flex-1 flex flex-col overflow-hidden"
             >
-              {nodeCategories.map((category) => (
-                <div key={category.label} className="space-y-2">
-                  <p className="text-[10px] text-gray-600 uppercase font-black tracking-widest mb-3">{category.label}</p>
-                  <div className="space-y-2">
-                    {category.nodes.map((item) => (
-                      <button
-                        key={item.type}
-                        onClick={() => handleAddNode(item.type, item.label)}
-                        className="w-full flex items-center gap-3 p-2 bg-[#1a1a1a] hover:bg-[#222222] border border-[#2a2a2a] rounded-xl transition-all group"
-                      >
-                        <div className={`p-1.5 bg-black rounded-lg ${item.color} group-hover:scale-110 transition-transform`}>
-                          <item.icon className="w-3.5 h-3.5" />
-                        </div>
-                        <div className="flex-1 text-left">
-                          <p className="text-[11px] font-bold text-gray-300">{item.label}</p>
-                        </div>
-                        <Plus className="w-3 h-3 text-gray-700 group-hover:text-[#0097A7] transition-colors" />
-                      </button>
-                    ))}
-                  </div>
+              <div className="p-4 pb-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-600" />
+                  <input
+                    type="text"
+                    placeholder="Search nodes..."
+                    value={nodeSearch}
+                    onChange={(e) => setNodeSearch(e.target.value)}
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl py-2 pl-9 pr-3 text-[11px] text-gray-300 placeholder:text-gray-600 focus:outline-none focus:border-[#0097A7]/50"
+                  />
                 </div>
-              ))}
+              </div>
+              <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-8 custom-scrollbar">
+                {filteredCategories.length === 0 ? (
+                  <div className="py-10 text-center">
+                    <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">No nodes found</p>
+                  </div>
+                ) : (
+                  filteredCategories.map((category) => (
+                    <div key={category.label} className="space-y-2">
+                      <p className="text-[10px] text-gray-600 uppercase font-black tracking-widest mb-3">{category.label}</p>
+                      <div className="space-y-2">
+                        {category.nodes.map((item) => (
+                          <button
+                            key={item.type}
+                            onClick={() => handleAddNode(item.type, item.label)}
+                            className="w-full flex items-center gap-3 p-2 bg-[#1a1a1a] hover:bg-[#222222] border border-[#2a2a2a] rounded-xl transition-all group"
+                          >
+                            <div className={`p-1.5 bg-black rounded-lg ${item.color} group-hover:scale-110 transition-transform`}>
+                              <item.icon className="w-3.5 h-3.5" />
+                            </div>
+                            <div className="flex-1 text-left">
+                              <p className="text-[11px] font-bold text-gray-300">{item.label}</p>
+                            </div>
+                            <Plus className="w-3 h-3 text-gray-700 group-hover:text-[#0097A7] transition-colors" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </motion.div>
           )}
 
@@ -328,7 +376,19 @@ export default function ProjectSidebar() {
               </div>
 
               <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-3 custom-scrollbar">
-                {workflows.length === 0 ? (
+                {isLoadingWorkflows ? (
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="bg-[#111111] border border-white/5 rounded-2xl p-4">
+                      <div className="flex items-center gap-4">
+                        <Skeleton className="w-12 h-12 rounded-xl" />
+                        <div className="flex-1 space-y-2">
+                          <Skeleton className="h-4 w-2/3" />
+                          <Skeleton className="h-3 w-1/2" />
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : workflows.length === 0 ? (
                   <div className="py-20 text-center space-y-4">
                     <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center mx-auto">
                       <Layout className="w-6 h-6 text-gray-700" />
@@ -340,9 +400,14 @@ export default function ProjectSidebar() {
                     <div
                       key={wf.id}
                       onClick={() => {
-                        setNodes(wf.nodes);
-                        setEdges(wf.edges);
-                        setActiveWorkflowId(wf.id);
+                        const validated = validateWorkflow(wf);
+                        if (!validated) {
+                          console.error('[ProjectSidebar] Cannot load invalid workflow');
+                          return;
+                        }
+                        setNodes(validated.nodes as unknown as Node[]);
+                        setEdges(validated.edges as unknown as Edge[]);
+                        setActiveWorkflowId(validated.id || null);
                       }}
                       className={`group relative bg-[#111111] border border-white/5 hover:border-[#0097A7]/30 rounded-2xl p-4 cursor-pointer transition-all ${currentWfId === wf.id ? 'border-[#0097A7]/50 bg-[#0097A7]/5' : ''}`}
                     >
@@ -406,7 +471,19 @@ export default function ProjectSidebar() {
               </div>
 
               <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-3 custom-scrollbar">
-                {chats.length === 0 ? (
+                {isLoadingChats ? (
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="bg-[#111111] border border-white/5 rounded-2xl p-4">
+                      <div className="flex items-center gap-4">
+                        <Skeleton className="w-10 h-10 rounded-xl" />
+                        <div className="flex-1 space-y-2">
+                          <Skeleton className="h-4 w-2/3" />
+                          <Skeleton className="h-3 w-1/2" />
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : chats.length === 0 ? (
                   <div className="py-20 text-center space-y-4">
                     <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center mx-auto">
                       <MessageSquare className="w-6 h-6 text-gray-700" />

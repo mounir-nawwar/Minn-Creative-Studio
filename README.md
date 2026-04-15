@@ -37,7 +37,7 @@ Built with a "Mission Control" aesthetic, MINN STUDIO empowers creators to orche
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) (Latest LTS recommended).
-- A [Google Gemini API Key](https://aistudio.google.com/).
+- Firebase project with Firestore and Authentication enabled.
 
 ### Installation
 
@@ -53,13 +53,16 @@ Built with a "Mission Control" aesthetic, MINN STUDIO empowers creators to orche
    ```
 
 3. **Environment Configuration:**
-   Create a `.env.local` file in the root directory and add your keys:
+   Create a `.env` file in the root directory:
    ```env
-   GEMINI_API_KEY=your_gemini_api_key_here
-   SESSION_SECRET=your_jwt_secret
    ADMIN_USERNAME=admin
-   ADMIN_PASSWORD=admin
+   ADMIN_PASSWORD=your-secure-password
+   SESSION_SECRET=your-secure-session-secret-at-least-32-characters
+   FIREBASE_STORAGE_BUCKET=your-bucket.appspot.com
+   FIREBASE_SERVICE_ACCOUNT=<base64-encoded-service-account-json>
    ```
+   
+   > **Note:** API keys for Gemini/Imagen/Veo are managed server-side. Configure them in your backend deployment environment.
 
 ### Running the App
 

@@ -33,6 +33,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { API_BASE } from '../constants';
 import { stripUndefined } from '../lib/utils';
+import { validateWorkflow } from '../lib/workflowValidation';
 
 interface ToolbarProps { user: User | null; onLogout: () => void; }
 const Toolbar = ({ user, onLogout }: ToolbarProps) => {
@@ -53,6 +54,16 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
+  
+  const nodesRef = useRef(nodes);
+  const edgesRef = useRef(edges);
+  const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
+  const activeWorkflowIdRef = useRef(activeWorkflowId);
+  
+  useEffect(() => { nodesRef.current = nodes; }, [nodes]);
+  useEffect(() => { edgesRef.current = edges; }, [edges]);
+  useEffect(() => { hasUnsavedChangesRef.current = hasUnsavedChanges; }, [hasUnsavedChanges]);
+  useEffect(() => { activeWorkflowIdRef.current = activeWorkflowId; }, [activeWorkflowId]);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -85,19 +96,19 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
   // Auto-save every 2 minutes
   useEffect(() => {
     const timer = setInterval(() => {
-      if (hasUnsavedChanges && activeWorkflowId) {
+      if (hasUnsavedChangesRef.current && activeWorkflowIdRef.current) {
         confirmSave(true);
       }
     }, 120000); // 2 minutes
     return () => clearInterval(timer);
-  }, [hasUnsavedChanges, activeWorkflowId, nodes, edges]);
+  }, []);
 
   // Keyboard shortcut Cmd+S
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
         e.preventDefault();
-        if (activeWorkflowId) {
+        if (activeWorkflowIdRef.current) {
           confirmSave();
         } else {
           setShowSaveModal(true);
@@ -106,7 +117,7 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeWorkflowId, nodes, edges]);
+  }, []);
 
   const handleSave = () => {
     if (!auth.currentUser || !currentProject) return;
@@ -209,11 +220,18 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
     await deleteDoc(doc(db, 'workflows', id));
   };
 
-  const loadWorkflow = (workflow: any) => {
-    setNodes(workflow.nodes || []);
-    setEdges(workflow.edges || []);
-    setActiveWorkflowId(workflow.id);
-    setWorkflowName(workflow.name);
+  const loadWorkflow = (workflow: unknown) => {
+    console.log('[Toolbar] Loading workflow:', workflow);
+    const validated = validateWorkflow(workflow);
+    if (!validated) {
+      console.error('[Toolbar] Cannot load invalid workflow');
+      return;
+    }
+    console.log('[Toolbar] Validated workflow:', validated);
+    setNodes(validated.nodes as unknown as typeof nodes);
+    setEdges(validated.edges as unknown as typeof edges);
+    setActiveWorkflowId(validated.id || null);
+    setWorkflowName(validated.name || '');
     setHasUnsavedChanges(false);
   };
 
@@ -312,29 +330,31 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
               Workflows
               <ChevronDown className="w-3 h-3" />
             </button>
-            <div className="absolute top-full left-0 mt-2 w-64 bg-[#111111] border border-[#1a1a1a] rounded-2xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 p-2">
-              <div className="max-h-64 overflow-y-auto custom-scrollbar space-y-1">
-                {workflows.map(w => (
-                  <div 
-                    key={w.id}
-                    onClick={() => loadWorkflow(w)}
-                    className={`flex items-center justify-between p-2 rounded-xl cursor-pointer transition-all ${activeWorkflowId === w.id ? 'bg-[#0097A7]/20 text-[#0097A7]' : 'hover:bg-white/5 text-gray-500 hover:text-gray-300'}`}
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <Save className="w-3 h-3 flex-shrink-0" />
-                      <span className="text-[10px] font-bold truncate">{w.name}</span>
-                    </div>
-                    <button 
-                      onClick={(e) => deleteWorkflow(e, w.id)}
-                      className="p-1 hover:text-red-500 transition-colors"
+            <div className="absolute top-full left-0 pt-2 w-64 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+              <div className="bg-[#111111] border border-[#1a1a1a] rounded-2xl shadow-2xl p-2">
+                <div className="max-h-64 overflow-y-auto custom-scrollbar space-y-1">
+                  {workflows.map(w => (
+                    <div 
+                      key={w.id}
+                      onClick={() => loadWorkflow(w)}
+                      className={`flex items-center justify-between p-2 rounded-xl cursor-pointer transition-all ${activeWorkflowId === w.id ? 'bg-[#0097A7]/20 text-[#0097A7]' : 'hover:bg-white/5 text-gray-500 hover:text-gray-300'}`}
                     >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
-                {workflows.length === 0 && (
-                  <p className="text-[9px] text-gray-600 text-center py-4 uppercase font-bold tracking-widest">No saved workflows</p>
-                )}
+                      <div className="flex items-center gap-2 truncate">
+                        <Save className="w-3 h-3 flex-shrink-0" />
+                        <span className="text-[10px] font-bold truncate">{w.name}</span>
+                      </div>
+                      <button 
+                        onClick={(e) => deleteWorkflow(e, w.id)}
+                        className="p-1 hover:text-red-500 transition-colors"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                  {workflows.length === 0 && (
+                    <p className="text-[9px] text-gray-600 text-center py-4 uppercase font-bold tracking-widest">No saved workflows</p>
+                  )}
+                </div>
               </div>
             </div>
           </div>

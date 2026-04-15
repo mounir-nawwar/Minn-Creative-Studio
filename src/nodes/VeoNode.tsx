@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
 import { useProjectStore } from '../store/useProjectStore';
@@ -10,6 +10,7 @@ import { downloadFile } from '../lib/utils';
 import { useAssets } from '../hooks/useAssets';
 import { useAssetExpand } from '../hooks/useAssetExpand';
 import { ExpandableAssetWrapper } from '../components/ExpandableAssetWrapper';
+import { toast } from '../store/useToastStore';
 
 const VeoNode = ({ id, data }: any) => {
   const [model, setModel] = useState(data.config?.model || 'veo-3.1-fast-generate-001');
@@ -27,10 +28,19 @@ const VeoNode = ({ id, data }: any) => {
   const updateNodeData = useStore((state) => state.updateNodeData);
   const edges = useStore((state) => state.edges);
   const nodes = useStore((state) => state.nodes);
-  const { currentProject } = useProjectStore();
+  const { currentProject, uploadEnabled } = useProjectStore();
   const { addAsset } = useAssets();
   const abortControllerRef = useRef<AbortController | null>(null);
   const { setExpandedAsset } = useAssetExpand();
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   const referenceImages = useMemo(() => {
     const refEdges = edges.filter(e => e.target === id && e.targetHandle === 'reference');
@@ -152,7 +162,7 @@ const VeoNode = ({ id, data }: any) => {
         })),
         motionIntensity: parameters.motionIntensity,
         videoUrl: inputVideo,
-        projectId: currentProject?.id,
+        projectId: uploadEnabled ? currentProject?.id : undefined,
         projectContext,
         onProgress: (p) => updateNodeData(id, { progress: p })
       }, abortControllerRef.current.signal);
@@ -173,11 +183,20 @@ const VeoNode = ({ id, data }: any) => {
         }
       });
 
-    } catch (err: any) {
-      if (err.name === 'AbortError') {
+      if (videos.length > 0 && videos[0]) {
+        toast.success('Video generated', `${videos.length} video${videos.length > 1 ? 's' : ''} ready`);
+      }
+
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      if (err instanceof Error && err.name === 'AbortError') {
         console.log('Video generation aborted');
       } else {
-        updateNodeData(id, { error: err.message, isRunning: false });
+        const displayMessage = message.includes('timed out') 
+          ? 'Video generation timed out after 10 minutes. Try a shorter duration or simpler prompt.'
+          : message;
+        updateNodeData(id, { error: displayMessage, isRunning: false });
+        toast.error('Video generation failed', displayMessage);
       }
     } finally {
       abortControllerRef.current = null;
@@ -421,7 +440,7 @@ const VeoNode = ({ id, data }: any) => {
         {data.output && (
           <div className="mt-2 space-y-2">
             {(data.outputs && data.outputs.length > 1 ? data.outputs : [data.output]).map((url: string, i: number) => (
-              <div key={i} className="space-y-1">
+              <div key={url || `video-${i}`} className="space-y-1">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">
                     {data.outputs?.length > 1 ? `Video ${i + 1}` : 'Result Video'}
@@ -448,4 +467,4 @@ const VeoNode = ({ id, data }: any) => {
   );
 };
 
-export default VeoNode;
+export default React.memo(VeoNode);

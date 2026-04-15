@@ -18,7 +18,7 @@ const RelightNode = ({ id, data }: any) => {
   
   const updateNodeData = useStore((state) => state.updateNodeData);
   const { setExpandedAsset } = useAssetExpand();
-  const { currentProject } = useProjectStore();
+  const { currentProject, uploadEnabled } = useProjectStore();
   const { addAsset } = useAssets();
 
   const directions = [
@@ -52,7 +52,7 @@ const RelightNode = ({ id, data }: any) => {
         lightColor,
         intensity: intensity / 100,
         style,
-        projectId: currentProject?.id
+        projectId: uploadEnabled ? currentProject?.id : undefined
       });
       
       updateNodeData(id, { output: relitUrl, isRunning: false, progress: 100 });

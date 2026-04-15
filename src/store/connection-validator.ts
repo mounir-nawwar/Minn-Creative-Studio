@@ -269,25 +269,6 @@ export function checkConnection(
 }
 
 /**
- * @deprecated Use buildValidationCache instead
- * Builds validation cache for O(1) lookups during drag operations
- * Maintains backward compatibility for existing code
- * 
- * @param sourceNodeId - The ID of the source node
- * @param sourceHandleId - The ID of the source handle
- * @param nodes - Array of all nodes in the flow
- * @returns ValidationCache for cached validation or null if invalid
- */
-export function checkConnectionDeprecated(
-  sourceNodeId: string,
-  sourceHandleId: string | null,
-  nodes: Node[]
-): ValidationCache | null {
-  console.warn('DEPRECATED: checkConnectionDeprecated is deprecated. Use buildValidationCache instead.');
-  return buildValidationCache(sourceNodeId, sourceHandleId, nodes);
-}
-
-/**
  * Actual implementation of connection validation
  */
 function validateConnection(

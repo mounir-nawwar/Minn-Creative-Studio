@@ -2,9 +2,11 @@ export type NodeType =
   | 'prompt' 
   | 'promptConcatenator'
   | 'promptEnhancer'
+  | 'promptLibrary'
   | 'llm'
   | 'vision' 
   | 'videoDescriber'
+  | 'imageDescriber'
   | 'imagen' 
   | 'nanoBanana' 
   | 'veo' 
@@ -49,16 +51,31 @@ export type NodeType =
   | 'sequence'
   | 'imageUpload'
   | 'videoUpload'
-  | 'output';
+  | 'output'
+  | 'variation'
+  | 'inpainting'
+  | 'brandContext';
+
+export interface NodeConfig {
+  url?: string;
+  fileName?: string;
+  prompt?: string;
+  negativePrompt?: string;
+  seed?: number;
+  aspectRatio?: string;
+  numberOfImages?: number;
+  model?: string;
+  [key: string]: unknown;
+}
 
 export interface WorkflowNodeData {
   label: string;
   type: NodeType;
-  config?: any;
+  config?: NodeConfig;
   output?: any;
   outputs?: any[];
   uploadEnabled?: boolean;
-  error?: string;
+  error?: string | null;
   isRunning?: boolean;
   triggerRun?: number;
   progress?: string | number;
@@ -67,8 +84,8 @@ export interface WorkflowNodeData {
 export interface Workflow {
   id: string;
   name: string;
-  nodes: any[];
-  edges: any[];
+  nodes: { id: string; type?: string; position: { x: number; y: number }; data: WorkflowNodeData }[];
+  edges: { id: string; source: string; target: string; sourceHandle?: string | null; targetHandle?: string | null }[];
   createdAt: number;
   updatedAt: number;
 }

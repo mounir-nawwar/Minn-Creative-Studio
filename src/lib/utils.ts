@@ -1,29 +1,26 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
-export function cn(...inputs: ClassValue[]) {
+export function cn(...inputs: ClassValue[]): string {
   return twMerge(clsx(inputs));
 }
 
-export function stripUndefined<T>(obj: T): T {
-  if (obj === undefined) return null as any;
+export function stripUndefined<T>(obj: T): T | null {
+  if (obj === undefined) return null;
   if (obj === null) return obj;
-  if (typeof obj === 'function') return null as any;
-  if (typeof obj === 'number') return (isFinite(obj) ? obj : null) as any;
+  if (typeof obj === 'function') return null;
+  if (typeof obj === 'number') return isFinite(obj) ? obj : null;
   if (typeof obj !== 'object') return obj;
-  if (obj instanceof Date) return obj; // Firestore supports Date natively
+  if (obj instanceof Date) return obj;
   if (Array.isArray(obj)) {
-    return (obj as any[])
+    return (obj as unknown[])
       .map(item =>
-        // Firestore doesn't support nested arrays — convert inner arrays to JSON strings
         Array.isArray(item) ? JSON.stringify(item) : stripUndefined(item)
       )
-      .filter(v => v !== undefined) as unknown as T;
+      .filter((v): v is NonNullable<typeof v> => v !== undefined) as unknown as T;
   }
-  // Only recurse into plain objects — class instances get converted to null to avoid
-  // Firestore "invalid nested entity" errors from non-serializable types
   if (Object.getPrototypeOf(obj) !== Object.prototype) {
-    return null as any;
+    return null;
   }
   return Object.fromEntries(
     Object.entries(obj as object)
@@ -36,7 +33,7 @@ export function stripUndefined<T>(obj: T): T {
  * Robustly downloads a file by fetching it as a blob.
  * Firebase Storage URLs are proxied through the backend to avoid CORS restrictions.
  */
-export async function downloadFile(url: string, filename: string) {
+export async function downloadFile(url: string, filename: string): Promise<void> {
   try {
     let blob: Blob;
 
@@ -78,7 +75,7 @@ export async function downloadFile(url: string, filename: string) {
     link.click();
     document.body.removeChild(link);
     setTimeout(() => window.URL.revokeObjectURL(blobUrl), 100);
-  } catch (err) {
+  } catch (err: unknown) {
     console.error('Download failed:', err);
     window.open(url, '_blank');
   }

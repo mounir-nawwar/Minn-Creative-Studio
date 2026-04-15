@@ -4,24 +4,35 @@ import ffmpeg from 'fluent-ffmpeg';
 import ffmpegStatic from 'ffmpeg-static';
 import path from 'path';
 import fs from 'fs';
+import { requireAuth } from '../middleware/auth.ts';
+import { validateBody, batchSizeSchema } from '../middleware/validation.ts';
 
-ffmpeg.setFfmpegPath(ffmpegStatic!);
+if (!ffmpegStatic) {
+  throw new Error('ffmpeg-static path not found. Ensure ffmpeg-static is installed.');
+}
+ffmpeg.setFfmpegPath(ffmpegStatic);
 
 const router = express.Router();
 
-router.post('/', async (req: any, res: any) => {
+router.post('/', requireAuth, validateBody(batchSizeSchema), async (req, res) => {
   const { imageUrl, sizes } = req.body;
+  
+  const inputPath = path.join('/tmp', `input_${Date.now()}.png`);
+  const outputPaths: string[] = [];
   
   try {
     const response = await fetch(imageUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch image: ${response.status}`);
+    }
     const buffer = await response.buffer();
-    const inputPath = path.join('/tmp', `input_${Date.now()}.png`);
     fs.writeFileSync(inputPath, buffer);
 
-    const results = [];
+    const results: { size: string; url: string }[] = [];
 
     for (const size of sizes) {
       const outputPath = path.join('/tmp', `output_${size.replace(':', '_')}_${Date.now()}.png`);
+      outputPaths.push(outputPath);
       
       let filter = '';
       if (size === '1:1') filter = 'crop=min(iw\\,ih):min(iw\\,ih),scale=1024:1024';
@@ -44,15 +55,22 @@ router.post('/', async (req: any, res: any) => {
         size,
         url: `data:image/png;base64,${outputBuffer.toString('base64')}`
       });
-
-      fs.unlinkSync(outputPath);
     }
 
-    fs.unlinkSync(inputPath);
     res.json({ images: results });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
     console.error('Batch Resize Error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: message });
+  } finally {
+    if (fs.existsSync(inputPath)) {
+      fs.unlinkSync(inputPath);
+    }
+    for (const outputPath of outputPaths) {
+      if (fs.existsSync(outputPath)) {
+        fs.unlinkSync(outputPath);
+      }
+    }
   }
 });
 

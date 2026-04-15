@@ -57,7 +57,9 @@ export function useAssets() {
   const uploadAsset = async (file: File, onProgress?: (progress: number) => void, signal?: AbortSignal) => {
     if (!currentProject || !auth.currentUser) throw new Error('No project selected');
 
-    console.log(`[useAssets] Starting robust upload for: ${file.name}`);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[useAssets] Starting robust upload for: ${file.name}`);
+    }
     const fileId = `${Date.now()}-${file.name}`;
     
     // Set initial progress
@@ -69,7 +71,9 @@ export function useAssets() {
       formData.append('file', file);
       formData.append('projectId', currentProject.id);
 
-      console.log(`[useAssets] Sending to backend: ${API_BASE}/upload`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[useAssets] Sending to backend: ${API_BASE}/upload`);
+      }
 
       const { url, fileName: storagePath } = await new Promise<{ url: string; fileName: string }>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
@@ -173,7 +177,7 @@ export function useAssets() {
     }
   };
 
-  const addAsset = async (assetData: Partial<Asset>) => {
+  const addAsset = async (assetData: Partial<Asset>): Promise<Asset> => {
     if (!currentProject || !auth.currentUser) throw new Error('No project selected');
 
     const asset: any = {
@@ -190,6 +194,7 @@ export function useAssets() {
       return { id: docRef.id, ...asset } as Asset;
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, `projects/${currentProject.id}/assets`);
+      throw error;
     }
   };
 

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
 import { useProjectStore } from '../store/useProjectStore';
@@ -10,6 +10,7 @@ import { downloadFile } from '../lib/utils';
 import { useAssets } from '../hooks/useAssets';
 import { useAssetExpand } from '../hooks/useAssetExpand';
 import { ExpandableAssetWrapper } from '../components/ExpandableAssetWrapper';
+import { toast } from '../store/useToastStore';
 
 const ImagenNode = ({ id, data }: any) => {
   const [model, setModel] = useState(data.config?.model || 'gemini-3.1-flash-image-preview');
@@ -22,10 +23,23 @@ const ImagenNode = ({ id, data }: any) => {
   const updateNodeData = useStore((state) => state.updateNodeData);
   const edges = useStore((state) => state.edges);
   const nodes = useStore((state) => state.nodes);
-  const { currentProject } = useProjectStore();
+  const { currentProject, uploadEnabled } = useProjectStore();
   const { addAsset } = useAssets();
   const abortControllerRef = useRef<AbortController | null>(null);
+  const progressTickerRef = useRef<NodeJS.Timeout | null>(null);
   const { setExpandedAsset } = useAssetExpand();
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (progressTickerRef.current) {
+        clearInterval(progressTickerRef.current);
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   const isNanoBanana = model.includes('flash') || model.includes('pro');
 
@@ -108,7 +122,7 @@ const ImagenNode = ({ id, data }: any) => {
 
     // Fake progress ticker: increments 20 → 78% while waiting for the API
     let tickerProgress = 20;
-    const progressTicker = setInterval(() => {
+    progressTickerRef.current = setInterval(() => {
       tickerProgress = Math.min(tickerProgress + 3, 78);
       updateNodeData(id, { progress: tickerProgress });
     }, 800);
@@ -132,10 +146,13 @@ const ImagenNode = ({ id, data }: any) => {
         guidanceStrength: parameters.guidanceStrength,
         cfgScale: parameters.cfgScale,
         projectContext,
-        projectId: currentProject?.id,
+        projectId: uploadEnabled ? currentProject?.id : undefined,
       }, abortControllerRef.current.signal);
 
-      clearInterval(progressTicker);
+      if (progressTickerRef.current) {
+        clearInterval(progressTickerRef.current);
+        progressTickerRef.current = null;
+      }
       // Server already uploaded to Storage — URL is permanent
       updateNodeData(id, { output: imageUrl, isRunning: false, progress: 100 });
 
@@ -148,17 +165,29 @@ const ImagenNode = ({ id, data }: any) => {
           thumbnailUrl: imageUrl,
           tags: ['generated', 'image', 'imagen']
         });
+        toast.success('Image generated', 'Your image is ready');
       }
 
-    } catch (err: any) {
-      clearInterval(progressTicker);
-      if (err.name === 'AbortError') {
+    } catch (err: unknown) {
+      if (progressTickerRef.current) {
+        clearInterval(progressTickerRef.current);
+        progressTickerRef.current = null;
+      }
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      if (err instanceof Error && err.name === 'AbortError') {
         console.log('Generation aborted');
       } else {
-        updateNodeData(id, { error: err.message, isRunning: false });
+        const displayMessage = message.includes('timed out') 
+          ? 'Generation timed out. Try a simpler prompt or shorter duration.'
+          : message;
+        updateNodeData(id, { error: displayMessage, isRunning: false });
+        toast.error('Image generation failed', displayMessage);
       }
     } finally {
-      clearInterval(progressTicker);
+      if (progressTickerRef.current) {
+        clearInterval(progressTickerRef.current);
+        progressTickerRef.current = null;
+      }
       abortControllerRef.current = null;
     }
   };
@@ -330,4 +359,4 @@ const ImagenNode = ({ id, data }: any) => {
   );
 };
 
-export default ImagenNode;
+export default React.memo(ImagenNode);

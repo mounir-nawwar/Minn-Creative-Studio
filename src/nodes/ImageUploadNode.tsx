@@ -15,10 +15,24 @@ const ImageUploadNode = ({ id, data }: any) => {
   const [activeTab, setActiveTab] = useState<'upload' | 'assets'>('upload');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const localBlobUrlRef = useRef<string | null>(null);
   const updateNodeData = useStore((state) => state.updateNodeData);
   const { currentProject } = useProjectStore();
   const { uploadAsset } = useAssets();
   const { setExpandedAsset } = useAssetExpand();
+
+  // Cleanup blob URL on unmount
+  useEffect(() => {
+    return () => {
+      if (localBlobUrlRef.current) {
+        URL.revokeObjectURL(localBlobUrlRef.current);
+        localBlobUrlRef.current = null;
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   const handleCancelUpload = () => {
     abortControllerRef.current?.abort();
@@ -30,19 +44,27 @@ const ImageUploadNode = ({ id, data }: any) => {
   const nodeUploadEnabled = data.uploadEnabled ?? true;
   const prevUploadEnabled = useRef(nodeUploadEnabled);
   const toggleNodeUpload = (checked: boolean) => updateNodeData(id, { uploadEnabled: checked });
+  
+  const imageUrlRef = useRef(imageUrl);
+  const isUploadingRef = useRef(isUploading);
+  const currentProjectRef = useRef(currentProject);
+  
+  useEffect(() => { imageUrlRef.current = imageUrl; }, [imageUrl]);
+  useEffect(() => { isUploadingRef.current = isUploading; }, [isUploading]);
+  useEffect(() => { currentProjectRef.current = currentProject; }, [currentProject]);
 
   // When toggled from OFF → ON with an existing local blob, trigger the upload
   useEffect(() => {
     const wasOff = !prevUploadEnabled.current;
     prevUploadEnabled.current = nodeUploadEnabled;
-    if (wasOff && nodeUploadEnabled && imageUrl?.startsWith('blob:') && !isUploading && currentProject) {
+    if (wasOff && nodeUploadEnabled && imageUrlRef.current?.startsWith('blob:') && !isUploadingRef.current && currentProjectRef.current) {
       (async () => {
         const controller = new AbortController();
         abortControllerRef.current = controller;
         setIsUploading(true);
         updateNodeData(id, { isRunning: true, progress: 1 });
         try {
-          const res = await fetch(imageUrl);
+          const res = await fetch(imageUrlRef.current!);
           const blob = await res.blob();
           const ext = blob.type.split('/')[1] || 'png';
           const file = new File([blob], data.config?.fileName || `image.${ext}`, { type: blob.type });
@@ -51,22 +73,32 @@ const ImageUploadNode = ({ id, data }: any) => {
           }, controller.signal);
           setImageUrl(asset.url);
           updateNodeData(id, { output: asset.url, isRunning: false, progress: 100, config: { ...data.config, url: asset.url } });
-          URL.revokeObjectURL(imageUrl);
-        } catch (err: any) {
-          updateNodeData(id, { error: `Upload failed: ${err.message}`, isRunning: false });
+          if (imageUrlRef.current?.startsWith('blob:')) {
+            URL.revokeObjectURL(imageUrlRef.current);
+          }
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : 'Unknown error';
+          updateNodeData(id, { error: `Upload failed: ${message}`, isRunning: false });
         } finally {
           setIsUploading(false);
         }
       })();
     }
-  }, [nodeUploadEnabled]);
+  }, [nodeUploadEnabled, id, data.config, uploadAsset, updateNodeData]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !currentProject) return;
 
+    // Cleanup previous blob URL if exists
+    if (localBlobUrlRef.current) {
+      URL.revokeObjectURL(localBlobUrlRef.current);
+      localBlobUrlRef.current = null;
+    }
+
     // 1. Instant Preview logic
     const localUrl = URL.createObjectURL(file);
+    localBlobUrlRef.current = localUrl;
     setImageUrl(localUrl);
 
     if (!nodeUploadEnabled) {
@@ -95,7 +127,9 @@ const ImageUploadNode = ({ id, data }: any) => {
         updateNodeData(id, { progress: Math.max(progress, 1) });
       }, controller.signal);
       
-      console.log('ImageUploadNode: Upload finished successfully:', asset.url);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('ImageUploadNode: Upload finished successfully:', asset.url);
+      }
       
       // Update with permanent URL
       setImageUrl(asset.url);
@@ -107,14 +141,16 @@ const ImageUploadNode = ({ id, data }: any) => {
       });
       setIsUploading(false);
       
-      // Cleanup local URL
-      URL.revokeObjectURL(localUrl);
-      // Ensure state is updated to permanent URL after revocation to prevent race condition
-      setImageUrl(asset.url);
-    } catch (err: any) {
-      console.error('Upload error:', err);
+      // Cleanup local URL after successful upload
+      if (localBlobUrlRef.current === localUrl) {
+        URL.revokeObjectURL(localUrl);
+        localBlobUrlRef.current = null;
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      console.error('Upload error:', message);
       // Keep the local URL usable even if upload fails, but show error
-      updateNodeData(id, { error: `Upload failed (Using local copy): ${err.message}`, isRunning: false });
+      updateNodeData(id, { error: `Upload failed (Using local copy): ${message}`, isRunning: false });
       setIsUploading(false);
     }
   };
@@ -245,4 +281,4 @@ const ImageUploadNode = ({ id, data }: any) => {
   );
 };
 
-export default ImageUploadNode;
+export default React.memo(ImageUploadNode);

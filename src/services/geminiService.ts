@@ -1,24 +1,65 @@
 import { API_BASE } from "../constants";
 
-async function callBackend(method: string, params: any, signal?: AbortSignal) {
-  const response = await fetch(`${API_BASE}/gemini/proxy`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ method, params }),
-    signal
-  });
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 1000;
+const TIMEOUT_ERROR_MESSAGE = "Request timed out. Please try again with a shorter duration or simpler prompt.";
 
-  const contentType = response.headers.get('content-type');
-  if (contentType && contentType.includes('application/json')) {
-    const data = await response.json();
-    if (!response.ok || !data.success) {
-      throw new Error(data.error || 'Backend proxy call failed');
+async function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function callBackend(method: string, params: any, signal?: AbortSignal, retryCount = 0): Promise<any> {
+  try {
+    const response = await fetch(`${API_BASE}/gemini/proxy`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ method, params }),
+      signal
+    });
+
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Backend proxy call failed');
+      }
+      return data.data;
+    } else {
+      const text = await response.text();
+      console.error('Non-JSON response from backend:', text.substring(0, 500));
+      throw new Error(`Server returned non-JSON response (${response.status}). Check console for details.`);
     }
-    return data.data;
-  } else {
-    const text = await response.text();
-    console.error('Non-JSON response from backend:', text.substring(0, 500));
-    throw new Error(`Server returned non-JSON response (${response.status}). Check console for details.`);
+  } catch (err: unknown) {
+    const isTimeout = err instanceof Error && (
+      err.name === 'AbortError' ||
+      err.message.includes('abort') ||
+      err.message.includes('timeout')
+    );
+    
+    const isRetryable = !isTimeout && 
+      retryCount < MAX_RETRIES && 
+      err instanceof Error && 
+      !err.message.includes('blocked') &&
+      !err.message.includes('Invalid') &&
+      !err.message.includes('non-JSON response') &&
+      !err.message.includes('No image generated') &&
+      !err.message.includes('No audio generated') &&
+      !err.message.includes('quota') &&
+      !err.message.includes('exceeded') &&
+      !err.message.includes('failed');
+    
+    if (isRetryable) {
+      const delay = RETRY_DELAY_MS * Math.pow(2, retryCount);
+      console.warn(`[Retry ${retryCount + 1}/${MAX_RETRIES}] ${method} failed, retrying in ${delay}ms...`);
+      await sleep(delay);
+      return callBackend(method, params, signal, retryCount + 1);
+    }
+    
+    if (isTimeout) {
+      throw new Error(TIMEOUT_ERROR_MESSAGE);
+    }
+    
+    throw err;
   }
 }
 
@@ -72,12 +113,18 @@ export const generateImage = async (params: {
         config: { numberOfImages: 1, aspectRatio: aspectRatio as any },
         projectId,
       }, signal);
+      
+      if (!response?.generatedImages?.[0]?.image) {
+        throw new Error('No image generated in response from API');
+      }
+      
       const img = response.generatedImages[0].image;
       if (img.storageUrl) return img.storageUrl;
       return `data:image/png;base64,${img.imageBytes}`;
-    } catch (err) {
-      console.error('Gemini API Error:', err);
-      throw err;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      console.error('Image generation error:', message);
+      throw new Error(`Image generation failed: ${message}`);
     }
   } else {
     const parts: any[] = [];
@@ -126,10 +173,11 @@ export const generateImage = async (params: {
           return `data:image/png;base64,${part.inlineData.data}`;
         }
       }
-      throw new Error("No image generated in response");
-    } catch (err) {
-      console.error('Gemini API Error:', err);
-      throw err;
+      throw new Error("No image generated in response from API");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      console.error('Image generation error:', message);
+      throw new Error(`Image generation failed: ${message}`);
     }
   }
 };
@@ -208,14 +256,22 @@ export const generateVideo = async (params: {
       config: videoConfig
     }, signal);
 
+    const MAX_POLL_COUNT = 120; // 10 minutes max (120 * 5 seconds)
+    const POLL_INTERVAL_MS = 5000;
     let pollCount = 0;
+    
     while (!operation.done) {
       pollCount++;
+      
+      if (pollCount > MAX_POLL_COUNT) {
+        throw new Error("Video generation timed out after 10 minutes. Please try again with a shorter duration or simpler prompt.");
+      }
+      
       // Simulate progress during polling
       const simulatedProgress = Math.min(20 + (pollCount * 5), 90);
       onProgress?.(simulatedProgress);
       
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
       if (signal?.aborted) throw new Error("Video generation cancelled");
       operation = await callBackend('getOperation', { operation: operation }, signal);
     }
@@ -368,10 +424,17 @@ export const generateAudio = async (params: {
 
     // Handle Long Running Operation (Lyria Pro)
     if (response.isLro) {
+      const MAX_POLL_COUNT = 60; // 5 minutes max (60 * 5 seconds)
       let operation: { name: any; done: boolean; response?: any } = { name: response.operation, done: false };
       let pollCount = 0;
+      
       while (!operation.done) {
         pollCount++;
+        
+        if (pollCount > MAX_POLL_COUNT) {
+          throw new Error("Audio generation timed out after 5 minutes. Please try again.");
+        }
+        
         onProgress?.(Math.min(10 + (pollCount * 5), 90));
         await new Promise(resolve => setTimeout(resolve, 5000));
         if (signal?.aborted) throw new Error("Audio generation cancelled");

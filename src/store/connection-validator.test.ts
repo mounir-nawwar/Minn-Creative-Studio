@@ -8,7 +8,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Node } from 'reactflow';
 import {
   checkConnection,
-  checkConnectionDeprecated,
   isValidConnectionCached,
   getConnectionFeedback,
   validateMultipleConnections,

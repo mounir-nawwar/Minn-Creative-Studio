@@ -199,4 +199,4 @@ const VideoUploadNode = ({ id, data }: any) => {
   );
 };
 
-export default VideoUploadNode;
+export default React.memo(VideoUploadNode);

@@ -1,13 +1,28 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    // Project files - only authenticated users, scoped to project ownership
     match /projects/{projectId}/{allPaths=**} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow write: if request.auth != null 
+        && request.auth.uid == request.resource.name.split('/')[2].split('-')[0];
     }
+    
+    // Workflow outputs - authenticated users only
     match /workflows/{allPaths=**} {
       allow read: if request.auth != null;
       allow write: if request.auth != null;
+    }
+    
+    // Generated assets - authenticated users only
+    match /generated/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+    
+    // Deny all other access
+    match /{allPaths=**} {
+      allow read, write: if false;
     }
   }
 }

@@ -1,5 +1,6 @@
 import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import CustomLoginPage from './components/CustomLoginPage';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { useProject } from './hooks/useProject';
 
 // Heavy main-app components — only loaded after authentication
@@ -26,6 +27,8 @@ import { UnicornScene } from 'unicornstudio-react';
 import { perfMonitor } from './services/performance';
 import { ConnectionProvider } from './contexts/ConnectionContext';
 import AssetExpandModal from './components/AssetExpandModal';
+import { ToastContainer } from './components/ToastContainer';
+import { OfflineIndicator } from './components/OfflineIndicator';
 
 declare global {
   interface Window {
@@ -180,6 +183,8 @@ export default function App() {
         </>
       )}
 
+      <ToastContainer />
+
       {/* ── AUTH SCREENS — swap with cross-fade ─────────────────────────── */}
       <AnimatePresence mode="wait">
 
@@ -301,11 +306,14 @@ export default function App() {
               <div className="flex-1 flex flex-col min-w-0">
                 <ProjectContextBar />
                 <Toolbar user={user!} onLogout={handleCustomLogout} />
-                <ConnectionProvider>
-                  <Canvas />
-                </ConnectionProvider>
+                <ErrorBoundary>
+                  <ConnectionProvider>
+                    <Canvas />
+                  </ConnectionProvider>
+                </ErrorBoundary>
                 <ChatDrawer />
                 <AssetExpandModal />
+                <OfflineIndicator />
                 <AnimatePresence>
                   {isSettingsOpen && (
                     <ProjectCreationOverlay

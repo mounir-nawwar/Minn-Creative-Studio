@@ -11,6 +11,7 @@ import ParameterSlider from '../components/ParameterSlider';
 import { downloadFile } from '../lib/utils';
 import { useAssetExpand } from '../hooks/useAssetExpand';
 import { ExpandableAssetWrapper } from '../components/ExpandableAssetWrapper';
+import { toast } from '../store/useToastStore';
 
 const LyriaNode = ({ id, data }: any) => {
   const [model, setModel] = useState(data.config?.model || 'lyria-3-pro-preview');
@@ -26,7 +27,7 @@ const LyriaNode = ({ id, data }: any) => {
   const [temperature, setTemperature] = useState(data.config?.temperature || 1.0);
   
   const updateNodeData = useStore((state) => state.updateNodeData);
-  const { currentProject } = useProjectStore();
+  const { currentProject, uploadEnabled } = useProjectStore();
   const { addAsset } = useAssets();
   const edges = useStore((state) => state.edges);
   const nodes = useStore((state) => state.nodes);
@@ -64,7 +65,7 @@ const LyriaNode = ({ id, data }: any) => {
       const audioUrl = await generateAudio({
         prompt: finalPrompt,
         model,
-        projectId: currentProject?.id,
+        projectId: uploadEnabled ? currentProject?.id : undefined,
         referenceImages: referenceImages.map(r => ({ url: r.url })),
         negativePrompt: isLyria ? negativePrompt : undefined,
         duration: isPro ? duration : undefined,
@@ -82,10 +83,16 @@ const LyriaNode = ({ id, data }: any) => {
           thumbnailUrl: audioUrl,
           tags: ['generated', 'audio', isLyria ? 'lyria' : 'tts']
         });
+        toast.success(isLyria ? 'Music generated' : 'Audio generated', 'Your audio is ready');
       }
 
-    } catch (err: any) {
-      updateNodeData(id, { error: err.message, isRunning: false });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      const displayMessage = message.includes('timed out') 
+        ? 'Audio generation timed out. Try a shorter duration.'
+        : message;
+      updateNodeData(id, { error: displayMessage, isRunning: false });
+      toast.error('Audio generation failed', displayMessage);
     }
   };
 
@@ -272,4 +279,4 @@ const LyriaNode = ({ id, data }: any) => {
   );
 };
 
-export default LyriaNode;
+export default React.memo(LyriaNode);

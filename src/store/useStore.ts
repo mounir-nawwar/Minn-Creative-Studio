@@ -17,12 +17,16 @@ import { checkConnection, ValidationResult } from './connection-validator';
 import { NodeType } from '../types';
 import { perfMonitor } from '../services/performance';
 
-// Define proper type for node data
 interface NodeData {
   label: string;
   type: NodeType;
   config?: Record<string, unknown>;
-  [key: string]: unknown; // Allow additional properties
+  [key: string]: unknown;
+}
+
+interface HistoryState {
+  nodes: Node<WorkflowNodeData>[];
+  edges: Edge[];
 }
 
 interface WorkflowState {
@@ -33,6 +37,8 @@ interface WorkflowState {
   isChatOpen: boolean;
   activeChatId: string | null;
   expandedAsset: { url: string; type: 'image' | 'video' | 'audio' } | null;
+  history: HistoryState[];
+  historyIndex: number;
   onNodesChange: OnNodesChange;
   onEdgesChange: OnEdgesChange;
   onConnect: OnConnect;
@@ -46,7 +52,14 @@ interface WorkflowState {
   setChatOpen: (open: boolean) => void;
   setActiveChatId: (id: string | null) => void;
   setExpandedAsset: (url: string | null, type?: 'image' | 'video' | 'audio') => void;
+  undo: () => void;
+  redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
+  saveToHistory: () => void;
 }
+
+const MAX_HISTORY = 50;
 
 export const useStore = create<WorkflowState>((set, get) => ({
   nodes: [],
@@ -56,15 +69,55 @@ export const useStore = create<WorkflowState>((set, get) => ({
   isChatOpen: false,
   activeChatId: null,
   expandedAsset: null,
+  history: [],
+  historyIndex: -1,
+  
+  saveToHistory: () => {
+    const { nodes, edges, history, historyIndex } = get();
+    const newHistory = history.slice(0, historyIndex + 1);
+    newHistory.push({ nodes: JSON.parse(JSON.stringify(nodes)), edges: JSON.parse(JSON.stringify(edges)) });
+    if (newHistory.length > MAX_HISTORY) {
+      newHistory.shift();
+    }
+    set({ history: newHistory, historyIndex: newHistory.length - 1 });
+  },
+  
+  undo: () => {
+    const { history, historyIndex } = get();
+    if (historyIndex > 0) {
+      const prevState = history[historyIndex - 1];
+      set({ 
+        nodes: JSON.parse(JSON.stringify(prevState.nodes)), 
+        edges: JSON.parse(JSON.stringify(prevState.edges)),
+        historyIndex: historyIndex - 1 
+      });
+    }
+  },
+  
+  redo: () => {
+    const { history, historyIndex } = get();
+    if (historyIndex < history.length - 1) {
+      const nextState = history[historyIndex + 1];
+      set({ 
+        nodes: JSON.parse(JSON.stringify(nextState.nodes)), 
+        edges: JSON.parse(JSON.stringify(nextState.edges)),
+        historyIndex: historyIndex + 1 
+      });
+    }
+  },
+  
+  canUndo: () => get().historyIndex > 0,
+  canRedo: () => get().historyIndex < get().history.length - 1,
+  
   onNodesChange: (changes: NodeChange[]) => {
-    set({
-      nodes: applyNodeChanges(changes, get().nodes),
-    });
+    const hasRemove = changes.some(c => c.type === 'remove');
+    set({ nodes: applyNodeChanges(changes, get().nodes) });
+    if (hasRemove) {
+      setTimeout(() => get().saveToHistory(), 0);
+    }
   },
   onEdgesChange: (changes: EdgeChange[]) => {
-    set({
-      edges: applyEdgeChanges(changes, get().edges),
-    });
+    set({ edges: applyEdgeChanges(changes, get().edges) });
   },
   onConnect: (connection: Connection) => {
     const validation = perfMonitor.measureValidation(() => 
@@ -77,13 +130,11 @@ export const useStore = create<WorkflowState>((set, get) => ({
         connection,
         reason: validation.message
       });
-      return; // BLOCK invalid connections
+      return;
     }
     
     perfMonitor.mark('update-edge-start');
-    set({
-      edges: addEdge(connection, get().edges),
-    });
+    set({ edges: addEdge(connection, get().edges) });
     perfMonitor.mark('update-edge-end');
     
     const duration = perfMonitor.measure('update-edge', 'update-edge-start', 'update-edge-end');
@@ -95,7 +146,6 @@ export const useStore = create<WorkflowState>((set, get) => ({
   setEdges: (edges) => set({ edges }),
   updateNodeData: (nodeId, data) => {
     perfMonitor.mark(`update-${nodeId}-start`);
-    
     set({
       nodes: get().nodes.map((node) => {
         if (node.id === nodeId) {
@@ -104,29 +154,26 @@ export const useStore = create<WorkflowState>((set, get) => ({
         return node;
       }),
     });
-    
     perfMonitor.mark(`update-${nodeId}-end`);
-    
     const duration = perfMonitor.measure(`update-${nodeId}`, `update-${nodeId}-start`, `update-${nodeId}-end`);
     if (duration > 50) {
       console.warn(`[Performance Monitor] Slow node update (${nodeId}): ${duration.toFixed(2)}ms`);
     }
   },
   addNode: (node) => {
-    set({
-      nodes: [...get().nodes, node],
-    });
+    set({ nodes: [...get().nodes, node] });
+    setTimeout(() => get().saveToHistory(), 0);
   },
   deleteNode: (nodeId) => {
     set({
       nodes: get().nodes.filter((node) => node.id !== nodeId),
       edges: get().edges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId),
     });
+    setTimeout(() => get().saveToHistory(), 0);
   },
   deleteEdge: (edgeId) => {
-    set({
-      edges: get().edges.filter((edge) => edge.id !== edgeId),
-    });
+    set({ edges: get().edges.filter((edge) => edge.id !== edgeId) });
+    setTimeout(() => get().saveToHistory(), 0);
   },
   setPendingNodeType: (type, data = null) => set({ pendingNodeType: type, pendingNodeData: data }),
   setChatOpen: (open) => set({ isChatOpen: open }),

@@ -15,7 +15,7 @@ const StyleTransferNode = ({ data, id }: any) => {
   
   const updateNodeData = useStore((state) => state.updateNodeData);
   const { setExpandedAsset } = useAssetExpand();
-  const { currentProject } = useProjectStore();
+  const { currentProject, uploadEnabled } = useProjectStore();
   const { addAsset } = useAssets();
 
   const contentUrl = useMemo(() => {
@@ -45,7 +45,7 @@ const StyleTransferNode = ({ data, id }: any) => {
         styleUrl,
         strength,
         preserveStructure,
-        projectId: currentProject?.id
+        projectId: uploadEnabled ? currentProject?.id : undefined
       });
 
       updateNodeData(id, { output: resultUrl, isRunning: false, progress: 100 });
