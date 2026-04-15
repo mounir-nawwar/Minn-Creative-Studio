@@ -46,7 +46,8 @@ const RelightNode = ({ id, data }: any) => {
     updateNodeData(id, { isRunning: true, error: undefined, progress: 10 });
 
     try {
-      const relitUrl = await relightImage(imageUrl, {
+      const relitUrl = await relightImage({
+        imageUrl,
         lightDirection,
         lightColor,
         intensity: intensity / 100,

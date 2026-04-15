@@ -2,6 +2,7 @@ import React from 'react';
 import { useStore } from '../store/useStore';
 import AssetPreviewModal from './AssetPreviewModal';
 import { Asset } from '../types/project.types';
+import { Timestamp } from 'firebase/firestore';
 
 /**
  * Global asset expansion modal - rendered once at root level
@@ -13,20 +14,16 @@ export const AssetExpandModal = () => {
   
   if (!expandedAsset) return null;
 
-  // Convert expandedAsset to Asset format
   const asset: Asset = {
     id: 'expanded',
     name: 'Expanded Asset',
     type: expandedAsset.type,
     url: expandedAsset.url,
     thumbnailUrl: expandedAsset.url,
-    createdAt: new Date(),
-    createdBy: 'system',
+    createdAt: Timestamp.now(),
     isFavorited: false,
     metadata: {},
     tags: [],
-    nodeId: undefined,
-    workflowId: undefined
   };
 
   return (
