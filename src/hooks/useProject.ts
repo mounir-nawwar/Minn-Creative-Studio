@@ -1,17 +1,18 @@
 import { useState, useEffect } from 'react';
-import { 
-  db, 
-  auth, 
-  collection, 
-  query, 
-  where, 
-  orderBy, 
-  onSnapshot, 
-  doc, 
-  getDoc, 
-  setDoc, 
-  updateDoc, 
-  deleteDoc, 
+import { onAuthStateChanged } from 'firebase/auth';
+import {
+  db,
+  auth,
+  collection,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
   serverTimestamp,
   Timestamp,
   handleFirestoreError,
@@ -27,39 +28,80 @@ export function useProject() {
   const [archivedProjects, setArchivedProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Load active projects (exclude archived via client-side filter)
+  // Load active projects — re-subscribe whenever auth state changes.
+  // The [] effect runs once at mount when auth.currentUser may still be null,
+  // so we use onAuthStateChanged to set up (and tear down) the Firestore
+  // snapshot only after a real user is available.
   useEffect(() => {
-    if (!auth.currentUser) {
-      setProjects([]);
-      setLoading(false);
-      return;
-    }
+    let unsubscribeSnapshot: (() => void) | null = null;
 
-    const q = query(
-      collection(db, 'projects'),
-      orderBy('createdAt', 'desc')
-    );
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      // Tear down any existing snapshot when auth changes
+      if (unsubscribeSnapshot) {
+        unsubscribeSnapshot();
+        unsubscribeSnapshot = null;
+      }
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const allProjects = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Project[];
-      
-      const activeProjects = allProjects.filter(p => p.status !== 'archived');
-      const archived = allProjects.filter(p => p.status === 'archived');
-      
-      setProjects(activeProjects);
-      setArchivedProjects(archived);
-      setLoading(false);
-    }, (error) => {
-      console.error("Firestore error in useProject:", error);
-      setLoading(false);
-      handleFirestoreError(error, OperationType.LIST, 'projects');
+      if (!user) {
+        setProjects([]);
+        setArchivedProjects([]);
+        setLoading(false);
+        return;
+      }
+
+      const q = query(
+        collection(db, 'projects'),
+        orderBy('createdAt', 'desc')
+      );
+
+      unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
+        const allProjects = snapshot.docs.map(d => ({
+          id: d.id,
+          ...d.data()
+        })) as Project[];
+
+        const activeProjects = allProjects.filter(p => p.status !== 'archived');
+        const archived = allProjects.filter(p => p.status === 'archived');
+
+        setProjects(activeProjects);
+        setArchivedProjects(archived);
+        setLoading(false);
+      }, (error) => {
+        console.error('Firestore error in useProject:', error);
+        setLoading(false);
+        handleFirestoreError(error, OperationType.LIST, 'projects');
+      });
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeSnapshot) unsubscribeSnapshot();
+    };
   }, []);
+
+  // Sync currentProject with updates from projects list
+  useEffect(() => {
+    const storeCurrentProject = useProjectStore.getState().currentProject;
+    if (!storeCurrentProject?.id || projects.length === 0) return;
+    
+    const updated = projects.find(p => p.id === storeCurrentProject.id);
+    if (!updated) return;
+    
+    const newUsage = JSON.stringify(updated.usage);
+    const currentUsage = JSON.stringify(storeCurrentProject.usage);
+    
+    console.log('[useProject] Sync check:', {
+      projectId: storeCurrentProject.id,
+      updatedUsage: updated.usage,
+      currentUsage: storeCurrentProject.usage,
+      isDifferent: newUsage !== currentUsage
+    });
+    
+    if (newUsage !== currentUsage) {
+      console.log('[useProject] Updating currentProject');
+      useProjectStore.getState().setCurrentProject(updated);
+    }
+  }, [projects]);
 
   const createProject = async (projectData: Partial<Project>) => {
     if (!auth.currentUser) throw new Error('User not authenticated');

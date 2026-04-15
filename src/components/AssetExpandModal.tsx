@@ -1,4 +1,5 @@
 import React from 'react';
+import { AnimatePresence } from 'motion/react';
 import { useStore } from '../store/useStore';
 import AssetPreviewModal from './AssetPreviewModal';
 import { Asset } from '../types/project.types';
@@ -12,9 +13,7 @@ export const AssetExpandModal = () => {
   const expandedAsset = useStore((state) => state.expandedAsset);
   const setExpandedAsset = useStore((state) => state.setExpandedAsset);
   
-  if (!expandedAsset) return null;
-
-  const asset: Asset = {
+  const asset: Asset | null = expandedAsset ? {
     id: 'expanded',
     name: 'Expanded Asset',
     type: expandedAsset.type,
@@ -24,15 +23,20 @@ export const AssetExpandModal = () => {
     isFavorited: false,
     metadata: {},
     tags: [],
-  };
+  } : null;
 
   return (
-    <AssetPreviewModal
-      asset={asset}
-      onClose={() => setExpandedAsset(null)}
-      onDelete={() => {}}
-      onToggleFavorite={() => {}}
-    />
+    <AnimatePresence>
+      {asset && (
+        <AssetPreviewModal
+          key="expanded-modal"
+          asset={asset}
+          onClose={() => setExpandedAsset(null)}
+          onDelete={() => {}}
+          onToggleFavorite={() => {}}
+        />
+      )}
+    </AnimatePresence>
   );
 };
 

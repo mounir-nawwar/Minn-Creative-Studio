@@ -49,7 +49,8 @@ const LLMNode = ({ id, data }: any) => {
         model,
         systemInstruction,
         imageUrls: imageUrl ? [imageUrl] : [],
-        projectContext
+        projectContext,
+        projectId: currentProject?.id,
       });
 
       updateNodeData(id, { output: text, isRunning: false });

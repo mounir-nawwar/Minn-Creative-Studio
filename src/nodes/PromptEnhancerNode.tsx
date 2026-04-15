@@ -53,7 +53,8 @@ Return only the enhanced prompt, nothing else.`;
         prompt,
         model: 'gemini-3-flash-preview',
         systemInstruction,
-        projectContext
+        projectContext,
+        projectId: currentProject?.id,
       });
 
       updateNodeData(id, { output: enhancedPrompt, isRunning: false });

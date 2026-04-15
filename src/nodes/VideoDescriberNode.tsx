@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
+import { useProjectStore } from '../store/useProjectStore';
 import { generateText } from '../services/geminiService';
 
 const VideoDescriberNode = ({ id, data }: any) => {
   const [model, setModel] = useState(data.config?.model || 'gemini-3-flash-preview');
   const [prompt, setPrompt] = useState(data.config?.prompt || 'Describe this video in detail, focusing on style, camera movement, and lighting.');
   const updateNodeData = useStore((state) => state.updateNodeData);
+  const { currentProject } = useProjectStore();
 
   const handleRun = async () => {
     const state = useStore.getState();
@@ -30,7 +32,8 @@ const VideoDescriberNode = ({ id, data }: any) => {
       const text = await generateText({
         prompt,
         model,
-        videoUrls: [videoUrl]
+        videoUrls: [videoUrl],
+        projectId: currentProject?.id,
       });
 
       updateNodeData(id, { output: text, isRunning: false });

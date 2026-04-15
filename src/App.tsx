@@ -13,7 +13,7 @@ const ProjectPicker       = lazy(() => import('./pages/ProjectPicker'));
 const ProjectCreationOverlay = lazy(() => import('./components/ProjectCreationOverlay'));
 import { motion, AnimatePresence } from 'motion/react';
 import type { Easing } from 'motion/react';
-import { auth, signInWithGoogle, signOut as firebaseLogOut, db } from './firebase';
+import { auth, signInWithGoogle, checkRedirectResult, signOut as firebaseLogOut, db } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { getDocFromServer, doc } from 'firebase/firestore';
 import { Key } from 'lucide-react';
@@ -60,6 +60,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
+  const [signInError, setSignInError] = useState<string | null>(null);
   const { currentProject, isSettingsOpen, closeSettings, settingsMode } = useProjectStore();
   const { updateCurrentProject } = useProject();
   const setNodes = useStore((state) => state.setNodes);
@@ -84,6 +85,9 @@ export default function App() {
       }
     };
     checkAuth();
+
+    // Handle the case where Firebase fell back to redirect mode from signInWithPopup
+    checkRedirectResult().catch(() => {});
 
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u);
@@ -225,7 +229,17 @@ export default function App() {
                   <p className="auth-subtext">Sign in to access your creative workspace</p>
                 </div>
                 <div className="a3" style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(10px, 0.9vw, 13px)' }}>
-                  <button onClick={signInWithGoogle} className="auth-btn-white">{GOOGLE_SVG} Continue with Google</button>
+                  <button onClick={async () => {
+                    setSignInError(null);
+                    try {
+                      await signInWithGoogle();
+                    } catch (err: any) {
+                      if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
+                        setSignInError('Sign-in failed. Please try again.');
+                      }
+                    }
+                  }} className="auth-btn-white">{GOOGLE_SVG} Continue with Google</button>
+                  {signInError && <p style={{ margin: 0, fontSize: 'clamp(9px, 0.65vw, 11px)', color: '#ff6b6b', textAlign: 'center' }}>{signInError}</p>}
                   <button onClick={handleCustomLogout} className="auth-link-btn">Switch admin account</button>
                 </div>
               </div>

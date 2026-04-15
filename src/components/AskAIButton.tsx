@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Sparkles, Loader2, ArrowRight } from 'lucide-react';
 import { suggestNodeConfig } from '../services/geminiService';
+import { useProjectStore } from '../store/useProjectStore';
 
 interface AskAIButtonProps {
   nodeType: string;
@@ -13,6 +14,7 @@ export default function AskAIButton({ nodeType, currentConfig, onSuggestion, lab
   const [isOpen, setIsOpen] = useState(false);
   const [goal, setGoal] = useState('');
   const [loading, setLoading] = useState(false);
+  const { currentProject } = useProjectStore();
 
   const handleAsk = async () => {
     if (!goal.trim()) return;
@@ -21,7 +23,8 @@ export default function AskAIButton({ nodeType, currentConfig, onSuggestion, lab
       const suggestion = await suggestNodeConfig({
         nodeType,
         userGoal: goal,
-        currentConfig
+        currentConfig,
+        projectId: currentProject?.id,
       });
       onSuggestion(suggestion);
       setIsOpen(false);

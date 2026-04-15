@@ -285,6 +285,7 @@ export default function ChatDrawer() {
         imageUrls,
         projectContext,
         maxOutputTokens: 8192,
+        projectId: currentProject?.id,
       });
 
       // Save Model Message

@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, User, browserLocalPersistence, setPersistence } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, getRedirectResult, onAuthStateChanged, User, browserLocalPersistence, setPersistence } from 'firebase/auth';
 import { getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, or, orderBy, serverTimestamp, Timestamp, limit } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
@@ -15,8 +15,13 @@ auth.useDeviceLanguage();
 export const storage = getStorage(app, firebaseConfig.storageBucket);
 export const googleProvider = new GoogleAuthProvider();
 
+// Ensure localStorage persistence (more reliable than session on localhost)
+setPersistence(auth, browserLocalPersistence).catch(() => {});
+
 // Auth Helpers
 export const signInWithGoogle = () => signInWithPopup(auth, googleProvider);
+
+export const checkRedirectResult = () => getRedirectResult(auth);
 
 export const signOut = () => auth.signOut();
 

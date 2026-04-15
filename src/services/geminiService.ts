@@ -92,35 +92,68 @@ export const generateImage = async (params: {
   model: string;
   aspectRatio: string;
   imageSize?: string;
+  resolution?: string;
   referenceImages?: { url: string; role: string; strength: number }[];
   seed?: number;
   guidanceStrength?: number;
   cfgScale?: number;
   projectContext?: string;
   projectId?: string;
-}, signal?: AbortSignal) => {
-  const { prompt, model, aspectRatio, imageSize, referenceImages, seed, guidanceStrength, cfgScale, projectContext, projectId } = params;
+  sampleCount?: number;
+  personGeneration?: string;
+  enhancePrompt?: boolean;
+  addWatermark?: boolean;
+  safetySetting?: string;
+  candidateCount?: number;
+  temperature?: number;
+  topP?: number;
+  topK?: number;
+  mimeType?: string;
+  grounding?: boolean;
+  thinkingBudget?: number;
+}, signal?: AbortSignal): Promise<string | string[]> => {
+  const { 
+    prompt, model, aspectRatio, imageSize, resolution, referenceImages, seed, 
+    guidanceStrength, cfgScale, projectContext, projectId, sampleCount = 1,
+    personGeneration, enhancePrompt, addWatermark, safetySetting,
+    candidateCount, temperature, topP, topK, mimeType, grounding, thinkingBudget
+  } = params;
 
   const fullPrompt = projectContext 
     ? `Project Context: ${projectContext}\n\nTask: Generate an image based on this prompt: ${prompt}`
     : prompt;
 
-  if (model.startsWith('imagen-4')) {
+  const isImagen4 = model.startsWith('imagen-4');
+
+  if (isImagen4) {
     try {
+      const config: any = {
+        numberOfImages: sampleCount,
+        aspectRatio: aspectRatio as any,
+      };
+      if (seed !== undefined) config.seed = seed;
+      if (personGeneration) config.personGeneration = personGeneration;
+      if (enhancePrompt !== undefined) config.enhancePrompt = enhancePrompt;
+      if (addWatermark !== undefined) config.addWatermark = addWatermark;
+      if (safetySetting) config.safetySetting = safetySetting;
+
       const response = await callBackend('generateImages', {
         model: model,
         prompt: fullPrompt,
-        config: { numberOfImages: 1, aspectRatio: aspectRatio as any },
+        config,
         projectId,
       }, signal);
       
-      if (!response?.generatedImages?.[0]?.image) {
-        throw new Error('No image generated in response from API');
+      if (!response?.generatedImages?.length) {
+        throw new Error('No images generated in response from API');
       }
       
-      const img = response.generatedImages[0].image;
-      if (img.storageUrl) return img.storageUrl;
-      return `data:image/png;base64,${img.imageBytes}`;
+      const images = response.generatedImages.map((img: any) => {
+        if (img.image.storageUrl) return img.image.storageUrl;
+        return `data:image/png;base64,${img.image.imageBytes}`;
+      });
+
+      return images.length === 1 ? images[0] : images;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       console.error('Image generation error:', message);
@@ -131,8 +164,6 @@ export const generateImage = async (params: {
     
     if (referenceImages && referenceImages.length > 0) {
       for (const ref of referenceImages) {
-        // Remote URLs (Firebase Storage etc.) → let server fetch to avoid Cloud Run 32MB body limit
-        // Blob/data URLs → fetch in browser (server can't reach them)
         if (ref.url.startsWith('http')) {
           parts.push({ _imageUrl: ref.url });
         } else {
@@ -145,35 +176,61 @@ export const generateImage = async (params: {
     parts.push({ text: fullPrompt });
 
     try {
-      const response = await callBackend('generateContent', {
-        model: model,
-        contents: { parts },
-        config: {
-          responseModalities: ['IMAGE'],
-          imageConfig: {
-            aspectRatio: aspectRatio as any,
-            imageSize: imageSize as any
-          },
-          ...(seed !== undefined && { seed }),
-          ...(guidanceStrength !== undefined && { topP: guidanceStrength / 20 }),
-          ...(cfgScale !== undefined && { temperature: cfgScale / 15 }),
-          safetySettings: [
-            { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-            { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-            { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-            { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-          ],
-        },
-        projectId,
-      }, signal);
+      const imageConfig: any = {
+        aspectRatio: aspectRatio as any,
+        imageSize: (resolution || imageSize) as any,
+      };
 
-      for (const part of response.candidates?.[0]?.content?.parts || []) {
-        if (part.inlineData) {
-          if (part.inlineData.storageUrl) return part.inlineData.storageUrl;
-          return `data:image/png;base64,${part.inlineData.data}`;
+      const config: any = {
+        responseModalities: ['IMAGE'],
+        imageConfig,
+        ...(seed !== undefined && { seed }),
+        ...(temperature !== undefined && { temperature }),
+        ...(topP !== undefined && { topP }),
+        ...(topK !== undefined && { topK }),
+        ...(grounding && { 
+          tools: [{ googleSearchRetrieval: {} }] 
+        }),
+        ...(thinkingBudget !== undefined && { 
+          thinkingConfig: { thinkingBudget } 
+        }),
+        safetySettings: [
+          { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+          { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+          { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+          { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+        ],
+      };
+
+      // For multiple images, make multiple API calls (candidateCount not supported for images)
+      const numImages = sampleCount || 1;
+      const images: string[] = [];
+      
+      for (let i = 0; i < numImages; i++) {
+        const response = await callBackend('generateContent', {
+          model: model,
+          contents: { parts },
+          config: {
+            ...config,
+            ...(seed !== undefined && numImages > 1 ? { seed: seed + i } : {}),
+          },
+          projectId,
+        }, signal);
+
+        const imageParts = response.candidates?.[0]?.content?.parts?.filter((p: any) => p.inlineData) || [];
+        if (imageParts.length > 0) {
+          const imgUrl = imageParts[0].inlineData.storageUrl 
+            ? imageParts[0].inlineData.storageUrl 
+            : `data:image/png;base64,${imageParts[0].inlineData.data}`;
+          images.push(imgUrl);
         }
       }
-      throw new Error("No image generated in response from API");
+
+      if (images.length === 0) {
+        throw new Error("No image generated in response from API");
+      }
+
+      return images.length === 1 ? images[0] : images;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       console.error('Image generation error:', message);
@@ -308,8 +365,9 @@ export const generateText = async (params: {
   videoUrls?: string[];
   projectContext?: string;
   maxOutputTokens?: number;
+  projectId?: string;
 }, signal?: AbortSignal) => {
-  const { prompt, model, systemInstruction, imageUrls = [], videoUrls = [], projectContext, maxOutputTokens } = params;
+  const { prompt, model, systemInstruction, imageUrls = [], videoUrls = [], projectContext, maxOutputTokens, projectId } = params;
 
   const fullPrompt = projectContext 
     ? `Project Context: ${projectContext}\n\nTask: ${prompt}`
@@ -334,7 +392,8 @@ export const generateText = async (params: {
       config: {
         systemInstruction,
         ...(maxOutputTokens && { maxOutputTokens }),
-      }
+      },
+      projectId,
     }, signal);
 
     return response.text;
@@ -356,6 +415,11 @@ export const generateAudio = async (params: {
   temperature?: number;
   topP?: number;
   topK?: number;
+  guidance?: number;
+  bpm?: number;
+  density?: number;
+  brightness?: number;
+  scale?: string;
   onProgress?: (progress: number) => void;
 }, signal?: AbortSignal) => {
   const { 
@@ -370,13 +434,17 @@ export const generateAudio = async (params: {
     temperature,
     topP,
     topK,
+    guidance,
+    bpm,
+    density,
+    brightness,
+    scale,
     onProgress
   } = params;
 
   const isLyria = model.includes('lyria');
   const parts: any[] = [];
 
-  // Add reference images for multimodal Lyria
   if (isLyria && referenceImages && referenceImages.length > 0) {
     for (const ref of referenceImages) {
       if (ref.url.startsWith('http')) {
@@ -411,6 +479,11 @@ export const generateAudio = async (params: {
           ...(temperature !== undefined && { temperature }),
           ...(topP !== undefined && { topP }),
           ...(topK !== undefined && { topK }),
+          ...(guidance !== undefined && { guidance }),
+          ...(bpm !== undefined && { bpm }),
+          ...(density !== undefined && { density }),
+          ...(brightness !== undefined && { brightness }),
+          ...(scale && { scale }),
         }),
         safetySettings: [
           { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
@@ -509,14 +582,37 @@ export const upscaleImage = async (params: {
   scale: string;
   preserveStyle: boolean;
   projectId?: string;
+  model?: string;
 }, signal?: AbortSignal) => {
-  const { imageUrl, scale, preserveStyle, projectId } = params;
+  const { imageUrl, scale, preserveStyle, projectId, model = 'gemini-3.1-flash-image-preview' } = params;
 
   const { data, mimeType } = await urlToBase64(imageUrl);
 
+  const isImagenUpscale = model.includes('upscale');
+
+  if (isImagenUpscale) {
+    try {
+      const response = await callBackend('upscaleImage', {
+        model: model,
+        image: { bytesBase64Encoded: data, mimeType },
+        config: {
+          upscaleFactor: scale === '4K' ? 4 : 2,
+        },
+        projectId,
+      }, signal);
+
+      if (response.storageUrl) return response.storageUrl;
+      if (response.imageBytes) return `data:image/png;base64,${response.imageBytes}`;
+      throw new Error("No upscaled image returned from API");
+    } catch (err) {
+      console.error('Upscale API Error:', err);
+      throw err;
+    }
+  }
+
   try {
     const response = await callBackend('generateContent', {
-      model: 'gemini-3.1-flash-image-preview',
+      model: model,
       contents: {
         parts: [
           { text: `Upscale this image to ${scale}. Preserve style: ${preserveStyle}` },
@@ -548,8 +644,9 @@ export const suggestNodeConfig = async (params: {
   userGoal: string;
   currentConfig: any;
   projectContext?: string;
+  projectId?: string;
 }, signal?: AbortSignal) => {
-  const { nodeType, userGoal, currentConfig, projectContext } = params;
+  const { nodeType, userGoal, currentConfig, projectContext, projectId } = params;
 
   try {
     const response = await callBackend('generateContent', {
@@ -563,7 +660,8 @@ export const suggestNodeConfig = async (params: {
       Return ONLY a JSON object representing the updated configuration fields.` }] }],
       config: {
         responseMimeType: "application/json",
-      }
+      },
+      projectId,
     }, signal);
 
     return JSON.parse(response.text);

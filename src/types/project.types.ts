@@ -6,6 +6,19 @@ export type FontStyle = 'geometric' | 'serif' | 'handwritten' | 'monospace' | 'd
 
 export type AssetType = 'image' | 'video' | 'audio' | 'document' | 'reference';
 
+export interface ProjectUsage {
+  totalCost: number;
+  textCost: number;
+  imageCost: number;
+  videoCost: number;
+  audioCost: number;
+  totalTokens: number;
+  totalImages: number;
+  totalVideos: number;
+  totalAudio: number;
+  lastUpdated?: Timestamp | FieldValue;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -55,6 +68,9 @@ export interface Project {
   
   // Sharing
   collaborators: string[];
+  
+  // Usage & Cost Tracking
+  usage?: ProjectUsage;
 }
 
 export interface Asset {

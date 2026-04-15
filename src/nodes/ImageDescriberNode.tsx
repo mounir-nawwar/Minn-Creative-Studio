@@ -1,12 +1,14 @@
 import React, { useState, useRef } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
+import { useProjectStore } from '../store/useProjectStore';
 import { Upload, Image as ImageIcon } from 'lucide-react';
 import { generateText } from '../services/geminiService';
 
 const ImageDescriberNode = ({ id, data }: any) => {
   const [imageUrl, setImageUrl] = useState(data.config?.imageUrl || '');
   const updateNodeData = useStore((state) => state.updateNodeData);
+  const { currentProject } = useProjectStore();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -47,7 +49,8 @@ const ImageDescriberNode = ({ id, data }: any) => {
       const description = await generateText({
         prompt: "Describe this image in detail for a creative generation prompt. Focus on lighting, composition, and mood.",
         model: "gemini-3-flash-preview",
-        imageUrls: [finalImageUrl]
+        imageUrls: [finalImageUrl],
+        projectId: currentProject?.id,
       });
 
       updateNodeData(id, { output: description, isRunning: false });

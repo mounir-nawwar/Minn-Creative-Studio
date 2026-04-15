@@ -11,6 +11,7 @@ import { pipeline } from 'stream/promises';
 import { timingSafeEqual } from 'crypto';
 import { initializeApp, cert, getApps, App } from 'firebase-admin/app';
 import { getStorage as getAdminStorage } from 'firebase-admin/storage';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { GoogleGenAI } from '@google/genai';
 import { GoogleAuth } from 'google-auth-library';
 import helmet from 'helmet';
@@ -22,8 +23,9 @@ import firebaseConfig from './firebase-applet-config.json';
 import upscaleRoutes from './backend/routes/upscale.ts';
 import interpolateRoutes from './backend/routes/interpolate.ts';
 import videoRoutes from './backend/routes/video.ts';
+import { calculateCost, categorizeCost } from './backend/config/pricing.ts';
 
-dotenv.config({ path: '.env.local' });
+dotenv.config({ path: '.env' });
 
 function isValidImageUrl(urlString: string): { valid: boolean; error?: string } {
   try {
@@ -72,7 +74,6 @@ function isValidImageUrl(urlString: string): { valid: boolean; error?: string } 
     return { valid: false, error: 'Invalid URL format' };
   }
 }
-dotenv.config({ override: false });
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -361,6 +362,11 @@ async function vertexPredict(params: any) {
   if (config.negative_prompt) instance.negative_prompt = config.negative_prompt;
   if (config.seed !== undefined) instance.seed = config.seed;
   if (config.duration) instance.duration = config.duration;
+  if (config.guidance !== undefined) instance.guidance = config.guidance;
+  if (config.bpm !== undefined) instance.bpm = config.bpm;
+  if (config.density !== undefined) instance.density = config.density;
+  if (config.brightness !== undefined) instance.brightness = config.brightness;
+  if (config.scale) instance.scale = config.scale;
 
   const parameters: any = {
     sampleCount: config.sampleCount || 1,
@@ -407,21 +413,14 @@ async function startServer() {
   const app = express();
   const PORT = parseInt(process.env.PORT || '3000');
 
-  // Security middleware
+  // Security middleware - CSP disabled for simple 2-user app
+  // COOP disabled: Firebase popup auth uses window.opener.postMessage across origins.
+  // same-origin-allow-popups still causes Chrome to warn on window.closed polling;
+  // disabling COOP entirely is acceptable for a private 2-user internal tool.
   app.use(helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", "data:", "blob:", "https:"],
-        connectSrc: ["'self'", "https://firestore.googleapis.com", "https://firebasestorage.googleapis.com", "https://storage.googleapis.com"],
-        fontSrc: ["'self'"],
-        objectSrc: ["'none'"],
-        upgradeInsecureRequests: [],
-      },
-    },
+    contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: false,
   }));
 
   // CORS configuration
@@ -597,6 +596,11 @@ async function startServer() {
             if (config.negative_prompt) instance.negative_prompt = config.negative_prompt;
             if (config.seed !== undefined) instance.seed = config.seed;
             if (config.duration) instance.duration = config.duration;
+            if (config.guidance !== undefined) instance.guidance = config.guidance;
+            if (config.bpm !== undefined) instance.bpm = config.bpm;
+            if (config.density !== undefined) instance.density = config.density;
+            if (config.brightness !== undefined) instance.brightness = config.brightness;
+            if (config.scale) instance.scale = config.scale;
 
             const url = `https://us-central1-aiplatform.googleapis.com/v1/projects/${VERTEX_PROJECT}/locations/us-central1/publishers/google/models/${model}:predictLongRunning`;
             const op = await vertexRest(url, 'POST', { instances: [instance], parameters: { sampleCount: 1 } });
@@ -611,6 +615,75 @@ async function startServer() {
         }
 
         const candidates = (response as any).candidates ?? [];
+        
+        // Count generated images for cost tracking
+        const generatedImages = candidates.flatMap((c: any) => 
+          (c?.content?.parts ?? []).filter((p: any) => p.inlineData && p.inlineData.mimeType?.startsWith('image/'))
+        );
+        const imageCount = generatedImages.length;
+        
+        const usageMetadata = (response as any).usageMetadata;
+
+        // --- USAGE LOG (temporary) ---
+        if (usageMetadata) {
+          const thinking = (usageMetadata.totalTokenCount || 0) - (usageMetadata.promptTokenCount || 0) - (usageMetadata.candidatesTokenCount || 0);
+          console.log(`[Usage] model=${sdkParams.model} projectId=${projectId ?? 'none'} images=${imageCount} | in=${usageMetadata.promptTokenCount} out=${usageMetadata.candidatesTokenCount}${thinking > 0 ? ` thinking=${thinking}` : ''} total=${usageMetadata.totalTokenCount}`);
+        } else {
+          console.log(`[Usage] model=${sdkParams.model} projectId=${projectId ?? 'none'} images=${imageCount} | no usageMetadata`);
+        }
+        // --- END USAGE LOG ---
+
+        // Track cost for image generation via generateContent (Nano Banana).
+        // Prefer token-based pricing when usageMetadata is available — it reflects
+        // the actual input + output token consumption (image tokens are included in
+        // candidatesTokenCount). Fall back to per-image rate if tokens are absent.
+        if (imageCount > 0 && projectId && adminApp) {
+          const cost = calculateCost(sdkParams.model, {
+            promptTokenCount: usageMetadata?.promptTokenCount,
+            candidatesTokenCount: usageMetadata?.candidatesTokenCount,
+          });
+
+          if (cost > 0) {
+            try {
+              const db = getFirestore();
+              await db.collection('projects').doc(projectId).update({
+                'usage.totalCost': FieldValue.increment(cost),
+                'usage.imageCost': FieldValue.increment(cost),
+                'usage.totalImages': FieldValue.increment(imageCount),
+                'usage.totalTokens': FieldValue.increment(usageMetadata?.totalTokenCount || 0),
+                'usage.lastUpdated': FieldValue.serverTimestamp(),
+              });
+              console.log(`[Cost] $${cost.toFixed(4)} for ${imageCount} image(s) · ${usageMetadata?.totalTokenCount ?? '?'} tokens (${sdkParams.model})`);
+            } catch (e) {
+              console.error('Cost tracking failed:', e);
+            }
+          }
+        }
+
+        // Track cost for pure text generation (no images in response)
+        if (usageMetadata && !imageCount && projectId && adminApp) {
+          const cost = calculateCost(sdkParams.model, {
+            promptTokenCount: usageMetadata.promptTokenCount,
+            candidatesTokenCount: usageMetadata.candidatesTokenCount,
+          }, {});
+          if (cost > 0) {
+            try {
+              const db = getFirestore();
+              await db.collection('projects').doc(projectId).update({
+                'usage.totalCost': FieldValue.increment(cost),
+                'usage.textCost': FieldValue.increment(cost),
+                'usage.totalTokens': FieldValue.increment(usageMetadata.totalTokenCount || 0),
+                'usage.lastUpdated': FieldValue.serverTimestamp(),
+              });
+              const billable = (usageMetadata.promptTokenCount || 0) + (usageMetadata.candidatesTokenCount || 0);
+              const thinking = (usageMetadata.totalTokenCount || 0) - billable;
+              console.log(`[Cost] $${cost.toFixed(4)} | billable=${billable} tokens${thinking > 0 ? ` thinking=${thinking} (not billed)` : ''} (${sdkParams.model})`);
+            } catch (e) {
+              console.error('Cost tracking failed:', e);
+            }
+          }
+        }
+        
         // Upload inlineData (images, audio) to Storage server-side — avoids base64 round-trip through browser
         if (projectId && adminApp) {
           for (const c of candidates) {
@@ -626,7 +699,28 @@ async function startServer() {
 
       if (method === 'generateImages') {
         const { projectId, ...sdkParams } = params;
+        console.log('[generateImages] projectId:', projectId, 'model:', sdkParams.model);
         const genData = await ai(sdkParams.model).models.generateImages(sdkParams);
+        const imageCount = genData.generatedImages?.length || 1;
+        
+        // Calculate and track cost
+        const cost = calculateCost(sdkParams.model, {}, { numberOfImages: imageCount, sampleCount: sdkParams.config?.numberOfImages || 1 });
+        console.log('[generateImages] Calculated cost:', cost, 'projectId:', projectId, 'adminApp:', !!adminApp);
+        if (cost > 0 && projectId && adminApp) {
+          try {
+            const db = getFirestore();
+            await db.collection('projects').doc(projectId).update({
+              'usage.totalCost': FieldValue.increment(cost),
+              'usage.imageCost': FieldValue.increment(cost),
+              'usage.totalImages': FieldValue.increment(imageCount),
+              'usage.lastUpdated': FieldValue.serverTimestamp(),
+            });
+            console.log(`[Cost] $${cost.toFixed(4)} for ${imageCount} images (${sdkParams.model})`);
+          } catch (e) {
+            console.error('Cost tracking failed:', e);
+          }
+        }
+        
         if (projectId && adminApp) {
           for (const img of (genData.generatedImages ?? [])) {
             if (img.image?.imageBytes) {
