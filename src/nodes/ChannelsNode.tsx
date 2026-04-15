@@ -1,6 +1,8 @@
 import React, { useState, useRef } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
+import { useAssetExpand } from '../hooks/useAssetExpand';
+import { ExpandableAssetWrapper } from '../components/ExpandableAssetWrapper';
 
 const ChannelsNode = ({ id, data }: any) => {
   const [red, setRed] = useState(data.config?.red ?? true);
@@ -9,6 +11,7 @@ const ChannelsNode = ({ id, data }: any) => {
   const [alpha, setAlpha] = useState(data.config?.alpha ?? true);
   const updateNodeData = useStore((state) => state.updateNodeData);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { setExpandedAsset } = useAssetExpand();
 
   const handleRun = async () => {
     const state = useStore.getState();
@@ -126,9 +129,12 @@ const ChannelsNode = ({ id, data }: any) => {
         <canvas ref={canvasRef} className="hidden" />
 
         {data.output && (
-          <div className="mt-2 rounded-lg overflow-hidden border border-[#2a2a2a]">
+          <ExpandableAssetWrapper
+            onClick={() => setExpandedAsset(data.output, 'image')}
+            type="image"
+          >
             <img src={data.output} alt="Processed" className="w-full h-auto" />
-          </div>
+          </ExpandableAssetWrapper>
         )}
       </div>
     </BaseNode>

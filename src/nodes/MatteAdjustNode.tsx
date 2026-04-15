@@ -1,12 +1,15 @@
 import React, { useState, useRef } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
+import { useAssetExpand } from '../hooks/useAssetExpand';
+import { ExpandableAssetWrapper } from '../components/ExpandableAssetWrapper';
 
 const MatteAdjustNode = ({ id, data }: any) => {
   const [amount, setAmount] = useState(data.config?.amount || 0); // -10 to 10 for grow/shrink
   const [blur, setBlur] = useState(data.config?.blur || 0);
   const updateNodeData = useStore((state) => state.updateNodeData);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { setExpandedAsset } = useAssetExpand();
 
   const handleRun = async () => {
     const state = useStore.getState();
@@ -121,7 +124,12 @@ const MatteAdjustNode = ({ id, data }: any) => {
 
         {data.output && (
           <div className="mt-2 rounded-lg overflow-hidden border border-[#2a2a2a] bg-black">
-            <img src={data.output} alt="Processed" className="w-full h-auto" />
+            <ExpandableAssetWrapper
+              onClick={() => setExpandedAsset(data.output, 'image')}
+              type="image"
+            >
+              <img src={data.output} alt="Processed" className="w-full h-auto" />
+            </ExpandableAssetWrapper>
           </div>
         )}
       </div>

@@ -8,6 +8,8 @@ import { Video, Loader2, AlertCircle, XCircle, Download } from 'lucide-react';
 import { generateVideo } from '../services/geminiService';
 import { downloadFile } from '../lib/utils';
 import { useAssets } from '../hooks/useAssets';
+import { useAssetExpand } from '../hooks/useAssetExpand';
+import { ExpandableAssetWrapper } from '../components/ExpandableAssetWrapper';
 
 const VeoNode = ({ id, data }: any) => {
   const [model, setModel] = useState(data.config?.model || 'veo-3.1-fast-generate-001');
@@ -28,6 +30,7 @@ const VeoNode = ({ id, data }: any) => {
   const { currentProject } = useProjectStore();
   const { addAsset } = useAssets();
   const abortControllerRef = useRef<AbortController | null>(null);
+  const { setExpandedAsset } = useAssetExpand();
 
   const referenceImages = useMemo(() => {
     const refEdges = edges.filter(e => e.target === id && e.targetHandle === 'reference');
@@ -430,9 +433,12 @@ const VeoNode = ({ id, data }: any) => {
                     <Download className="w-3 h-3" />
                   </button>
                 </div>
-                <div className="rounded-xl overflow-hidden border border-[#2a2a2a] bg-[#0a0a0a]">
+                <ExpandableAssetWrapper
+                  onClick={() => setExpandedAsset(url, 'video')}
+                  type="video"
+                >
                   <video src={url} className="w-full h-auto" controls loop autoPlay muted />
-                </div>
+                </ExpandableAssetWrapper>
               </div>
             ))}
           </div>

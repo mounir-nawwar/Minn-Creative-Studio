@@ -4,6 +4,8 @@ import { useStore } from '../store/useStore';
 import { Video, Upload, X, Loader2 } from 'lucide-react';
 import { useAssets } from '../hooks/useAssets';
 import ToggleSwitch from '../components/ToggleSwitch';
+import { useAssetExpand } from '../hooks/useAssetExpand';
+import { ExpandableAssetWrapper } from '../components/ExpandableAssetWrapper';
 
 const VideoUploadNode = ({ id, data }: any) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -11,6 +13,7 @@ const VideoUploadNode = ({ id, data }: any) => {
   const abortControllerRef = useRef<AbortController | null>(null);
   const updateNodeData = useStore((state) => state.updateNodeData);
   const { uploadAsset } = useAssets();
+  const { setExpandedAsset } = useAssetExpand();
 
   const handleCancelUpload = () => {
     abortControllerRef.current?.abort();
@@ -142,26 +145,34 @@ const VideoUploadNode = ({ id, data }: any) => {
             </div>
           </button>
         ) : (
-          <div className="relative group">
-            <div className="rounded-lg overflow-hidden border border-[#2a2a2a] bg-[#0a0a0a] aspect-video flex items-center justify-center">
-              <video 
-                src={data.output} 
-                className="w-full h-full object-contain"
-                controls
-              />
+          <ExpandableAssetWrapper
+            onClick={() => data.output && setExpandedAsset(data.output, 'video')}
+            type="video"
+          >
+            <div className="relative group">
+              <div className="rounded-lg overflow-hidden border border-[#2a2a2a] bg-[#0a0a0a] aspect-video flex items-center justify-center">
+                <video 
+                  src={data.output} 
+                  className="w-full h-full object-contain"
+                  controls
+                />
+              </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  clearVideo();
+                }}
+                className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+              >
+                <X className="w-3 h-3" />
+              </button>
+              {data.config?.fileName && (
+                <p className="text-[9px] text-gray-500 mt-1 truncate px-1">
+                  {data.config.fileName}
+                </p>
+              )}
             </div>
-            <button
-              onClick={clearVideo}
-              className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
-            >
-              <X className="w-3 h-3" />
-            </button>
-            {data.config?.fileName && (
-              <p className="text-[9px] text-gray-500 mt-1 truncate px-1">
-                {data.config.fileName}
-              </p>
-            )}
-          </div>
+          </ExpandableAssetWrapper>
         )}
 
         {isUploading && (

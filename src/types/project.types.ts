@@ -18,6 +18,10 @@ export interface Project {
   updatedAt: Timestamp | FieldValue;
   coverImage?: string;
   
+  // Soft delete fields
+  deletedAt?: Timestamp | FieldValue;
+  deletedBy?: string;
+  
   // Brand / Client Info
   clientName?: string;
   clientWebsite?: string;
@@ -64,6 +68,8 @@ export interface Asset {
   workflowId?: string;
   createdAt: Timestamp;
   isFavorited: boolean;
+  deletedAt?: Timestamp | FieldValue;
+  deletedBy?: string;
   metadata: {
     width?: number;
     height?: number;

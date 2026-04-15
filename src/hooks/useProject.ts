@@ -19,12 +19,15 @@ import {
 } from '../firebase';
 import { Project } from '../types/project.types';
 import { useProjectStore } from '../store/useProjectStore';
+import { RETENTION_DAYS } from '../constants';
 
 export function useProject() {
   const { currentProject, setCurrentProject, updateProject, clearProject } = useProjectStore();
   const [projects, setProjects] = useState<Project[]>([]);
+  const [archivedProjects, setArchivedProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Load active projects (exclude archived via client-side filter)
   useEffect(() => {
     if (!auth.currentUser) {
       setProjects([]);
@@ -32,32 +35,31 @@ export function useProject() {
       return;
     }
 
-    console.time("LoadProjects");
-    // If the user is authorized, they see all projects. 
-    // Otherwise, they only see their own (though security rules will restrict this anyway)
     const q = query(
       collection(db, 'projects'),
       orderBy('createdAt', 'desc')
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      console.timeEnd("LoadProjects");
-      const projectsData = snapshot.docs.map(doc => ({
+      const allProjects = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as Project[];
       
-      setProjects(projectsData);
+      const activeProjects = allProjects.filter(p => p.status !== 'archived');
+      const archived = allProjects.filter(p => p.status === 'archived');
+      
+      setProjects(activeProjects);
+      setArchivedProjects(archived);
       setLoading(false);
     }, (error) => {
-      console.timeEnd("LoadProjects");
       console.error("Firestore error in useProject:", error);
       setLoading(false);
       handleFirestoreError(error, OperationType.LIST, 'projects');
     });
 
     return () => unsubscribe();
-  }, [auth.currentUser]);
+  }, []);
 
   const createProject = async (projectData: Partial<Project>) => {
     if (!auth.currentUser) throw new Error('User not authenticated');
@@ -83,6 +85,7 @@ export function useProject() {
       fontStyle: projectData.fontStyle || 'geometric',
       negativeKeywords: projectData.negativeKeywords || '',
       styleKeywords: projectData.styleKeywords || '',
+      collaborators: [],
     };
 
     try {
@@ -116,9 +119,51 @@ export function useProject() {
     }
   };
 
+  // Soft delete - move to recycle bin
   const deleteProject = async (projectId: string) => {
+    if (!auth.currentUser) throw new Error('User not authenticated');
+    
+    const projectRef = doc(db, 'projects', projectId);
+    const now = serverTimestamp();
+    
+    try {
+      await updateDoc(projectRef, {
+        status: 'archived',
+        deletedAt: now,
+        deletedBy: auth.currentUser.uid,
+        updatedAt: now
+      });
+      
+      if (currentProject?.id === projectId) {
+        clearProject();
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `projects/${projectId}`);
+    }
+  };
+
+  // Restore from recycle bin
+  const restoreProject = async (projectId: string) => {
+    const projectRef = doc(db, 'projects', projectId);
+    const now = serverTimestamp();
+    
+    try {
+      await updateDoc(projectRef, {
+        status: 'active',
+        updatedAt: now
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `projects/${projectId}`);
+    }
+  };
+
+  // Permanent delete - remove from database
+  const permanentDeleteProject = async (projectId: string) => {
     try {
       await deleteDoc(doc(db, 'projects', projectId));
+      
+      setArchivedProjects(prev => prev.filter(p => p.id !== projectId));
+      
       if (currentProject?.id === projectId) {
         clearProject();
       }
@@ -127,8 +172,47 @@ export function useProject() {
     }
   };
 
+  // Cleanup expired items (older than RETENTION_DAYS)
+  const cleanupExpiredProjects = async () => {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - RETENTION_DAYS);
+    
+    const expired = archivedProjects.filter(p => {
+      if (!p.deletedAt) return false;
+      const deletedDate = p.deletedAt instanceof Timestamp 
+        ? p.deletedAt.toDate() 
+        : new Date(p.deletedAt as any);
+      return deletedDate < cutoffDate;
+    });
+
+    for (const project of expired) {
+      await permanentDeleteProject(project.id);
+    }
+
+    return expired.length;
+  };
+
+  // Get days until permanent deletion
+  const getDaysUntilDeletion = (project: Project): number | null => {
+    if (!project.deletedAt) return null;
+    
+    const deletedDate = project.deletedAt instanceof Timestamp 
+      ? project.deletedAt.toDate() 
+      : new Date(project.deletedAt as any);
+    
+    const deletionDate = new Date(deletedDate);
+    deletionDate.setDate(deletionDate.getDate() + RETENTION_DAYS);
+    
+    const now = new Date();
+    const diffTime = deletionDate.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    return Math.max(0, diffDays);
+  };
+
   return {
     projects,
+    archivedProjects,
     currentProject,
     loading,
     createProject,
@@ -136,6 +220,11 @@ export function useProject() {
     updateCurrentProject,
     updateProjectById,
     deleteProject,
-    clearProject
+    restoreProject,
+    permanentDeleteProject,
+    cleanupExpiredProjects,
+    getDaysUntilDeletion,
+    clearProject,
+    RETENTION_DAYS
   };
 }

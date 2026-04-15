@@ -4,10 +4,13 @@ import { useStore } from '../store/useStore';
 import { Download, FileDown, Trash2 } from 'lucide-react';
 import VideoPreview from '../components/VideoPreview';
 import { downloadFile } from '../lib/utils';
+import { useAssetExpand } from '../hooks/useAssetExpand';
+import { ExpandableGridWrapper } from '../components/ExpandableAssetWrapper';
 
 const OutputNode = ({ id, data }: any) => {
   const edges = useStore((state) => state.edges);
   const nodes = useStore((state) => state.nodes);
+  const { setExpandedAsset } = useAssetExpand();
 
   const incomingEdges = edges.filter(e => e.target === id);
   const outputs = incomingEdges.map(edge => {
@@ -47,16 +50,26 @@ const OutputNode = ({ id, data }: any) => {
                 </div>
                 
                 {output.type === 'veo' ? (
-                  <VideoPreview url={output.content} />
+                  <ExpandableGridWrapper
+                    onClick={() => setExpandedAsset(output.content, 'video')}
+                    type="video"
+                  >
+                    <VideoPreview url={output.content} />
+                  </ExpandableGridWrapper>
                 ) : (
-                  <div className="rounded-lg overflow-hidden border border-[#2a2a2a]">
-                    <img 
-                      src={output.content} 
-                      alt="Output" 
-                      className="w-full h-auto"
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
+                  <ExpandableGridWrapper
+                    onClick={() => setExpandedAsset(output.content, 'image')}
+                    type="image"
+                  >
+                    <div className="rounded-lg overflow-hidden">
+                      <img 
+                        src={output.content} 
+                        alt="Output" 
+                        className="w-full h-auto"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                  </ExpandableGridWrapper>
                 )}
               </div>
             ))}

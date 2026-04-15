@@ -25,6 +25,7 @@ import AuthLayout, { SF } from './components/AuthLayout';
 import { UnicornScene } from 'unicornstudio-react';
 import { perfMonitor } from './services/performance';
 import { ConnectionProvider } from './contexts/ConnectionContext';
+import AssetExpandModal from './components/AssetExpandModal';
 
 declare global {
   interface Window {
@@ -304,6 +305,7 @@ export default function App() {
                   <Canvas />
                 </ConnectionProvider>
                 <ChatDrawer />
+                <AssetExpandModal />
                 <AnimatePresence>
                   {isSettingsOpen && (
                     <ProjectCreationOverlay

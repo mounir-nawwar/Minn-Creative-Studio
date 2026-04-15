@@ -21,6 +21,8 @@ import { Asset, AssetType } from '../types/project.types';
 import { useStore } from '../store/useStore';
 import { useReactFlow } from 'reactflow';
 import { useRef } from 'react';
+import DeleteAssetModal from './DeleteAssetModal';
+import { RETENTION_DAYS } from '../constants';
 
 interface AssetGridProps {
   onAssetClick?: (asset: Asset) => void;
@@ -33,6 +35,7 @@ export default function AssetGrid({ onAssetClick, isPicker = false }: AssetGridP
   const { project, getViewport } = useReactFlow();
   const [filter, setFilter] = useState<AssetType | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [assetToDelete, setAssetToDelete] = useState<Asset | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -271,7 +274,7 @@ export default function AssetGrid({ onAssetClick, isPicker = false }: AssetGridP
                           <button 
                             onClick={(e) => {
                               e.stopPropagation();
-                              deleteAsset(asset.id);
+                              setAssetToDelete(asset);
                             }}
                             className="p-1 text-gray-500 hover:text-red-500 transition-colors"
                           >
@@ -287,6 +290,20 @@ export default function AssetGrid({ onAssetClick, isPicker = false }: AssetGridP
           </div>
         )}
       </div>
+      
+      {/* Delete Confirmation Modal */}
+      <DeleteAssetModal
+        asset={assetToDelete}
+        isOpen={!!assetToDelete}
+        onClose={() => setAssetToDelete(null)}
+        onConfirm={() => {
+          if (assetToDelete) {
+            deleteAsset(assetToDelete.id);
+            setAssetToDelete(null);
+          }
+        }}
+        retentionDays={RETENTION_DAYS}
+      />
     </div>
   );
 }

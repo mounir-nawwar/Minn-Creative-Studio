@@ -2,11 +2,14 @@ import React, { useState, useRef } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
 import { generateMask } from '../services/geminiService';
+import { useAssetExpand } from '../hooks/useAssetExpand';
+import { ExpandableAssetWrapper } from '../components/ExpandableAssetWrapper';
 
 const MaskByTextNode = ({ id, data }: any) => {
   const [prompt, setPrompt] = useState(data.config?.prompt || 'the main subject');
   const updateNodeData = useStore((state) => state.updateNodeData);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { setExpandedAsset } = useAssetExpand();
 
   const handleRun = async () => {
     const state = useStore.getState();
@@ -100,7 +103,12 @@ const MaskByTextNode = ({ id, data }: any) => {
 
         {data.output && (
           <div className="mt-2 rounded-lg overflow-hidden border border-[#2a2a2a] bg-black">
-            <img src={data.output} alt="Mask" className="w-full h-auto" />
+            <ExpandableAssetWrapper
+              onClick={() => setExpandedAsset(data.output, 'image')}
+              type="image"
+            >
+              <img src={data.output} alt="Mask" className="w-full h-auto" />
+            </ExpandableAssetWrapper>
           </div>
         )}
       </div>

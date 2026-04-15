@@ -6,12 +6,15 @@ import { useStore } from '../store/useStore';
 import { useProjectStore } from '../store/useProjectStore';
 import { useAssets } from '../hooks/useAssets';
 import { downloadFile } from '../lib/utils';
+import { useAssetExpand } from '../hooks/useAssetExpand';
+import { ExpandableAssetWrapper } from '../components/ExpandableAssetWrapper';
 
 const StyleTransferNode = ({ data, id }: any) => {
   const [strength, setStrength] = useState(data.config?.strength || 0.5);
   const [preserveStructure, setPreserveStructure] = useState(data.config?.preserveStructure ?? true);
   
   const updateNodeData = useStore((state) => state.updateNodeData);
+  const { setExpandedAsset } = useAssetExpand();
   const { currentProject } = useProjectStore();
   const { addAsset } = useAssets();
 
@@ -137,7 +140,12 @@ const StyleTransferNode = ({ data, id }: any) => {
               </button>
             </div>
             <div className="aspect-square bg-black rounded-lg overflow-hidden border border-white/10">
-              <img src={data.output} alt="Style Result" className="w-full h-full object-cover" />
+              <ExpandableAssetWrapper
+                onClick={() => setExpandedAsset(data.output, 'image')}
+                type="image"
+              >
+                <img src={data.output} alt="Style Result" className="w-full h-full object-cover" />
+              </ExpandableAssetWrapper>
             </div>
           </div>
         )}
@@ -147,3 +155,4 @@ const StyleTransferNode = ({ data, id }: any) => {
 };
 
 export default StyleTransferNode;
+

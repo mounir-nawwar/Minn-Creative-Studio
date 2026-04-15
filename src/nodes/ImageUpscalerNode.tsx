@@ -6,6 +6,8 @@ import { useAssets } from '../hooks/useAssets';
 import { Maximize, Loader2, Download } from 'lucide-react';
 import { upscaleImage } from '../services/geminiService';
 import { downloadFile } from '../lib/utils';
+import { useAssetExpand } from '../hooks/useAssetExpand';
+import { ExpandableAssetWrapper } from '../components/ExpandableAssetWrapper';
 
 const ImageUpscalerNode = ({ id, data }: any) => {
   const [scale, setScale] = useState(data.config?.scale || '2x');
@@ -14,6 +16,7 @@ const ImageUpscalerNode = ({ id, data }: any) => {
   const updateNodeData = useStore((state) => state.updateNodeData);
   const { currentProject } = useProjectStore();
   const { addAsset } = useAssets();
+  const { setExpandedAsset } = useAssetExpand();
 
   const handleRun = async () => {
     const state = useStore.getState();
@@ -102,12 +105,17 @@ const ImageUpscalerNode = ({ id, data }: any) => {
 
         {data.output && (
           <div className="mt-2 rounded-lg overflow-hidden border border-[#2a2a2a] bg-[#0a0a0a]">
-            <img 
-              src={data.output} 
-              alt="Upscaled" 
-              className="w-full h-auto object-contain max-h-48"
-              referrerPolicy="no-referrer"
-            />
+            <ExpandableAssetWrapper
+              onClick={() => setExpandedAsset(data.output, 'image')}
+              type="image"
+            >
+              <img 
+                src={data.output} 
+                alt="Upscaled" 
+                className="w-full h-auto object-contain max-h-48"
+                referrerPolicy="no-referrer"
+              />
+            </ExpandableAssetWrapper>
           </div>
         )}
       </div>

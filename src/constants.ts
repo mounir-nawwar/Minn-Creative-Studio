@@ -1,6 +1,8 @@
 export const APP_BASE = '';
 export const API_BASE = '/api';
 
+export const RETENTION_DAYS = 30;
+
 export const AUTHORIZED_EMAILS = [
   "nawwarmounir@gmail.com",
   "rstadmori@gmail.com"

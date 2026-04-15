@@ -6,6 +6,8 @@ import { Upload, X, ImageIcon, Loader2 } from 'lucide-react';
 import AssetGrid from '../components/AssetGrid';
 import { useAssets } from '../hooks/useAssets';
 import ToggleSwitch from '../components/ToggleSwitch';
+import { useAssetExpand } from '../hooks/useAssetExpand';
+import { ExpandableAssetWrapper } from '../components/ExpandableAssetWrapper';
 
 const ImageUploadNode = ({ id, data }: any) => {
   const [imageUrl, setImageUrl] = useState<string | null>(data.output || null);
@@ -16,6 +18,7 @@ const ImageUploadNode = ({ id, data }: any) => {
   const updateNodeData = useStore((state) => state.updateNodeData);
   const { currentProject } = useProjectStore();
   const { uploadAsset } = useAssets();
+  const { setExpandedAsset } = useAssetExpand();
 
   const handleCancelUpload = () => {
     abortControllerRef.current?.abort();
@@ -184,20 +187,29 @@ const ImageUploadNode = ({ id, data }: any) => {
               </button>
             </div>
           ) : (
-            <div className="bg-[#0a0a0a] border border-[#2a2a2a] rounded-xl overflow-hidden relative group/image">
-              <img
-                src={imageUrl}
-                alt="Uploaded"
-                className="w-full h-auto max-h-[300px] object-contain"
-                referrerPolicy="no-referrer"
-              />
-              <button
-                onClick={handleClear}
-                className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 rounded-lg text-white opacity-0 group-hover/image:opacity-100 transition-opacity"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
+            <ExpandableAssetWrapper
+              onClick={() => imageUrl && setExpandedAsset(imageUrl, 'image')}
+              type="image"
+              className="max-h-[300px]"
+            >
+              <div className="relative group/image">
+                <img
+                  src={imageUrl}
+                  alt="Uploaded"
+                  className="w-full h-auto max-h-[300px] object-contain"
+                  referrerPolicy="no-referrer"
+                />
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleClear();
+                  }}
+                  className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 rounded-lg text-white opacity-0 group-hover/image:opacity-100 transition-opacity"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </ExpandableAssetWrapper>
           )
         ) : (
           <div className="h-[240px] bg-[#0a0a0a] border border-[#2a2a2a] rounded-xl overflow-hidden flex flex-col">

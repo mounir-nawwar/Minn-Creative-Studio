@@ -1,11 +1,14 @@
 import React, { useState, useRef } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
+import { useAssetExpand } from '../hooks/useAssetExpand';
+import { ExpandableAssetWrapper } from '../components/ExpandableAssetWrapper';
 
 const BlurNode = ({ id, data }: any) => {
   const [blur, setBlur] = useState(data.config?.blur || 5);
   const updateNodeData = useStore((state) => state.updateNodeData);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { setExpandedAsset } = useAssetExpand();
 
   const handleRun = async () => {
     const state = useStore.getState();
@@ -81,9 +84,12 @@ const BlurNode = ({ id, data }: any) => {
         <canvas ref={canvasRef} className="hidden" />
 
         {data.output && (
-          <div className="mt-2 rounded-lg overflow-hidden border border-[#2a2a2a]">
+          <ExpandableAssetWrapper
+            onClick={() => setExpandedAsset(data.output, 'image')}
+            type="image"
+          >
             <img src={data.output} alt="Processed" className="w-full h-auto" />
-          </div>
+          </ExpandableAssetWrapper>
         )}
       </div>
     </BaseNode>

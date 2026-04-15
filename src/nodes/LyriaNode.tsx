@@ -9,6 +9,8 @@ import { Music, Mic2, Sparkles, Loader2, Download } from 'lucide-react';
 import ReferenceStrip from '../components/ReferenceStrip';
 import ParameterSlider from '../components/ParameterSlider';
 import { downloadFile } from '../lib/utils';
+import { useAssetExpand } from '../hooks/useAssetExpand';
+import { ExpandableAssetWrapper } from '../components/ExpandableAssetWrapper';
 
 const LyriaNode = ({ id, data }: any) => {
   const [model, setModel] = useState(data.config?.model || 'lyria-3-pro-preview');
@@ -28,6 +30,7 @@ const LyriaNode = ({ id, data }: any) => {
   const { addAsset } = useAssets();
   const edges = useStore((state) => state.edges);
   const nodes = useStore((state) => state.nodes);
+  const { setExpandedAsset } = useAssetExpand();
 
   const isLyria = model.includes('lyria');
   const isPro = model.includes('pro');
@@ -256,7 +259,12 @@ const LyriaNode = ({ id, data }: any) => {
                 <Download className="w-3 h-3" />
               </button>
             </div>
-            <AudioPreview url={data.output} />
+            <ExpandableAssetWrapper
+              onClick={() => setExpandedAsset(data.output, 'audio')}
+              type="audio"
+            >
+              <AudioPreview url={data.output} />
+            </ExpandableAssetWrapper>
           </div>
         )}
       </div>

@@ -32,6 +32,7 @@ interface WorkflowState {
   pendingNodeData: NodeData | null;
   isChatOpen: boolean;
   activeChatId: string | null;
+  expandedAsset: { url: string; type: 'image' | 'video' | 'audio' } | null;
   onNodesChange: OnNodesChange;
   onEdgesChange: OnEdgesChange;
   onConnect: OnConnect;
@@ -44,6 +45,7 @@ interface WorkflowState {
   setPendingNodeType: (type: string | null, data?: NodeData | null) => void;
   setChatOpen: (open: boolean) => void;
   setActiveChatId: (id: string | null) => void;
+  setExpandedAsset: (url: string | null, type?: 'image' | 'video' | 'audio') => void;
 }
 
 export const useStore = create<WorkflowState>((set, get) => ({
@@ -53,6 +55,7 @@ export const useStore = create<WorkflowState>((set, get) => ({
   pendingNodeData: null,
   isChatOpen: false,
   activeChatId: null,
+  expandedAsset: null,
   onNodesChange: (changes: NodeChange[]) => {
     set({
       nodes: applyNodeChanges(changes, get().nodes),
@@ -128,4 +131,11 @@ export const useStore = create<WorkflowState>((set, get) => ({
   setPendingNodeType: (type, data = null) => set({ pendingNodeType: type, pendingNodeData: data }),
   setChatOpen: (open) => set({ isChatOpen: open }),
   setActiveChatId: (id) => set({ activeChatId: id }),
+  setExpandedAsset: (url, type = 'image') => {
+    if (url) {
+      set({ expandedAsset: { url, type } });
+    } else {
+      set({ expandedAsset: null });
+    }
+  },
 }));

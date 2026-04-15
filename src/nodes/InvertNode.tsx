@@ -1,10 +1,13 @@
 import React, { useRef } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
+import { useAssetExpand } from '../hooks/useAssetExpand';
+import { ExpandableAssetWrapper } from '../components/ExpandableAssetWrapper';
 
 const InvertNode = ({ id, data }: any) => {
   const updateNodeData = useStore((state) => state.updateNodeData);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { setExpandedAsset } = useAssetExpand();
 
   const handleRun = async () => {
     const state = useStore.getState();
@@ -66,7 +69,12 @@ const InvertNode = ({ id, data }: any) => {
 
         {data.output && (
           <div className="mt-2 rounded-lg overflow-hidden border border-[#2a2a2a]">
-            <img src={data.output} alt="Processed" className="w-full h-auto" />
+            <ExpandableAssetWrapper
+              onClick={() => setExpandedAsset(data.output, 'image')}
+              type="image"
+            >
+              <img src={data.output} alt="Processed" className="w-full h-auto" />
+            </ExpandableAssetWrapper>
           </div>
         )}
       </div>

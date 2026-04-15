@@ -6,6 +6,8 @@ import { useStore } from '../store/useStore';
 import { useProjectStore } from '../store/useProjectStore';
 import { useAssets } from '../hooks/useAssets';
 import { downloadFile } from '../lib/utils';
+import { useAssetExpand } from '../hooks/useAssetExpand';
+import { ExpandableAssetWrapper } from '../components/ExpandableAssetWrapper';
 
 const InpaintingNode = ({ data, id }: any) => {
   const [prompt, setPrompt] = useState(data.config?.prompt || '');
@@ -16,6 +18,7 @@ const InpaintingNode = ({ data, id }: any) => {
   const updateNodeData = useStore((state) => state.updateNodeData);
   const { currentProject } = useProjectStore();
   const { addAsset } = useAssets();
+  const { setExpandedAsset } = useAssetExpand();
 
   useEffect(() => {
     const edge = useStore.getState().edges.find(e => e.target === id && e.targetHandle === 'imageUrl');
@@ -200,7 +203,12 @@ const InpaintingNode = ({ data, id }: any) => {
               </button>
             </div>
             <div className="aspect-video bg-black rounded-lg overflow-hidden border border-white/10">
-              <img src={data.output} alt="Inpainted Result" className="w-full h-full object-cover" />
+              <ExpandableAssetWrapper
+                onClick={() => setExpandedAsset(data.output, 'image')}
+                type="image"
+              >
+                <img src={data.output} alt="Inpainted Result" className="w-full h-full object-cover" />
+              </ExpandableAssetWrapper>
             </div>
           </div>
         )}

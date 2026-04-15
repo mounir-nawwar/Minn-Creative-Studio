@@ -3,10 +3,13 @@ import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
 import { Zap, Loader2, Video } from 'lucide-react';
 import { API_BASE } from '../constants';
+import { useAssetExpand } from '../hooks/useAssetExpand';
+import { ExpandableAssetWrapper } from '../components/ExpandableAssetWrapper';
 
 const FrameInterpolatorNode = ({ id, data }: any) => {
   const [targetFps, setTargetFps] = useState(data.config?.targetFps || 24);
   const updateNodeData = useStore((state) => state.updateNodeData);
+  const { setExpandedAsset } = useAssetExpand();
 
   const handleRun = async () => {
     const state = useStore.getState();
@@ -72,7 +75,10 @@ const FrameInterpolatorNode = ({ id, data }: any) => {
         </button>
 
         {data.output && (
-          <div className="mt-2 rounded-lg overflow-hidden border border-[#2a2a2a] bg-[#0a0a0a]">
+          <ExpandableAssetWrapper
+            onClick={() => setExpandedAsset(data.output, 'video')}
+            type="video"
+          >
             <video 
               src={data.output} 
               className="w-full h-auto object-contain max-h-48"
@@ -81,7 +87,7 @@ const FrameInterpolatorNode = ({ id, data }: any) => {
               autoPlay
               muted
             />
-          </div>
+          </ExpandableAssetWrapper>
         )}
       </div>
     </BaseNode>

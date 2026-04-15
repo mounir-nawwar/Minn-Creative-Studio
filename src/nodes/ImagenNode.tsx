@@ -8,6 +8,8 @@ import { ImageIcon, Loader2, Download, XCircle } from 'lucide-react';
 import { generateImage } from '../services/geminiService';
 import { downloadFile } from '../lib/utils';
 import { useAssets } from '../hooks/useAssets';
+import { useAssetExpand } from '../hooks/useAssetExpand';
+import { ExpandableAssetWrapper } from '../components/ExpandableAssetWrapper';
 
 const ImagenNode = ({ id, data }: any) => {
   const [model, setModel] = useState(data.config?.model || 'gemini-3.1-flash-image-preview');
@@ -23,6 +25,7 @@ const ImagenNode = ({ id, data }: any) => {
   const { currentProject } = useProjectStore();
   const { addAsset } = useAssets();
   const abortControllerRef = useRef<AbortController | null>(null);
+  const { setExpandedAsset } = useAssetExpand();
 
   const isNanoBanana = model.includes('flash') || model.includes('pro');
 
@@ -308,14 +311,18 @@ const ImagenNode = ({ id, data }: any) => {
                 <Download className="w-3 h-3" />
               </button>
             </div>
-            <div className="h-[200px] rounded-xl overflow-hidden border border-[#2a2a2a] bg-[#0a0a0a] group/output relative">
+            <ExpandableAssetWrapper
+              onClick={() => setExpandedAsset(data.output, 'image')}
+              type="image"
+              className="h-[200px]"
+            >
               <img 
                 src={data.output} 
                 alt="Generated" 
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                className="w-full h-full object-cover transition-transform duration-500"
                 referrerPolicy="no-referrer"
               />
-            </div>
+            </ExpandableAssetWrapper>
           </div>
         )}
       </div>
