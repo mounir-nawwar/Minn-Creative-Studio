@@ -108,7 +108,11 @@ export const generateAudio = async (params: {
         onProgress?.(Math.min(10 + (pollCount * 5), 90));
         await new Promise(resolve => setTimeout(resolve, 5000));
         if (signal?.aborted) throw new Error("Audio generation cancelled");
-        operation = await callBackend('getOperation', { operation: operation.name }, signal);
+        operation = await callBackend('getOperation', { 
+          operation: operation.name,
+          _audioModel: model,
+          _projectId: projectId,
+        }, signal);
       }
       response = operation.response;
     }

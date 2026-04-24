@@ -76,7 +76,8 @@ export const generateVideo = async (params: {
       model: model,
       prompt: fullPrompt || 'Animate this sequence',
       image: startFrameData,
-      config: videoConfig
+      config: videoConfig,
+      projectId: projectId,
     }, signal);
 
     const MAX_POLL_COUNT = 120; // 10 minutes max (120 * 5 seconds)
@@ -95,7 +96,12 @@ export const generateVideo = async (params: {
 
       await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
       if (signal?.aborted) throw new Error("Video generation cancelled");
-      operation = await callBackend('getOperation', { operation: operation }, signal);
+      operation = await callBackend('getOperation', { 
+        operation: operation, 
+        projectId: projectId,
+        model: model,
+        config: videoConfig,
+      }, signal);
     }
 
     onProgress?.(95);

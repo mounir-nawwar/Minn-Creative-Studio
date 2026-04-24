@@ -29,7 +29,7 @@ export default function WorkflowsTab() {
       orderBy('createdAt', 'desc')
     );
     return onSnapshot(q, (snapshot) => {
-      setWorkflows(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      setWorkflows(snapshot.docs.map(d => ({ ...d.data(), id: d.id })));
       setIsLoading(false);
     });
   }, [currentProject?.id]);

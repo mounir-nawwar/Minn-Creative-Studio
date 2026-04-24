@@ -29,6 +29,8 @@ const USE_VERTEX_AI = true;
 
 const router = express.Router();
 
+const trackedOperations = new Set<string>();
+
 router.post('/', requireAuth, aiLimiter, async (req, res) => {
   const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
   if (!USE_VERTEX_AI && !apiKey) return res.status(500).json({ error: 'API key not configured' });
@@ -69,9 +71,27 @@ router.post('/', requireAuth, aiLimiter, async (req, res) => {
           if (config.scale) instance.scale = config.scale;
           const url = `https://us-central1-aiplatform.googleapis.com/v1/projects/${VERTEX_PROJECT}/locations/us-central1/publishers/google/models/${model}:predictLongRunning`;
           const op = await vertexRest(url, 'POST', { instances: [instance], parameters: { sampleCount: 1 } });
-          return res.json({ success: true, data: { operation: op.name, isLro: true } });
+          
+          // Store context for cost tracking when operation completes
+          return res.json({ 
+            success: true, 
+            data: { 
+              operation: op.name, 
+              isLro: true,
+              _audioModel: model,
+              _projectId: projectId 
+            } 
+          });
         } else {
           response = await vertexPredict(sdkParams);
+          
+          // Track cost for non-pro audio immediately
+          if (projectId && isAdminInitialized()) {
+            const cost = calculateCost(sdkParams.model, {});
+            if (cost > 0) {
+              await trackProjectCost(projectId, cost, { type: 'audio', audioCount: 1 });
+            }
+          }
         }
       } else {
         response = await ai(sdkParams.model).models.generateContent(sdkParams);
@@ -167,13 +187,69 @@ router.post('/', requireAuth, aiLimiter, async (req, res) => {
 
     // Video: @google/genai SDK hardcodes v1beta — use v1 REST directly via vertexGenerateVideos
     if (method === 'generateVideos') {
-      if (USE_VERTEX_AI) return res.json({ success: true, data: await vertexGenerateVideos(params) });
-      return res.json({ success: true, data: await devAi!.models.generateVideos(params) });
+      const { projectId, model, config } = params;
+      const result = USE_VERTEX_AI 
+        ? await vertexGenerateVideos(params) 
+        : await devAi!.models.generateVideos(params);
+      
+      if (projectId && isAdminInitialized()) {
+        const cost = calculateCost(model || 'veo-3.1-generate-001', {}, {
+          duration: config?.duration,
+          resolution: config?.resolution,
+          audio: config?.audio,
+        });
+        if (cost > 0) {
+          await trackProjectCost(projectId, cost, {
+            type: 'video',
+            videoCount: config?.numberOfVideos || 1,
+          });
+        }
+      }
+      return res.json({ success: true, data: result });
     }
 
     if (method === 'getOperation') {
-      if (USE_VERTEX_AI) return res.json({ success: true, data: await vertexGetOperation(params.operation ?? params) });
-      return res.json({ success: true, data: await devAi!.operations.getVideosOperation(params) });
+      const { projectId, model, config, operation: opParam, _audioModel, _projectId } = params;
+      const opName = typeof opParam === 'string' ? opParam : opParam?.name;
+      const result = USE_VERTEX_AI 
+        ? await vertexGetOperation(opParam ?? params) 
+        : await devAi!.operations.getVideosOperation(params);
+      
+      const effectiveProjectId = projectId || _projectId;
+      const isAudioOp = _audioModel?.includes('lyria');
+      const isVideoOp = !isAudioOp && (_audioModel?.includes('veo') || !model?.includes('lyria'));
+      
+      if (result?.done && effectiveProjectId && isAdminInitialized() && opName && !trackedOperations.has(opName)) {
+        trackedOperations.add(opName);
+        
+        // Video cost tracking
+        if (isVideoOp) {
+          const videoModel = model || 'veo-3.1-generate-001';
+          const videoCost = calculateCost(videoModel, {}, {
+            duration: config?.duration,
+            resolution: config?.resolution,
+            audio: config?.audio,
+          });
+          if (videoCost > 0) {
+            await trackProjectCost(effectiveProjectId, videoCost, {
+              type: 'video',
+              videoCount: result?.response?.generatedVideos?.length || config?.numberOfVideos || 1,
+            });
+          }
+        }
+        
+        // Audio cost tracking (Lyria Pro)
+        if (isAudioOp && _audioModel) {
+          const audioCost = calculateCost(_audioModel, {});
+          if (audioCost > 0) {
+            await trackProjectCost(effectiveProjectId, audioCost, {
+              type: 'audio',
+              audioCount: 1,
+            });
+          }
+        }
+      }
+      return res.json({ success: true, data: result });
     }
 
     if (method === 'fetchVideoFile') {

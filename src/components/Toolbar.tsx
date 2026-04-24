@@ -59,7 +59,8 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
   const edgesRef = useRef(edges);
   const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
   const activeWorkflowIdRef = useRef(activeWorkflowId);
-  
+  const confirmSaveRef = useRef<((isAuto?: boolean) => Promise<void>) | null>(null);
+
   useEffect(() => { nodesRef.current = nodes; }, [nodes]);
   useEffect(() => { edgesRef.current = edges; }, [edges]);
   useEffect(() => { hasUnsavedChangesRef.current = hasUnsavedChanges; }, [hasUnsavedChanges]);
@@ -84,7 +85,7 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
       orderBy('updatedAt', 'desc')
     );
     return onSnapshot(q, (snapshot) => {
-      setWorkflows(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setWorkflows(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
     });
   }, [currentProject]);
 
@@ -109,7 +110,7 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
         e.preventDefault();
         if (activeWorkflowIdRef.current) {
-          confirmSave();
+          confirmSaveRef.current?.();
         } else {
           setShowSaveModal(true);
         }
@@ -213,6 +214,9 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
       setIsSaving(false);
     }
   };
+
+  // Keep ref in sync so the stale Ctrl+S closure always calls the latest confirmSave
+  useEffect(() => { confirmSaveRef.current = confirmSave; });
 
   const deleteWorkflow = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();

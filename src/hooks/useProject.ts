@@ -131,6 +131,18 @@ export function useProject() {
       negativeKeywords: projectData.negativeKeywords || '',
       styleKeywords: projectData.styleKeywords || '',
       collaborators: [],
+      usage: {
+        totalCost: 0,
+        textCost: 0,
+        imageCost: 0,
+        videoCost: 0,
+        audioCost: 0,
+        totalTokens: 0,
+        totalImages: 0,
+        totalVideos: 0,
+        totalAudio: 0,
+        lastUpdated: now,
+      },
     };
 
     await setDoc(newProjectRef, project);
