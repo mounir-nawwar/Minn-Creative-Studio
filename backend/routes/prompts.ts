@@ -1,16 +1,15 @@
 import express from 'express';
-import { db } from '../../src/firebase';
-import { collection, addDoc, getDocs, query, orderBy, Timestamp } from 'firebase/firestore';
+import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { requireAuth } from '../middleware/auth.ts';
 import { validateBody, promptCreateSchema } from '../middleware/validation.ts';
 
 const router = express.Router();
+const db = getFirestore();
 
 router.get('/', requireAuth, async (req, res) => {
   try {
-    const promptsRef = collection(db, 'prompts');
-    const q = query(promptsRef, orderBy('createdAt', 'desc'));
-    const snapshot = await getDocs(q);
+    const promptsRef = db.collection('prompts');
+    const snapshot = await promptsRef.orderBy('createdAt', 'desc').get();
     const prompts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     res.json(prompts);
   } catch (err: unknown) {
@@ -23,8 +22,8 @@ router.get('/', requireAuth, async (req, res) => {
 router.post('/', requireAuth, validateBody(promptCreateSchema), async (req, res) => {
   const { text, tags } = req.body;
   try {
-    const promptsRef = collection(db, 'prompts');
-    const docRef = await addDoc(promptsRef, {
+    const promptsRef = db.collection('prompts');
+    const docRef = await promptsRef.add({
       text,
       tags: tags || [],
       createdAt: Timestamp.now()

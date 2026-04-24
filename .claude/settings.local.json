@@ -15,7 +15,10 @@
       "Bash(npx tsc:*)",
       "Bash(sed 's/\\(.*$//')",
       "Bash(ls -la *.ts *.tsx)",
-      "Bash(awk -F':' '{print $1\":\"$2}')"
+      "Bash(awk -F':' '{print $1\":\"$2}')",
+      "Bash(wc *)",
+      "Bash(timeout 8 npm run dev)",
+      "Bash(find /c/Users/user/Desktop/Minn-Creative-Studio/src -type f \\\\\\( -name \"*.ts\" -o -name \"*.tsx\" -o -name \"*.js\" -o -name \"*.jsx\" \\\\\\) -exec wc -l {} +)"
     ]
   }
 }

@@ -54,3 +54,7 @@ body {
     stroke-dashoffset: 0;
   }
 }
+
+.react-flow__attribution {
+  display: none !important;
+}

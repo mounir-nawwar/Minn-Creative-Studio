@@ -332,6 +332,7 @@ const CanvasContent = () => {
             animated: true,
           }}
           connectionLineStyle={connectionLineStyle}
+          
         >
         <Background color="#1a1a1a" gap={30} size={1} variant={BackgroundVariant.Dots} />
         <Controls

@@ -11,8 +11,33 @@ import { useAssets } from '../hooks/useAssets';
 import { useAssetExpand } from '../hooks/useAssetExpand';
 import { ExpandableAssetWrapper } from '../components/ExpandableAssetWrapper';
 import { toast } from '../store/useToastStore';
+import { NodeProps } from '../types/nodeProps';
 
-const VeoNode = ({ id, data }: any) => {
+interface VeoNodeData {
+  type: 'veo';
+  config?: {
+    model?: string;
+    aspectRatio?: string;
+    resolution?: string;
+    duration?: number;
+    sampleCount?: number;
+    style?: string;
+    referenceStrength?: number;
+    referenceRoles?: Record<string, 'style' | 'background' | 'composition' | 'character' | 'subject'>;
+    negativePrompt?: string;
+    personGeneration?: string;
+    audio?: boolean;
+    resizeMode?: string;
+  };
+  output?: string;
+  outputs?: string[];
+  isRunning?: boolean;
+  error?: string;
+  progress?: number;
+  [key: string]: unknown;
+}
+
+const VeoNode = ({ id, data }: NodeProps<VeoNodeData>) => {
   const [model, setModel] = useState(data.config?.model || 'veo-3.1-fast-generate-001');
   const [aspectRatio, setAspectRatio] = useState(data.config?.aspectRatio || '16:9');
   const [resolution, setResolution] = useState(data.config?.resolution || '720p');
@@ -204,7 +229,7 @@ const VeoNode = ({ id, data }: any) => {
   };
 
   return (
-    <BaseNode id={id} data={data} inputs={true} onRun={handleRun} className="border-[#FF5722]">
+    <BaseNode id={id} data={{ ...data, label: data.label as string ?? 'Video Generator' }} inputs={true} onRun={handleRun} className="border-[#FF5722]">
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-2">
           <div className="space-y-1 col-span-2">

@@ -1,15 +1,33 @@
 import dotenv from 'dotenv';
 dotenv.config({ path: '.env' });
 
-function requireEnv(name: string): string {
+const isProduction = process.env.NODE_ENV === 'production' || !!process.env.K_SERVICE;
+
+function requireEnv(name: string, devDefault?: string): string {
   const value = process.env[name];
   if (!value) {
-    if (process.env.NODE_ENV === 'production' || process.env.K_SERVICE) {
+    if (isProduction) {
       throw new Error(`Missing required environment variable: ${name}`);
     }
-    console.warn(`⚠️  ${name} not set, using development default`);
+    if (devDefault) {
+      console.warn(`⚠️  ${name} not set, using development default`);
+      return devDefault;
+    }
+    throw new Error(`Missing required environment variable: ${name}`);
   }
-  return value || '';
+  return value;
+}
+
+function requireSecureEnv(name: string): string {
+  if (isProduction) {
+    return requireEnv(name);
+  }
+  const value = process.env[name];
+  if (!value) {
+    console.warn(`⚠️  ${name} not set, using development default (NOT SECURE)`);
+    return `dev-${name.toLowerCase()}-change-in-production`;
+  }
+  return value;
 }
 
 function parseAuthorizedEmails(): Set<string> {
@@ -25,13 +43,13 @@ function parseAuthorizedEmails(): Set<string> {
 }
 
 export const AUTH_CONFIG = {
-  sessionSecret: requireEnv('SESSION_SECRET') || 'dev-secret-change-in-production',
-  adminUsername: requireEnv('ADMIN_USERNAME') || 'admin',
-  adminPassword: requireEnv('ADMIN_PASSWORD') || 'admin',
+  sessionSecret: requireSecureEnv('SESSION_SECRET'),
+  adminUsername: requireSecureEnv('ADMIN_USERNAME'),
+  adminPassword: requireSecureEnv('ADMIN_PASSWORD'),
   authorizedEmails: parseAuthorizedEmails(),
   jwtExpiresIn: '30d',
   cookieMaxAge: 30 * 24 * 60 * 60 * 1000,
-  isProduction: process.env.NODE_ENV === 'production' || !!process.env.K_SERVICE
+  isProduction
 };
 
 export function isAuthorizedEmail(email: string): boolean {

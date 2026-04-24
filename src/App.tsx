@@ -86,8 +86,9 @@ export default function App() {
     };
     checkAuth();
 
-    // Handle the case where Firebase fell back to redirect mode from signInWithPopup
-    checkRedirectResult().catch(() => {});
+    checkRedirectResult().catch((err) => {
+      console.warn('Firebase redirect result check failed:', err);
+    });
 
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u);

@@ -13,15 +13,39 @@ import { useAssetExpand } from '../hooks/useAssetExpand';
 import { ExpandableAssetWrapper } from '../components/ExpandableAssetWrapper';
 import { toast } from '../store/useToastStore';
 import { motion, AnimatePresence } from 'motion/react';
+import { NodeProps } from '../types/nodeProps';
+import { MUSICAL_KEYS } from './lyriaConstants';
 
-const MUSICAL_KEYS = [
-  'C Major', 'G Major', 'D Major', 'A Major', 'E Major', 'B Major', 'F# Major', 'C# Major',
-  'F Major', 'Bb Major', 'Eb Major', 'Ab Major', 'Db Major', 'Gb Major',
-  'A Minor', 'E Minor', 'B Minor', 'F# Minor', 'C# Minor', 'G# Minor', 'D# Minor', 'A# Minor',
-  'D Minor', 'G Minor', 'C Minor', 'F Minor', 'Bb Minor', 'Eb Minor'
-];
+interface LyriaNodeData {
+  type: 'lyria';
+  config?: {
+    model?: string;
+    genre?: string;
+    mood?: string;
+    instrumentation?: string;
+    vocalStyle?: string;
+    language?: string;
+    duration?: number;
+    negativePrompt?: string;
+    seed?: number;
+    temperature?: number;
+    guidance?: number;
+    bpm?: number;
+    density?: number;
+    brightness?: number;
+    scale?: string;
+    topP?: number;
+    topK?: number;
+    voice?: string;
+  };
+  output?: string;
+  isRunning?: boolean;
+  error?: string;
+  progress?: number;
+  [key: string]: unknown;
+}
 
-const LyriaNode = ({ id, data }: any) => {
+const LyriaNode = ({ id, data }: NodeProps<LyriaNodeData>) => {
   const [model, setModel] = useState(data.config?.model || 'lyria-3-pro-preview');
   const [genre, setGenre] = useState(data.config?.genre || 'Cinematic');
   const [mood, setMood] = useState(data.config?.mood || 'Epic');
@@ -146,7 +170,7 @@ const LyriaNode = ({ id, data }: any) => {
   };
 
   return (
-    <BaseNode id={id} data={data} inputs={true} onRun={handleRun} className="border-[#0097A7]">
+    <BaseNode id={id} data={{ ...data, label: data.label as string ?? 'Audio Generator' }} inputs={true} onRun={handleRun} className="border-[#0097A7]">
       <div className="space-y-3">
         <div className="space-y-1">
           <label className="text-[10px] text-gray-500 uppercase font-bold">Model</label>

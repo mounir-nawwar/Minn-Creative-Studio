@@ -12,49 +12,13 @@ import {
   Library,
   Copy,
   Check,
-  ChevronLeft,
   Paperclip
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  db, 
-  auth, 
-  collection, 
-  addDoc, 
-  query, 
-  where, 
-  orderBy, 
-  onSnapshot, 
-  serverTimestamp, 
-  doc, 
-  deleteDoc,
-  updateDoc,
-  limit,
-  handleFirestoreError,
-  OperationType
-} from '../firebase';
-import { 
-  generateText,
-  urlToBase64
-} from '../services/geminiService';
-import { useProjectStore } from '../store/useProjectStore';
 import { useStore } from '../store/useStore';
+import { useProjectStore } from '../store/useProjectStore';
 import AssetGrid from './AssetGrid';
-
-interface Message {
-  id: string;
-  role: 'user' | 'model';
-  text: string;
-  createdAt: any;
-}
-
-interface Chat {
-  id: string;
-  title: string;
-  projectId: string;
-  createdAt: any;
-  lastMessage?: string;
-}
+import { useFirebaseChat } from '../hooks/useFirebaseChat';
 
 function parseInline(text: string): React.ReactNode {
   const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g);
@@ -98,7 +62,6 @@ function CodeCanvas({ code, label }: { code: string; label: string }) {
 }
 
 function renderMarkdown(text: string): React.ReactNode {
-  // Split on fenced code blocks first
   const segments = text.split(/(```[\w]*\n[\s\S]*?```)/g);
   return (
     <div className="space-y-0.5">
@@ -110,7 +73,6 @@ function renderMarkdown(text: string): React.ReactNode {
           const label = lang === 'prompt' ? 'Prompt' : lang ? lang : 'Prompt';
           return <CodeCanvas key={si} code={code} label={label} />;
         }
-        // Regular markdown text
         const lines = seg.split('\n');
         return lines.map((line, i) => {
           if (line.startsWith('### ')) return <p key={`${si}-${i}`} className="font-bold text-[13px] text-white mt-2 mb-0.5">{parseInline(line.slice(4))}</p>;
@@ -134,17 +96,14 @@ function renderMarkdown(text: string): React.ReactNode {
 
 export default function ChatDrawer() {
   const { isChatOpen: isOpen, setChatOpen: setIsOpen, activeChatId, setActiveChatId } = useStore();
-  const [chats, setChats] = useState<Chat[]>([]);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const { currentProject } = useProjectStore();
+  const { chats, messages, isTyping, createNewChat, deleteChat, sendMessage } = useFirebaseChat();
+
   const [inputText, setInputText] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
   const [showAssetPicker, setShowAssetPicker] = useState(false);
   const [selectedAssets, setSelectedAssets] = useState<any[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { currentProject } = useProjectStore();
-
-  const user = auth.currentUser;
 
   const handleAssetSelect = (asset: any) => {
     if (selectedAssets.find(a => a.id === asset.id)) return;
@@ -156,156 +115,18 @@ export default function ChatDrawer() {
     setSelectedAssets(prev => prev.filter(a => a.id !== assetId));
   };
 
-  // Fetch Chats for current project
-  useEffect(() => {
-    if (!user || !currentProject) return;
-    const q = query(
-      collection(db, 'chats'),
-      where('projectId', '==', currentProject.id),
-      orderBy('createdAt', 'desc')
-    );
-    return onSnapshot(q, (snapshot) => {
-      setChats(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Chat)));
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'chats');
-    });
-  }, [user, currentProject]);
-
-  // Fetch Messages
-  useEffect(() => {
-    if (!activeChatId) {
-      setMessages([]);
-      return;
-    }
-    const q = query(
-      collection(db, `chats/${activeChatId}/messages`),
-      orderBy('createdAt', 'asc')
-    );
-    return onSnapshot(q, (snapshot) => {
-      setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Message)));
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, `chats/${activeChatId}/messages`);
-    });
-  }, [activeChatId]);
-
-  // Scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const createNewChat = async () => {
-    if (!user || !currentProject) return;
-    try {
-      const newChat = await addDoc(collection(db, 'chats'), {
-        title: 'New Creative Session',
-        projectId: currentProject.id,
-        userId: user.uid,
-        createdAt: serverTimestamp(),
-      });
-      setActiveChatId(newChat.id);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, 'chats');
-    }
-  };
-
-  const deleteChat = async (e: React.MouseEvent, chatId: string) => {
-    e.stopPropagation();
-    if (activeChatId === chatId) setActiveChatId(null);
-    try {
-      await deleteDoc(doc(db, 'chats', chatId));
-    } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `chats/${chatId}`);
-    }
-  };
-
-  const handleSendMessage = async (e?: React.FormEvent) => {
+  const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!inputText.trim() || !user || !currentProject) return;
-
-    let chatId = activeChatId;
-    if (!chatId) {
-      const newChat = await addDoc(collection(db, 'chats'), {
-        title: inputText.slice(0, 30) + '...',
-        projectId: currentProject.id,
-        userId: user.uid,
-        createdAt: serverTimestamp(),
-      });
-      chatId = newChat.id;
-      setActiveChatId(chatId);
-
-      // Update project updatedAt
-      const { doc, updateDoc } = await import('firebase/firestore');
-      await updateDoc(doc(db, 'projects', currentProject.id), {
-        updatedAt: serverTimestamp()
-      });
-    }
-
-    const userMsg = inputText;
-    const currentAssets = [...selectedAssets];
+    if (!inputText.trim() || isTyping) return;
+    const textToSend = inputText;
+    const assetsToSend = [...selectedAssets];
     setInputText('');
     setSelectedAssets([]);
-    
-    // Save User Message
-    await addDoc(collection(db, `chats/${chatId}/messages`), {
-      chatId,
-      role: 'user',
-      text: userMsg,
-      assets: currentAssets.map(a => ({ id: a.id, url: a.url, name: a.name, type: a.type })),
-      createdAt: serverTimestamp(),
-    });
-
-    // Update Chat Title if it's the first message
-    if (messages.length === 0) {
-      await updateDoc(doc(db, 'chats', chatId), {
-        title: userMsg.slice(0, 40) + (userMsg.length > 40 ? '...' : '')
-      });
-    }
-
-    setIsTyping(true);
-
-    try {
-      const projectContext = `
-        Current Project: ${currentProject.name}
-        Type: ${currentProject.type}
-        Description: ${currentProject.description}
-        Brand: ${currentProject.clientName || 'N/A'}
-        Industry: ${currentProject.clientIndustry || 'N/A'}
-        AI Instructions: ${currentProject.aiInstructions || 'N/A'}
-        Style Keywords: ${currentProject.styleKeywords || 'N/A'}
-      `;
-
-      const imageUrls = currentAssets
-        .filter(a => a.type === 'image')
-        .map(a => a.url);
-
-      const modelText = await generateText({
-        prompt: userMsg,
-        model: "gemini-3-flash-preview",
-        systemInstruction: "You are a creative director assistant for AI video/image generation. You specialize in writing detailed generative prompts for Midjourney, Stable Diffusion, Sora, Runway, Kling, and similar tools. When asked for prompts, write complete, rich, detailed prompts with specific visual descriptions. Help with visual ideas, camera directions, lighting setups, style references, color palettes, and technical advice. Wrap any prompt in a fenced code block (triple backticks) so it renders as a copyable block.\n\nIMPORTANT: Match your response length to what was asked. Casual messages get short natural replies. Only go detailed when the user explicitly asks for prompts, ideas, or guidance. Never volunteer unsolicited project analysis or example prompts.",
-        imageUrls,
-        projectContext,
-        maxOutputTokens: 8192,
-        projectId: currentProject?.id,
-      });
-
-      // Save Model Message
-      await addDoc(collection(db, `chats/${chatId}/messages`), {
-        chatId,
-        role: 'model',
-        text: modelText,
-        createdAt: serverTimestamp(),
-      });
-
-      // Update Last Message
-      await updateDoc(doc(db, 'chats', chatId), {
-        lastMessage: modelText.slice(0, 50) + '...'
-      });
-
-    } catch (err) {
-      console.error("Gemini Error:", err);
-    } finally {
-      setIsTyping(false);
-    }
+    await sendMessage(textToSend, assetsToSend);
   };
 
   if (!currentProject) return null;
@@ -324,7 +145,6 @@ export default function ChatDrawer() {
       <AnimatePresence>
         {isOpen && (
           <>
-            {/* Soft backdrop — doesn't block the app, just dims slightly */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -333,7 +153,6 @@ export default function ChatDrawer() {
               className="fixed inset-0 z-[60] bg-black/30 backdrop-blur-sm"
             />
 
-            {/* Popup Card */}
             <motion.div
               initial={{ opacity: 0, scale: 0.92, y: 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -492,7 +311,7 @@ export default function ChatDrawer() {
                         )}
                       </AnimatePresence>
 
-                      <form onSubmit={handleSendMessage} className="flex items-center gap-2 bg-[#2c2c2e] rounded-2xl px-3 py-2">
+                      <form onSubmit={handleSubmit} className="flex items-center gap-2 bg-[#2c2c2e] rounded-2xl px-3 py-2">
                         <button
                           type="button"
                           onClick={() => setShowAssetPicker(true)}

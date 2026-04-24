@@ -103,19 +103,22 @@ export function useProject() {
     }
   }, [projects]);
 
-  const createProject = async (projectData: Partial<Project>) => {
+  const createProject = async (projectData: Partial<Project>): Promise<Project> => {
     if (!auth.currentUser) throw new Error('User not authenticated');
 
     const newProjectRef = doc(collection(db, 'projects'));
     const now = serverTimestamp();
     
-    const project: any = {
+    const project = {
       ...projectData,
       id: newProjectRef.id,
       userId: auth.currentUser.uid,
-      status: 'active',
+      status: 'active' as const,
       createdAt: now,
       updatedAt: now,
+      name: projectData.name || 'Untitled Project',
+      type: projectData.type || 'content',
+      subtype: projectData.subtype || 'Other',
       visualMood: projectData.visualMood || [],
       platforms: projectData.platforms || [],
       outputFormats: projectData.outputFormats || [],
@@ -130,87 +133,64 @@ export function useProject() {
       collaborators: [],
     };
 
-    try {
-      await setDoc(newProjectRef, project);
-      return project as Project;
-    } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, 'projects');
-    }
+    await setDoc(newProjectRef, project);
+    return project as Project;
   };
 
   const selectProject = (project: Project) => {
     setCurrentProject(project);
   };
 
-  const updateCurrentProject = async (updates: Partial<Project>) => {
+  const updateCurrentProject = async (updates: Partial<Project>): Promise<void> => {
     if (!currentProject) return;
     await updateProjectById(currentProject.id, updates);
   };
 
-  const updateProjectById = async (projectId: string, updates: Partial<Project>) => {
+  const updateProjectById = async (projectId: string, updates: Partial<Project>): Promise<void> => {
     const projectRef = doc(db, 'projects', projectId);
     const now = serverTimestamp();
     const fullUpdates = { ...updates, updatedAt: now };
-    try {
-      await updateDoc(projectRef, fullUpdates);
-      if (currentProject?.id === projectId) {
-        updateProject(fullUpdates);
-      }
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `projects/${projectId}`);
+    await updateDoc(projectRef, fullUpdates);
+    if (currentProject?.id === projectId) {
+      updateProject(fullUpdates);
     }
   };
 
-  // Soft delete - move to recycle bin
-  const deleteProject = async (projectId: string) => {
+  const deleteProject = async (projectId: string): Promise<void> => {
     if (!auth.currentUser) throw new Error('User not authenticated');
     
     const projectRef = doc(db, 'projects', projectId);
     const now = serverTimestamp();
     
-    try {
-      await updateDoc(projectRef, {
-        status: 'archived',
-        deletedAt: now,
-        deletedBy: auth.currentUser.uid,
-        updatedAt: now
-      });
-      
-      if (currentProject?.id === projectId) {
-        clearProject();
-      }
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `projects/${projectId}`);
+    await updateDoc(projectRef, {
+      status: 'archived',
+      deletedAt: now,
+      deletedBy: auth.currentUser.uid,
+      updatedAt: now
+    });
+    
+    if (currentProject?.id === projectId) {
+      clearProject();
     }
   };
 
-  // Restore from recycle bin
-  const restoreProject = async (projectId: string) => {
+  const restoreProject = async (projectId: string): Promise<void> => {
     const projectRef = doc(db, 'projects', projectId);
     const now = serverTimestamp();
     
-    try {
-      await updateDoc(projectRef, {
-        status: 'active',
-        updatedAt: now
-      });
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `projects/${projectId}`);
-    }
+    await updateDoc(projectRef, {
+      status: 'active',
+      updatedAt: now
+    });
   };
 
-  // Permanent delete - remove from database
-  const permanentDeleteProject = async (projectId: string) => {
-    try {
-      await deleteDoc(doc(db, 'projects', projectId));
-      
-      setArchivedProjects(prev => prev.filter(p => p.id !== projectId));
-      
-      if (currentProject?.id === projectId) {
-        clearProject();
-      }
-    } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `projects/${projectId}`);
+  const permanentDeleteProject = async (projectId: string): Promise<void> => {
+    await deleteDoc(doc(db, 'projects', projectId));
+    
+    setArchivedProjects(prev => prev.filter(p => p.id !== projectId));
+    
+    if (currentProject?.id === projectId) {
+      clearProject();
     }
   };
 
