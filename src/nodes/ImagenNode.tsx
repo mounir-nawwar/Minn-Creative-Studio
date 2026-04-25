@@ -45,7 +45,7 @@ interface ImagenNodeData {
 }
 
 const ImagenNode = ({ id, data }: NodeProps<ImagenNodeData>) => {
-  const [model, setModel] = useState(data.config?.model || 'imagen-4.0-generate-001');
+  const [model, setModel] = useState(data.config?.model || 'gemini-3.1-flash-image-preview');
   const [aspectRatio, setAspectRatio] = useState(data.config?.aspectRatio || '1:1');
   const [resolution, setResolution] = useState(data.config?.resolution || '1K');
   const [sampleCount, setSampleCount] = useState(data.config?.sampleCount || 1);
@@ -70,12 +70,13 @@ const ImagenNode = ({ id, data }: NodeProps<ImagenNodeData>) => {
   const { currentProject, uploadEnabled } = useProjectStore();
   const { addAsset } = useAssets();
   const abortControllerRef = useRef<AbortController | null>(null);
-  const progressTickerRef = useRef<NodeJS.Timeout | null>(null);
+  const startTimeRef = useRef<number | null>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
   const { setExpandedAsset } = useAssetExpand();
 
   useEffect(() => {
     return () => {
-      if (progressTickerRef.current) clearInterval(progressTickerRef.current);
+      if (timerRef.current) clearInterval(timerRef.current);
       if (abortControllerRef.current) abortControllerRef.current.abort();
     };
   }, []);
@@ -111,8 +112,13 @@ const ImagenNode = ({ id, data }: NodeProps<ImagenNodeData>) => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
-      updateNodeData(id, { isRunning: false, progress: 0, error: 'Generation cancelled' });
     }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    startTimeRef.current = null;
+    updateNodeData(id, { isRunning: false, progress: undefined, error: 'Generation cancelled' });
   };
 
   const handleDownload = (url: string) => {
@@ -137,7 +143,8 @@ const ImagenNode = ({ id, data }: NodeProps<ImagenNodeData>) => {
     }
 
     abortControllerRef.current = new AbortController();
-    updateNodeData(id, { isRunning: true, error: undefined, progress: 5 });
+    startTimeRef.current = Date.now();
+    updateNodeData(id, { isRunning: true, error: undefined, progress: '0:00' });
 
     const projectContext = currentProject ? `
       Project: ${currentProject.name}
@@ -148,11 +155,14 @@ const ImagenNode = ({ id, data }: NodeProps<ImagenNodeData>) => {
       Style Keywords: ${currentProject.styleKeywords}
     `.trim() : undefined;
 
-    let tickerProgress = 20;
-    progressTickerRef.current = setInterval(() => {
-      tickerProgress = Math.min(tickerProgress + 3, 78);
-      updateNodeData(id, { progress: tickerProgress });
-    }, 800);
+    const updateTimer = () => {
+      if (!startTimeRef.current) return;
+      const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+      const mins = Math.floor(elapsed / 60);
+      const secs = elapsed % 60;
+      updateNodeData(id, { progress: `${mins}:${secs.toString().padStart(2, '0')}` });
+    };
+    timerRef.current = setInterval(updateTimer, 1000);
 
     try {
       const params: any = {
@@ -194,11 +204,11 @@ const ImagenNode = ({ id, data }: NodeProps<ImagenNodeData>) => {
 
       const result = await generateImage(params, abortControllerRef.current.signal);
 
-      if (progressTickerRef.current) { clearInterval(progressTickerRef.current); progressTickerRef.current = null; }
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
 
       const imageUrls = Array.isArray(result) ? result : [result];
       setOutputs(imageUrls);
-      updateNodeData(id, { output: imageUrls[0], outputs: imageUrls, isRunning: false, progress: 100 });
+      updateNodeData(id, { output: imageUrls[0], outputs: imageUrls, isRunning: false, progress: undefined });
 
       imageUrls.forEach((url: string, i: number) => {
         if (url) {
@@ -215,17 +225,18 @@ const ImagenNode = ({ id, data }: NodeProps<ImagenNodeData>) => {
       toast.success('Image generated', `${imageUrls.length} image${imageUrls.length > 1 ? 's' : ''} ready`);
 
     } catch (err: unknown) {
-      if (progressTickerRef.current) { clearInterval(progressTickerRef.current); progressTickerRef.current = null; }
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
       const message = err instanceof Error ? err.message : 'Unknown error';
       if (!(err instanceof Error && err.name === 'AbortError')) {
         const displayMessage = message.includes('timed out')
           ? 'Generation timed out. Try a simpler prompt.'
           : message;
-        updateNodeData(id, { error: displayMessage, isRunning: false });
+        updateNodeData(id, { error: displayMessage, isRunning: false, progress: undefined });
         toast.error('Image generation failed', displayMessage);
       }
     } finally {
-      if (progressTickerRef.current) { clearInterval(progressTickerRef.current); progressTickerRef.current = null; }
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+      startTimeRef.current = null;
       abortControllerRef.current = null;
     }
   };

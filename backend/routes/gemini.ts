@@ -112,30 +112,46 @@ router.post('/', requireAuth, aiLimiter, async (req, res) => {
         console.log(`[Usage] model=${sdkParams.model} projectId=${projectId ?? 'none'} images=${imageCount} | no usageMetadata`);
       }
 
-      if (imageCount > 0 && projectId && isAdminInitialized()) {
+      if (imageCount > 0 && projectId && isAdminInitialized() && usageMetadata) {
         const cost = calculateCost(sdkParams.model, {
-          promptTokenCount: usageMetadata?.promptTokenCount,
-          candidatesTokenCount: usageMetadata?.candidatesTokenCount,
+          promptTokenCount: usageMetadata.promptTokenCount,
+          candidatesTokenCount: usageMetadata.candidatesTokenCount,
+          imageCount,
         });
         if (cost > 0) {
           await trackProjectCost(projectId, cost, {
             type: 'image',
             imageCount,
-            tokenCount: usageMetadata?.totalTokenCount || 0,
+            tokenCount: usageMetadata.totalTokenCount || 0,
           });
         }
       }
 
-      if (usageMetadata && !imageCount && projectId && isAdminInitialized()) {
-        const cost = calculateCost(sdkParams.model, {
-          promptTokenCount: usageMetadata.promptTokenCount,
-          candidatesTokenCount: usageMetadata.candidatesTokenCount,
-        }, {});
-        if (cost > 0) {
-          await trackProjectCost(projectId, cost, {
-            type: 'text',
-            tokenCount: usageMetadata.totalTokenCount || 0,
+      if (!imageCount && projectId && isAdminInitialized()) {
+        if (sdkParams.model?.includes('tts')) {
+          // TTS: billed per input character
+          const allParts = Array.isArray(sdkParams.contents)
+            ? sdkParams.contents.flatMap((c: any) => c?.parts ?? [])
+            : (sdkParams.contents?.parts ?? []);
+          const charCount = allParts
+            .filter((p: any) => typeof p.text === 'string')
+            .reduce((sum: number, p: any) => sum + p.text.length, 0);
+          if (charCount > 0) {
+            const cost = calculateCost(sdkParams.model, { characterCount: charCount });
+            if (cost > 0) await trackProjectCost(projectId, cost, { type: 'audio', audioCount: 1 });
+          }
+        } else if (usageMetadata) {
+          // All other text/chat models: input + output tokens
+          const cost = calculateCost(sdkParams.model, {
+            promptTokenCount: usageMetadata.promptTokenCount,
+            candidatesTokenCount: usageMetadata.candidatesTokenCount,
           });
+          if (cost > 0) {
+            await trackProjectCost(projectId, cost, {
+              type: 'text',
+              tokenCount: usageMetadata.totalTokenCount || 0,
+            });
+          }
         }
       }
 
@@ -187,24 +203,10 @@ router.post('/', requireAuth, aiLimiter, async (req, res) => {
 
     // Video: @google/genai SDK hardcodes v1beta — use v1 REST directly via vertexGenerateVideos
     if (method === 'generateVideos') {
-      const { projectId, model, config } = params;
-      const result = USE_VERTEX_AI 
-        ? await vertexGenerateVideos(params) 
+      const result = USE_VERTEX_AI
+        ? await vertexGenerateVideos(params)
         : await devAi!.models.generateVideos(params);
-      
-      if (projectId && isAdminInitialized()) {
-        const cost = calculateCost(model || 'veo-3.1-generate-001', {}, {
-          duration: config?.duration,
-          resolution: config?.resolution,
-          audio: config?.audio,
-        });
-        if (cost > 0) {
-          await trackProjectCost(projectId, cost, {
-            type: 'video',
-            videoCount: config?.numberOfVideos || 1,
-          });
-        }
-      }
+      // Cost is tracked in getOperation when done — avoids double-counting the LRO
       return res.json({ success: true, data: result });
     }
 
@@ -225,15 +227,17 @@ router.post('/', requireAuth, aiLimiter, async (req, res) => {
         // Video cost tracking
         if (isVideoOp) {
           const videoModel = model || 'veo-3.1-generate-001';
-          const videoCost = calculateCost(videoModel, {}, {
+          const videoCount = result?.response?.generatedVideos?.length || config?.numberOfVideos || 1;
+          const costPerVideo = calculateCost(videoModel, {}, {
             duration: config?.duration,
             resolution: config?.resolution,
             audio: config?.audio,
           });
+          const videoCost = costPerVideo * videoCount;
           if (videoCost > 0) {
             await trackProjectCost(effectiveProjectId, videoCost, {
               type: 'video',
-              videoCount: result?.response?.generatedVideos?.length || config?.numberOfVideos || 1,
+              videoCount,
             });
           }
         }

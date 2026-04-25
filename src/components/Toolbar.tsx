@@ -98,7 +98,7 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
   useEffect(() => {
     const timer = setInterval(() => {
       if (hasUnsavedChangesRef.current && activeWorkflowIdRef.current) {
-        confirmSave(true);
+        confirmSaveRef.current?.(true);
       }
     }, 120000); // 2 minutes
     return () => clearInterval(timer);

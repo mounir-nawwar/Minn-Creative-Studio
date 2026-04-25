@@ -55,6 +55,15 @@ body {
   }
 }
 
+@keyframes shimmer {
+  0% {
+    transform: translateX(-50%);
+  }
+  100% {
+    transform: translateX(0%);
+  }
+}
+
 .react-flow__attribution {
   display: none !important;
 }

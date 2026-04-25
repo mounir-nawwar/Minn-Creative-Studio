@@ -73,12 +73,13 @@ const LyriaNode = ({ id, data }: NodeProps<LyriaNodeData>) => {
   const nodes = useStore((state) => state.nodes);
   const { setExpandedAsset } = useAssetExpand();
   const abortControllerRef = useRef<AbortController | null>(null);
+  const startTimeRef = useRef<number | null>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (abortControllerRef.current) abortControllerRef.current.abort();
     };
   }, []);
 
@@ -103,8 +104,13 @@ const LyriaNode = ({ id, data }: NodeProps<LyriaNodeData>) => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
-      updateNodeData(id, { isRunning: false, progress: 0, error: 'Generation cancelled' });
     }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    startTimeRef.current = null;
+    updateNodeData(id, { isRunning: false, progress: undefined, error: 'Generation cancelled' });
   };
 
   const handleRun = async () => {
@@ -114,7 +120,17 @@ const LyriaNode = ({ id, data }: NodeProps<LyriaNodeData>) => {
     const userPrompt = promptNode?.data?.output || '';
 
     abortControllerRef.current = new AbortController();
-    updateNodeData(id, { isRunning: true, error: undefined, progress: 10 });
+    startTimeRef.current = Date.now();
+    updateNodeData(id, { isRunning: true, error: undefined, progress: '0:00' });
+
+    const updateTimer = () => {
+      if (!startTimeRef.current) return;
+      const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+      const mins = Math.floor(elapsed / 60);
+      const secs = elapsed % 60;
+      updateNodeData(id, { progress: `${mins}:${secs.toString().padStart(2, '0')}` });
+    };
+    timerRef.current = setInterval(updateTimer, 1000);
 
     try {
       let finalPrompt = userPrompt;
@@ -122,7 +138,6 @@ const LyriaNode = ({ id, data }: NodeProps<LyriaNodeData>) => {
         finalPrompt = `Genre: ${genre}. Mood: ${mood}. Instrumentation: ${instrumentation}. Tempo: ${bpm} BPM. Key: ${scale}. Vocal Style: ${vocalStyle}. Language: ${language}. ${userPrompt}`.trim();
       }
 
-      updateNodeData(id, { progress: 30 });
       const audioUrl = await generateAudio({
         prompt: finalPrompt,
         model,
@@ -139,10 +154,10 @@ const LyriaNode = ({ id, data }: NodeProps<LyriaNodeData>) => {
         topP: isLyria ? topP : undefined,
         topK: isLyria ? topK : undefined,
         voice: isTTS ? data.config?.voice || 'Kore' : undefined,
-        onProgress: (p) => updateNodeData(id, { progress: p })
       }, abortControllerRef.current?.signal);
 
-      updateNodeData(id, { output: audioUrl, isRunning: false, progress: 100 });
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+      updateNodeData(id, { output: audioUrl, isRunning: false, progress: undefined });
 
       if (audioUrl) {
         addAsset({
@@ -156,15 +171,18 @@ const LyriaNode = ({ id, data }: NodeProps<LyriaNodeData>) => {
       }
 
     } catch (err: unknown) {
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
       const message = err instanceof Error ? err.message : 'Unknown error';
       if (!(err instanceof Error && err.name === 'AbortError')) {
         const displayMessage = message.includes('timed out') 
           ? 'Audio generation timed out. Try a shorter duration.'
           : message;
-        updateNodeData(id, { error: displayMessage, isRunning: false });
+        updateNodeData(id, { error: displayMessage, isRunning: false, progress: undefined });
         toast.error('Audio generation failed', displayMessage);
       }
     } finally {
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+      startTimeRef.current = null;
       abortControllerRef.current = null;
     }
   };

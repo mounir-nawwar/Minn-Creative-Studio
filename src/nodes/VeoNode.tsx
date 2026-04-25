@@ -56,14 +56,14 @@ const VeoNode = ({ id, data }: NodeProps<VeoNodeData>) => {
   const { currentProject, uploadEnabled } = useProjectStore();
   const { addAsset } = useAssets();
   const abortControllerRef = useRef<AbortController | null>(null);
+  const startTimeRef = useRef<number | null>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
   const { setExpandedAsset } = useAssetExpand();
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (abortControllerRef.current) abortControllerRef.current.abort();
     };
   }, []);
 
@@ -119,8 +119,13 @@ const VeoNode = ({ id, data }: NodeProps<VeoNodeData>) => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
-      updateNodeData(id, { isRunning: false, progress: 0, error: 'Generation cancelled' });
     }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    startTimeRef.current = null;
+    updateNodeData(id, { isRunning: false, progress: undefined, error: 'Generation cancelled' });
   };
 
   const handleDownload = () => {
@@ -152,9 +157,18 @@ const VeoNode = ({ id, data }: NodeProps<VeoNodeData>) => {
     }
 
     abortControllerRef.current = new AbortController();
-    updateNodeData(id, { isRunning: true, error: undefined, progress: 10 });
+    startTimeRef.current = Date.now();
+    updateNodeData(id, { isRunning: true, error: undefined, progress: '0:00' });
 
-    // Construct project context string
+    const updateTimer = () => {
+      if (!startTimeRef.current) return;
+      const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+      const mins = Math.floor(elapsed / 60);
+      const secs = elapsed % 60;
+      updateNodeData(id, { progress: `${mins}:${secs.toString().padStart(2, '0')}` });
+    };
+    timerRef.current = setInterval(updateTimer, 1000);
+
     const projectContext = currentProject ? `
       Project: ${currentProject.name}
       Type: ${currentProject.type}
@@ -189,11 +203,10 @@ const VeoNode = ({ id, data }: NodeProps<VeoNodeData>) => {
         videoUrl: inputVideo,
         projectId: uploadEnabled ? currentProject?.id : undefined,
         projectContext,
-        onProgress: (p) => updateNodeData(id, { progress: p })
       }, abortControllerRef.current.signal);
 
-      // Server already uploaded to Storage — URLs are permanent
-      updateNodeData(id, { output: videos[0], outputs: videos, isRunning: false, progress: 100 });
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+      updateNodeData(id, { output: videos[0], outputs: videos, isRunning: false, progress: undefined });
 
       // Add to Assets grid
       videos.forEach((url, i) => {
@@ -213,6 +226,7 @@ const VeoNode = ({ id, data }: NodeProps<VeoNodeData>) => {
       }
 
     } catch (err: unknown) {
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
       const message = err instanceof Error ? err.message : 'Unknown error';
       if (err instanceof Error && err.name === 'AbortError') {
         console.log('Video generation aborted');
@@ -220,10 +234,12 @@ const VeoNode = ({ id, data }: NodeProps<VeoNodeData>) => {
         const displayMessage = message.includes('timed out') 
           ? 'Video generation timed out after 10 minutes. Try a shorter duration or simpler prompt.'
           : message;
-        updateNodeData(id, { error: displayMessage, isRunning: false });
+        updateNodeData(id, { error: displayMessage, isRunning: false, progress: undefined });
         toast.error('Video generation failed', displayMessage);
       }
     } finally {
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+      startTimeRef.current = null;
       abortControllerRef.current = null;
     }
   };

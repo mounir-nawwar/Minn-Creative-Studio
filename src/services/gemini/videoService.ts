@@ -1,5 +1,12 @@
 import { callBackend, urlToBase64 } from './client';
 
+const formatElapsed = (startTime: number): string => {
+  const elapsed = Math.floor((Date.now() - startTime) / 1000);
+  const mins = Math.floor(elapsed / 60);
+  const secs = elapsed % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
+
 export const generateVideo = async (params: {
   prompt: string;
   model: string;
@@ -19,7 +26,7 @@ export const generateVideo = async (params: {
   videoUrl?: string;
   projectId?: string;
   projectContext?: string;
-  onProgress?: (progress: number) => void;
+  onProgress?: (elapsed: string) => void;
 }, signal?: AbortSignal): Promise<string[]> => {
   const {
     prompt, model, aspectRatio, resolution, duration, sampleCount = 1,
@@ -46,21 +53,24 @@ export const generateVideo = async (params: {
     ...(resizeMode && { resizeMode }),
   };
 
+  const startTime = Date.now();
+  onProgress?.('0:00');
+
   let startFrameData;
   if (startFrameUrl) {
-    onProgress?.(5);
+    onProgress?.(formatElapsed(startTime));
     const { data, mimeType } = await urlToBase64(startFrameUrl);
     startFrameData = { imageBytes: data, mimeType };
   }
 
   if (endFrameUrl) {
-    onProgress?.(10);
+    onProgress?.(formatElapsed(startTime));
     const { data, mimeType } = await urlToBase64(endFrameUrl);
     videoConfig.lastFrame = { imageBytes: data, mimeType };
   }
 
   if (referenceImages && referenceImages.length > 0) {
-    onProgress?.(15);
+    onProgress?.(formatElapsed(startTime));
     videoConfig.referenceImages = await Promise.all(referenceImages.map(async (ref: any) => {
       const { data, mimeType } = await urlToBase64(ref.url);
       return {
@@ -71,7 +81,7 @@ export const generateVideo = async (params: {
   }
 
   try {
-    onProgress?.(20);
+    onProgress?.(formatElapsed(startTime));
     let operation = await callBackend('generateVideos', {
       model: model,
       prompt: fullPrompt || 'Animate this sequence',
@@ -80,7 +90,7 @@ export const generateVideo = async (params: {
       projectId: projectId,
     }, signal);
 
-    const MAX_POLL_COUNT = 120; // 10 minutes max (120 * 5 seconds)
+    const MAX_POLL_COUNT = 120;
     const POLL_INTERVAL_MS = 5000;
     let pollCount = 0;
 
@@ -91,8 +101,7 @@ export const generateVideo = async (params: {
         throw new Error("Video generation timed out after 10 minutes. Please try again with a shorter duration or simpler prompt.");
       }
 
-      const simulatedProgress = Math.min(20 + (pollCount * 5), 90);
-      onProgress?.(simulatedProgress);
+      onProgress?.(formatElapsed(startTime));
 
       await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
       if (signal?.aborted) throw new Error("Video generation cancelled");
@@ -104,7 +113,7 @@ export const generateVideo = async (params: {
       }, signal);
     }
 
-    onProgress?.(95);
+    onProgress?.(formatElapsed(startTime));
     const generatedVideos: any[] = operation.response?.generatedVideos ?? [];
     if (!generatedVideos.length) throw new Error("No video generated");
 
@@ -119,7 +128,7 @@ export const generateVideo = async (params: {
     );
     const videos = results.filter(Boolean) as string[];
     if (!videos.length) throw new Error("No video generated");
-    onProgress?.(100);
+    onProgress?.(undefined);
     return videos;
   } catch (err) {
     console.error('Gemini API Error:', err);

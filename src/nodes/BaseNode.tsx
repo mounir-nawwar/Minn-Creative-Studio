@@ -160,10 +160,9 @@ const BaseNode: React.FC<BaseNodeProps> = ({
       
       <div className="px-4 py-2 bg-[#1a1a1a] flex items-center justify-between group/header relative overflow-hidden rounded-t-xl">
         {data.isRunning && (
-          <motion.div 
-            initial={{ width: 0 }}
-            animate={{ width: `${data.progress || 0}%` }}
-            className="absolute bottom-0 left-0 h-[2px] bg-[#0097A7] shadow-[0_0_10px_rgba(0,151,167,0.5)]"
+          <div 
+            className="absolute bottom-0 left-0 h-[2px] w-[200%] bg-gradient-to-r from-transparent via-[#0097A7] to-transparent"
+            style={{ animation: 'shimmer 1.5s infinite linear' }}
           />
         )}
         <div className="flex items-center gap-2 z-10">
@@ -173,7 +172,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
         <div className="flex items-center gap-2 z-10">
           {data.isRunning && (
             <div className="flex items-center gap-2">
-              <span className="text-[8px] font-bold text-[#0097A7] animate-pulse">{data.progress || 0}%</span>
+              <span className="text-[10px] font-bold text-[#0097A7] tabular-nums">{typeof data.progress === 'string' ? data.progress : `${data.progress || 0}%`}</span>
               <Loader2 className="w-4 h-4 text-[#0097A7] animate-spin" />
             </div>
           )}

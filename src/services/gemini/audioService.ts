@@ -1,5 +1,12 @@
 import { callBackend, urlToBase64 } from './client';
 
+const formatElapsed = (startTime: number): string => {
+  const elapsed = Math.floor((Date.now() - startTime) / 1000);
+  const mins = Math.floor(elapsed / 60);
+  const secs = elapsed % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
+
 export const generateAudio = async (params: {
   prompt: string;
   model?: string;
@@ -17,7 +24,7 @@ export const generateAudio = async (params: {
   density?: number;
   brightness?: number;
   scale?: string;
-  onProgress?: (progress: number) => void;
+  onProgress?: (elapsed: string) => void;
 }, signal?: AbortSignal) => {
   const {
     prompt,
@@ -55,8 +62,10 @@ export const generateAudio = async (params: {
 
   parts.push({ text: prompt });
 
+  const startTime = Date.now();
+
   try {
-    onProgress?.(10);
+    onProgress?.('0:00');
     let response = await callBackend('generateContent', {
       model: model,
       contents: [{ parts }],
@@ -94,7 +103,7 @@ export const generateAudio = async (params: {
 
     // Handle Long Running Operation (Lyria Pro)
     if (response.isLro) {
-      const MAX_POLL_COUNT = 60; // 5 minutes max (60 * 5 seconds)
+      const MAX_POLL_COUNT = 60;
       let operation: { name: any; done: boolean; response?: any } = { name: response.operation, done: false };
       let pollCount = 0;
 
@@ -105,7 +114,7 @@ export const generateAudio = async (params: {
           throw new Error("Audio generation timed out after 5 minutes. Please try again.");
         }
 
-        onProgress?.(Math.min(10 + (pollCount * 5), 90));
+        onProgress?.(formatElapsed(startTime));
         await new Promise(resolve => setTimeout(resolve, 5000));
         if (signal?.aborted) throw new Error("Audio generation cancelled");
         operation = await callBackend('getOperation', { 
@@ -120,12 +129,11 @@ export const generateAudio = async (params: {
     const inlineData = response.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData)?.inlineData;
     if (!inlineData) throw new Error("No audio generated");
 
+    onProgress?.(undefined);
     if (inlineData.storageUrl) {
-      onProgress?.(100);
       return inlineData.storageUrl;
     }
 
-    onProgress?.(100);
     return `data:audio/wav;base64,${inlineData.data}`;
   } catch (err) {
     console.error('Gemini API Error:', err);
