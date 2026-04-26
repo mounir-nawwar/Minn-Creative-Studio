@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Project, PROJECT_TYPES, ProjectStatus } from '../types/project.types';
-import { Calendar, User, Briefcase, Layout, Clock, Trash2, Settings, MoreVertical, Check } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { User, Trash2, Settings } from 'lucide-react';
+import { motion } from 'motion/react';
 
 interface ProjectCardProps {
   project: Project;
@@ -30,102 +30,62 @@ export default function ProjectCard({ project, layout = 'grid', isShared, onClic
         whileHover={{ x: 4 }}
         whileTap={{ scale: 0.995 }}
         onClick={onClick}
-        className="group relative bg-[#111111] border border-white/5 hover:border-[#0097A7]/50 rounded-2xl p-4 cursor-pointer transition-all flex items-center gap-6"
+        className="group relative bg-black border border-white/5 hover:border-[rgba(0,151,167,0.2)] rounded-2xl p-4 cursor-pointer transition-all flex items-center gap-5"
       >
         {/* Thumbnail */}
-        <div className="w-16 h-16 bg-[#0a0a0a] rounded-xl overflow-hidden shrink-0">
+        <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-gradient-to-br from-[rgba(0,151,167,0.1)] to-black">
           {project.coverImage ? (
-            <img src={project.coverImage} alt={project.name} className="w-full h-full object-cover opacity-60" />
+            <img src={project.coverImage} alt={project.name} className="w-full h-full object-contain" style={{ opacity: 0.7 }} />
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-[#0097A7]/5">
-              <span className="text-xl grayscale opacity-20">{projectType.icon}</span>
+            <div className="w-full h-full flex items-center justify-center">
+              <span className="text-xl grayscale opacity-30">{projectType.icon}</span>
             </div>
           )}
         </div>
 
         {/* Info */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-0.5">
-            <span className="text-[8px] font-black text-[#0097A7] uppercase tracking-widest">{projectType.label}</span>
-            <span className="text-[8px] text-gray-700 font-bold uppercase tracking-widest">{project.subtype}</span>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[9px] font-semibold text-[#0097A7] uppercase tracking-[0.14em]">{projectType.label}</span>
+            <span className="text-[8px] text-[#4A6070] font-medium uppercase tracking-widest">{project.subtype}</span>
           </div>
-          <h3 className="text-sm font-black text-white tracking-tight truncate group-hover:text-[#0097A7] transition-colors">
+          <h3 className="text-sm font-semibold group-hover:text-[#0097A7] transition-colors truncate">
             {project.name}
           </h3>
           {project.clientName && (
-            <p className="text-[9px] font-bold text-gray-500 uppercase tracking-tighter mt-0.5">{project.clientName}</p>
+            <p className="text-[10px] text-[#2C3A4E] mt-0.5 tracking-tight">{project.clientName}</p>
           )}
         </div>
 
-        {/* Stats / Status */}
-        <div className="flex items-center gap-8 shrink-0">
-          <div className="flex flex-col items-end gap-1">
-            <span className="text-[8px] font-black text-gray-700 uppercase tracking-widest">Last Updated</span>
-            <span className="text-[10px] font-bold text-gray-500 tabular-nums">{formatDate(project.updatedAt)}</span>
-          </div>
+        {/* Status */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <div className={`w-1.5 h-1.5 rounded-full ${project.status === 'active' ? 'bg-[#0097A7] shadow-[0_0_5px_#0097A7]' : project.status === 'completed' ? 'bg-[#22c55e]' : 'bg-[#4A6070]'}`} />
+          <span className="text-[10px] font-medium capitalize">{project.status}</span>
+        </div>
 
-          <div className="relative">
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsStatusMenuOpen(!isStatusMenuOpen);
-              }}
-              className="px-3 py-1.5 bg-black/40 rounded-full border border-white/5 hover:border-[#0097A7]/30 transition-all"
-            >
-              <div className="flex items-center gap-2">
-                <div className={`w-1 h-1 rounded-full ${project.status === 'active' ? 'bg-[#0097A7]' : 'bg-gray-600'}`} />
-                <span className="text-[8px] font-black text-white uppercase tracking-widest">{project.status}</span>
-              </div>
-            </button>
-            <AnimatePresence>
-              {isStatusMenuOpen && (
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  className="absolute bottom-full right-0 mb-2 p-1 bg-black border border-white/10 rounded-xl z-30 min-w-[120px] shadow-2xl"
-                >
-                  {(['active', 'archived', 'completed'] as ProjectStatus[]).map((s) => (
-                    <button
-                      key={s}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onStatusChange(s);
-                        setIsStatusMenuOpen(false);
-                      }}
-                      className={`w-full flex items-center justify-between px-3 py-2 text-[8px] font-black uppercase tracking-widest rounded-lg ${
-                        project.status === s ? 'text-[#0097A7] bg-[#0097A7]/10' : 'text-gray-500 hover:text-white hover:bg-white/5'
-                      }`}
-                    >
-                      {s}
-                      {project.status === s && <Check className="w-2.5 h-2.5" />}
-                    </button>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+        {/* Date */}
+        <div className="text-[10px] text-[#2C3A4E] shrink-0 min-w-[90px] text-right">{formatDate(project.updatedAt)}</div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onEdit();
-              }}
-              className="p-2 text-gray-600 hover:text-[#0097A7] transition-colors"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete();
-              }}
-              className="p-2 text-gray-600 hover:text-red-500 transition-colors"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </div>
+        {/* Actions */}
+        <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-all">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit();
+            }}
+            className="w-[30px] h-[30px] rounded-lg bg-[#121A24] border border-[#1A2434] flex items-center justify-center text-[#8A9EAE] hover:text-[#0097A7] hover:border-[rgba(0,151,167,0.3)] transition-all"
+          >
+            <Settings className="w-[11px] h-[11px]" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            className="w-[30px] h-[30px] rounded-lg bg-[#121A24] border border-[#1A2434] flex items-center justify-center text-[rgba(239,68,68,0.6)] hover:text-red-500 hover:border-red-500/30 transition-all"
+          >
+            <Trash2 className="w-[11px] h-[11px]" />
+          </button>
         </div>
       </motion.div>
     );
@@ -133,151 +93,88 @@ export default function ProjectCard({ project, layout = 'grid', isShared, onClic
 
   return (
     <motion.div
-      whileHover={{ scale: 1.02, y: -4 }}
+      whileHover={{ scale: 1.025, y: -3 }}
       whileTap={{ scale: 0.98 }}
       onClick={onClick}
-      className="group relative bg-[#111111] border border-white/5 hover:border-[#0097A7]/50 rounded-3xl overflow-hidden cursor-pointer transition-all shadow-2xl"
+      className="group relative bg-[#000000] border border-[rgba(255,255,255,0.05)] hover:border-[rgba(0,151,167,0.3)] rounded-3xl overflow-hidden cursor-pointer transition-all"
+      style={{
+        height: 320,
+        boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+      }}
+      animate={{
+        boxShadow: '0 4px 20px rgba(0,0,0,0.3), 0 24px 60px rgba(0,0,0,0.6), 0 0 30px rgba(0,151,167,0.1)',
+      }}
     >
-      {/* Cover Image or Icon Placeholder */}
-      <div className="h-40 bg-[#0a0a0a] relative overflow-hidden">
+      {/* Full-bleed Image or category icon - top 85% */}
+      <div className="absolute inset-0 h-[85%]">
         {project.coverImage ? (
           <img 
             src={project.coverImage} 
             alt={project.name} 
-            className="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity"
+            className="w-full h-full object-contain"
+            style={{ opacity: 0.6 }}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#0097A7]/10 to-black">
-            <span className="text-6xl grayscale opacity-20 group-hover:grayscale-0 group-hover:opacity-40 transition-all duration-500">
-              {projectType.icon}
-            </span>
-          </div>
-        )}
-        
-        {/* Status Badge */}
-        <div className="absolute top-4 left-4 flex flex-col gap-2 z-20">
-          <div className="relative">
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsStatusMenuOpen(!isStatusMenuOpen);
-              }}
-              className="px-3 py-1 bg-black/60 backdrop-blur-md rounded-full border border-white/10 hover:border-[#0097A7]/50 transition-all cursor-pointer group/status"
-            >
-              <div className="flex items-center gap-2">
-                <div className={`w-1.5 h-1.5 rounded-full ${project.status === 'active' ? 'bg-[#0097A7] animate-pulse' : 'bg-gray-500'}`} />
-                <span className="text-[9px] font-black text-white uppercase tracking-widest">{project.status}</span>
-              </div>
-            </button>
-
-            <AnimatePresence>
-              {isStatusMenuOpen && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  className="absolute top-full left-0 mt-2 p-1 bg-black/90 backdrop-blur-xl border border-white/10 rounded-xl z-30 min-w-[120px] shadow-2xl"
-                >
-                  {(['active', 'archived', 'completed'] as ProjectStatus[]).map((s) => (
-                    <button
-                      key={s}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onStatusChange(s);
-                        setIsStatusMenuOpen(false);
-                      }}
-                      className={`w-full flex items-center justify-between px-3 py-2 text-left text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${
-                        project.status === s 
-                        ? 'text-[#0097A7] bg-[#0097A7]/10' 
-                        : 'text-gray-500 hover:text-white hover:bg-white/5'
-                      }`}
-                    >
-                      {s}
-                      {project.status === s && <Check className="w-3 h-3" />}
-                    </button>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-          {isShared && (
-            <div className="px-3 py-1 bg-[#0097A7]/20 backdrop-blur-md rounded-full border border-[#0097A7]/30">
-              <div className="flex items-center gap-2">
-                <User className="w-2.5 h-2.5 text-[#0097A7]" />
-                <span className="text-[9px] font-black text-[#0097A7] uppercase tracking-widest">Shared</span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Actions */}
-        {!isShared && (
-          <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onEdit();
-              }}
-              className="p-2 bg-black/60 backdrop-blur-md rounded-full border border-white/10 text-gray-500 hover:text-[#0097A7]"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete();
-              }}
-              className="p-2 bg-black/60 backdrop-blur-md rounded-full border border-white/10 text-gray-500 hover:text-red-500"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
+          <div className="w-full h-full bg-gradient-to-br from-[rgba(0,151,167,0.09)] to-black flex items-center justify-center">
+            <span className="text-[80px] grayscale opacity-20">{projectType.icon}</span>
           </div>
         )}
       </div>
 
-      {/* Content */}
-      <div className="p-6 space-y-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-black text-[#0097A7] uppercase tracking-[0.2em]">
-              {projectType.label}
-            </span>
-            <span className="text-[10px] text-gray-600">•</span>
-            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
-              {project.subtype}
-            </span>
-          </div>
-          <h3 className="text-lg font-black text-white tracking-tight group-hover:text-[#0097A7] transition-colors truncate">
-            {project.name}
-          </h3>
+      {/* Gradient overlay - bottom 40% only */}
+      <div className="absolute bottom-0 left-0 right-0 h-[40%] bg-gradient-to-t from-black to-transparent" />
+
+      {/* Status pill - top left */}
+      <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 bg-[rgba(4,6,9,0.72)] backdrop-blur-xl border border-[rgba(255,255,255,0.07)] rounded-md">
+        <div className={`w-1 h-1 rounded-full ${project.status === 'active' ? 'bg-[#0097A7] shadow-[0_0_5px_#0097A7]' : project.status === 'completed' ? 'bg-[#22c55e]' : 'bg-[#4A6070]'}`} />
+        <span className="text-[9px] font-medium text-[rgba(255,255,255,0.55)] tracking-[0.07em] uppercase">{project.status}</span>
+      </div>
+
+      {/* Shared badge */}
+      {isShared && (
+        <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 ml-24 bg-[rgba(0,151,167,0.2)] backdrop-blur-xl border border-[rgba(0,151,167,0.3)] rounded-md">
+          <User className="w-2.5 h-2.5 text-[#0097A7]" />
+          <span className="text-[9px] font-semibold text-[#0097A7] tracking-[0.07em] uppercase">Shared</span>
+        </div>
+      )}
+
+      {/* Action buttons - top right, on hover */}
+      {!isShared && (
+        <div className="absolute top-3 right-3 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit();
+            }}
+            className="w-[30px] h-[30px] rounded-full bg-[rgba(4,6,9,0.72)] backdrop-blur-xl border border-[rgba(255,255,255,0.07)] flex items-center justify-center text-[rgba(255,255,255,0.5)] hover:text-[#0097A7] hover:border-[rgba(0,151,167,0.3)] transition-all"
+          >
+            <Settings className="w-[11px] h-[11px]" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            className="w-[30px] h-[30px] rounded-full bg-[rgba(4,6,9,0.72)] backdrop-blur-xl border border-[rgba(255,255,255,0.07)] flex items-center justify-center text-[rgba(239,68,68,0.65)] hover:text-red-500 transition-all"
+          >
+            <Trash2 className="w-[11px] h-[11px]" />
+          </button>
+        </div>
+      )}
+
+      {/* Bottom text - spans full card */}
+      <div className="absolute bottom-0 left-0 right-0 p-4 bg-black">
+        <div className="text-[9px] font-semibold text-[#0097A7] tracking-[0.16em] uppercase mb-1">{projectType.label}</div>
+        <div className="text-[17px] font-semibold tracking-[-0.03em] leading-tight">{project.name}</div>
+        <div className="text-[10px] text-[rgba(255,255,255,0.3)] mt-1">
+          {project.clientName} · {formatDate(project.updatedAt)}
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          {project.clientName && (
-            <div className="flex items-center gap-2 text-gray-500">
-              <Briefcase className="w-3.5 h-3.5" />
-              <span className="text-[10px] font-bold truncate uppercase tracking-tighter">{project.clientName}</span>
-            </div>
-          )}
-          <div className="flex items-center gap-2 text-gray-500">
-            <Clock className="w-3.5 h-3.5" />
-            <span className="text-[10px] font-bold uppercase tracking-tighter">{formatDate(project.updatedAt)}</span>
-          </div>
-        </div>
-
-        {/* Visual Identity Preview */}
-        <div className="flex items-center gap-1.5 pt-2">
-          <div className="w-4 h-4 rounded-full border border-white/10" style={{ backgroundColor: project.primaryColor }} />
-          <div className="w-4 h-4 rounded-full border border-white/10" style={{ backgroundColor: project.secondaryColor }} />
-          <div className="w-4 h-4 rounded-full border border-white/10" style={{ backgroundColor: project.accentColor }} />
-          <div className="flex-1" />
-          <div className="flex -space-x-2">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="w-6 h-6 rounded-full border-2 border-[#111111] bg-[#1a1a1a] flex items-center justify-center">
-                <div className="w-1 h-1 bg-gray-600 rounded-full" />
-              </div>
-            ))}
-          </div>
+        {/* Color dots */}
+        <div className="flex gap-1.5 mt-2.5">
+          <div className="w-[11px] h-[11px] rounded-full border border-[rgba(255,255,255,0.08)]" style={{ backgroundColor: project.primaryColor || '#0097A7' }} />
+          <div className="w-[11px] h-[11px] rounded-full border border-[rgba(255,255,255,0.08)]" style={{ backgroundColor: project.secondaryColor || '#C9A96E' }} />
+          <div className="w-[11px] h-[11px] rounded-full border border-[rgba(255,255,255,0.08)]" style={{ backgroundColor: project.accentColor || '#F2EDE8' }} />
         </div>
       </div>
     </motion.div>

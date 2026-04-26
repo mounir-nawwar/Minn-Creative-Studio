@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Search, LayoutGrid, List, Sparkles, LogOut, Trash2, RotateCcw, Calendar, Clock, AlertTriangle } from 'lucide-react';
+import { Plus, Search, LayoutGrid, List, Sparkles, LogOut, Trash2, RotateCcw, Calendar, Clock, AlertTriangle, User } from 'lucide-react';
 import { useProject } from '../hooks/useProject';
 import ProjectCard from '../components/ProjectCard';
 import ProjectCreationOverlay from '../components/ProjectCreationOverlay';
@@ -36,6 +36,7 @@ export default function ProjectPicker() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'active' | 'archived' | 'completed' | 'recycle-bin'>('active');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const filteredProjects = filter === 'recycle-bin' 
     ? archivedProjects 
@@ -63,48 +64,108 @@ export default function ProjectPicker() {
   return (
     <div className="min-h-screen bg-transparent text-white selection:bg-[#0097A7]/30 relative z-10">
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 h-24 bg-black/60 backdrop-blur-xl border-b border-white/5 z-50 px-12 flex items-center justify-between">
-        <div className="flex items-center gap-8">
-          <div className="space-y-1">
-            <img src={MinnLogo} alt="MINN STUDIO" className="h-7 w-auto mb-2" />
-            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Creative Pipeline Management</p>
-          </div>
-          
-          <div className="h-10 w-px bg-white/10" />
-          
-          <div className="relative group">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600 group-focus-within:text-[#0097A7] transition-colors" />
-            <input 
+      <header className="fixed top-0 left-0 right-0 h-[70px] z-50 px-9 flex items-center justify-between">
+        <div className="flex items-center gap-7">
+          <img src={MinnLogo} alt="MINN STUDIO" style={{ height: 22, width: 'auto', display: 'block' }} />
+
+          <div style={{ width: 1, height: 28, background: 'rgba(255,255,255,0.06)' }} />
+
+          <div className="relative">
+            <Search className="absolute left-[13px] top-1/2 -translate-y-1/2 w-4 h-4 text-[#2C3A4E]" />
+            <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search projects or clients..."
-              className="bg-[#111111] border border-white/5 rounded-2xl py-3 pl-12 pr-6 text-xs font-bold w-80 focus:outline-none focus:border-[#0097A7] transition-all"
+              placeholder="Search projects or clients…"
+              style={{
+                width: 300,
+                padding: '9px 16px 9px 36px',
+                background: '#080B0E',
+                border: '1px solid #1A2434',
+                borderRadius: 11,
+                fontSize: 13,
+                color: '#F2EDE8',
+                fontFamily: 'inherit',
+                letterSpacing: '-0.01em',
+                transition: 'border-color 0.15s',
+              }}
             />
           </div>
         </div>
 
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-3 bg-[#111111] p-1.5 pr-4 rounded-full border border-white/5">
-            <img 
-              src={auth.currentUser?.photoURL || ''} 
-              alt="User" 
-              className="w-8 h-8 rounded-full border border-[#0097A7]"
-            />
-            <div className="flex flex-col">
-              <span className="text-[10px] font-black text-white leading-none uppercase">{auth.currentUser?.displayName}</span>
-              <button 
-                onClick={() => signOut()}
-                className="text-[8px] font-bold text-gray-600 hover:text-red-500 uppercase tracking-widest text-left"
-              >
-                Sign Out
-              </button>
+        <div className="flex items-center gap-3">
+          {/* Profile pill */}
+          <div className="relative">
+            <div 
+              onClick={() => setProfileOpen(!profileOpen)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '7px 14px 7px 8px',
+                borderRadius: 999,
+                background: '#080B0E',
+                border: '1px solid #1A2434',
+                cursor: 'pointer',
+              }}
+            >
+              <div style={{
+                width: 30,
+                height: 30,
+                borderRadius: '50%',
+                background: '#121A24',
+                border: '1.5px solid rgba(0,151,167,0.35)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#4A6070',
+                overflow: 'hidden',
+              }}>
+                {auth.currentUser?.photoURL ? (
+                  <img src={auth.currentUser?.photoURL} alt="User" className="w-full h-full object-cover" />
+                ) : (
+                  <User className="w-4 h-4" />
+                )}
+              </div>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 500, color: '#F2EDE8', letterSpacing: '-0.01em', lineHeight: 1 }}>{auth.currentUser?.displayName}</div>
+                <div style={{ fontSize: 10, color: '#2C3A4E', marginTop: 2, letterSpacing: '0.01em' }}>Admin</div>
+              </div>
             </div>
+            {profileOpen && (
+              <div className="absolute top-full right-0 mt-2 p-1.5 border border-[rgba(255,255,255,0.07)] rounded-[14px] min-w-[170px] shadow-[0_16px_40px_rgba(0,0,0,0.6)] z-50" style={{ animation: 'scaleIn 0.18s cubic-bezier(0.22,1,0.36,1)', background: '#080B0E' }}>
+                <button 
+                  onClick={() => {
+                    signOut();
+                    setProfileOpen(false);
+                  }} 
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-[9px] bg-none border-none text-[12px] font-medium"
+                  style={{ color: 'rgba(239,68,68,0.7)', letterSpacing: '-0.01em', textAlign: 'left' }}
+                >
+                  <LogOut className="w-[12px] h-[12px]" />
+                  Sign Out
+                </button>
+              </div>
+            )}
           </div>
-          
+
           <button
             onClick={() => setIsOverlayOpen(true)}
-            className="flex items-center gap-3 px-8 py-4 bg-[#0097A7] text-white rounded-2xl font-black uppercase text-[11px] tracking-[0.2em] hover:scale-105 transition-all shadow-[0_0_30px_rgba(0,151,167,0.3)]"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '10px 22px',
+              borderRadius: 12,
+              background: '#0097A7',
+              border: 'none',
+              color: '#fff',
+              fontSize: 13,
+              fontWeight: 500,
+              letterSpacing: '-0.01em',
+              boxShadow: '0 0 22px rgba(0,151,167,0.3)',
+              transition: 'all 0.18s',
+            }}
           >
             <Plus className="w-4 h-4" />
             New Project
@@ -113,58 +174,87 @@ export default function ProjectPicker() {
       </header>
 
       {/* Main Content */}
-      <main className="pt-32 pb-20 px-12 max-w-[1600px] mx-auto">
+      <main style={{ paddingTop: 110, paddingBottom: 80, paddingLeft: 36, paddingRight: 36, maxWidth: 1400, margin: '0 auto' }}>
         {/* Filters */}
         <div className="flex items-center justify-between mb-12">
-          <div className="flex items-center gap-3">
-            {['all', 'active', 'completed', 'archived'].map((f) => (
-              <button
-                key={f}
-                onClick={() => setFilter(f as any)}
-                className={`px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border ${
-                  filter === f 
-                  ? 'bg-white text-black border-white' 
-                  : 'bg-[#111111] text-gray-500 border-white/5 hover:border-white/20'
-                }`}
-              >
-                {f}
-              </button>
-            ))}
+          <div className="flex items-center gap-1.5">
+            {['all', 'active', 'completed', 'archived'].map((f) => {
+              const isActive = filter === f;
+              const label = f.charAt(0).toUpperCase() + f.slice(1);
+              return (
+                <button
+                  key={f}
+                  onClick={() => setFilter(f as any)}
+                  className="px-[18px] py-2 rounded-full text-[12px] font-medium transition-all border"
+                  style={{
+                    background: isActive ? '#F2EDE8' : 'transparent',
+                    border: `1px solid ${isActive ? '#F2EDE8' : 'rgba(255,255,255,0.07)'}`,
+                    color: isActive ? '#080B0E' : '#4A6070',
+                    letterSpacing: '-0.01em',
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
             
             {/* Recycle Bin Tab */}
             <button
               onClick={() => setFilter('recycle-bin')}
-              className={`px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border ${
-                filter === 'recycle-bin'
-                  ? 'bg-[#0097A7] text-white border-[#0097A7]'
-                  : archivedCount > 0
-                    ? 'bg-[#0097A7]/10 text-[#0097A7] border-[#0097A7]/30 hover:border-[#0097A7]/50'
-                    : 'bg-[#111111] text-gray-500 border-white/5 hover:border-white/20'
-              }`}
+              className="px-[18px] py-2 rounded-full text-[12px] font-medium transition-all border"
+              style={{
+                background: filter === 'recycle-bin' ? '#0097A7' : (archivedCount > 0 ? 'rgba(0,151,167,0.1)' : 'transparent'),
+                border: `1px solid ${filter === 'recycle-bin' ? '#0097A7' : (archivedCount > 0 ? 'rgba(0,151,167,0.3)' : 'rgba(255,255,255,0.07)')}`,
+                color: filter === 'recycle-bin' ? '#fff' : (archivedCount > 0 ? '#0097A7' : '#4A6070'),
+                letterSpacing: '-0.01em',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 7,
+              }}
             >
-              <span className="flex items-center gap-2">
-                Recycle Bin
-                {archivedCount > 0 && (
-                  <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-[#0097A7] text-white text-[9px] font-black rounded-full">
-                    {archivedCount}
-                  </span>
-                )}
-              </span>
+              Recycle Bin
+              {archivedCount > 0 && (
+                <span 
+                  style={{
+                    background: filter === 'recycle-bin' ? 'rgba(255,255,255,0.25)' : 'rgba(0,151,167,0.2)',
+                    color: filter === 'recycle-bin' ? '#fff' : '#0097A7',
+                    borderRadius: 999,
+                    minWidth: 18,
+                    height: 18,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 9,
+                    fontWeight: 600,
+                    padding: '0 5px'
+                  }}
+                >
+                  {archivedCount}
+                </span>
+              )}
             </button>
           </div>
           
-          <div className="flex items-center gap-2 p-1 bg-[#111111] rounded-xl border border-white/5">
+          <div className="flex items-center gap-0.5 p-1 border border-[#1A2434] rounded-[10px]" style={{ background: '#080B0E' }}>
             <button 
               onClick={() => setViewMode('grid')}
-              className={`p-2 rounded-lg transition-colors ${viewMode === 'grid' ? 'bg-white/10 text-white' : 'text-gray-600 hover:text-white'}`}
+              className="w-8 h-8 rounded-[7px] flex items-center justify-center transition-all"
+              style={{
+                background: viewMode === 'grid' ? '#1A2535' : 'transparent',
+                color: viewMode === 'grid' ? '#F2EDE8' : '#2C3A4E',
+              }}
             >
-              <LayoutGrid className="w-4 h-4" />
+              <LayoutGrid className="w-[14px] h-[14px]" />
             </button>
             <button 
               onClick={() => setViewMode('list')}
-              className={`p-2 rounded-lg transition-colors ${viewMode === 'list' ? 'bg-white/10 text-white' : 'text-gray-600 hover:text-white'}`}
+              className="w-8 h-8 rounded-[7px] flex items-center justify-center transition-all"
+              style={{
+                background: viewMode === 'list' ? '#1A2535' : 'transparent',
+                color: viewMode === 'list' ? '#F2EDE8' : '#2C3A4E',
+              }}
             >
-              <List className="w-4 h-4" />
+            <List className="w-[14px] h-[14px]" />
             </button>
           </div>
         </div>
@@ -177,31 +267,33 @@ export default function ProjectPicker() {
               animate={{ opacity: 1, y: 0 }}
               className="flex flex-col items-center justify-center py-40 text-center space-y-8"
             >
-              <div className="w-32 h-32 bg-[#111111] rounded-[40px] flex items-center justify-center border border-white/5">
+              <div className="w-20 h-20 rounded-[24px] flex items-center justify-center border border-[#1A2434]" style={{ background: '#080B0E' }}>
                 {filter === 'recycle-bin' ? (
-                  <Trash2 className="w-12 h-12 text-gray-700" />
+                  <Trash2 className="w-7 h-7 text-[#2C3A4E]" />
                 ) : (
-                  <Sparkles className="w-12 h-12 text-gray-800" />
+                  <Sparkles className="w-7 h-7 text-[#2C3A4E]" />
                 )}
               </div>
               <div className="space-y-2">
-                <h2 className="text-2xl font-black text-white tracking-tighter uppercase">
-                  {filter === 'recycle-bin' ? 'Recycle Bin Empty' : 'No projects found'}
+                <h2 className="text-xl font-semibold text-[#F2EDE8]" style={{ letterSpacing: '-0.03em' }}>
+                  {filter === 'recycle-bin' ? 'Recycle bin is empty' : 'No projects here'}
                 </h2>
-                <p className="text-gray-500 text-sm max-w-md mx-auto">
+                <p className="text-[#2C3A4E] text-sm mx-auto" style={{ letterSpacing: '-0.01em', maxWidth: 340 }}>
                   {filter === 'recycle-bin' 
                     ? `Deleted projects will appear here for ${RETENTION_DAYS} days before permanent removal.`
                     : searchQuery 
                       ? `We couldn't find any projects matching "${searchQuery}"` 
-                      : "You haven't created any projects yet. Start by creating your first creative mission."}
+                      : 'Create your first project to get started.'}
                 </p>
               </div>
               {!searchQuery && filter !== 'recycle-bin' && (
                 <button
                   onClick={() => setIsOverlayOpen(true)}
-                  className="px-10 py-4 bg-white text-black rounded-2xl font-black uppercase text-[11px] tracking-[0.2em] hover:scale-105 transition-all"
+                  className="flex items-center gap-2 px-[28px] py-3 bg-[#0097A7] text-white rounded-[12px] text-[13px] font-medium transition-all"
+                  style={{ letterSpacing: '-0.01em', boxShadow: '0 0 22px rgba(0,151,167,0.3)', marginTop: 4 }}
                 >
-                  Create Your First Project
+                  <Plus className="w-[13px] h-[13px]" />
+                  New Project
                 </button>
               )}
             </motion.div>
@@ -291,8 +383,8 @@ export default function ProjectPicker() {
             <motion.div 
               layout
               className={viewMode === 'grid' 
-                ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8"
-                : "flex flex-col gap-4"
+                ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+                : "flex flex-col gap-2"
               }
             >
               {filteredProjects.map((project) => (
@@ -350,14 +442,26 @@ export default function ProjectPicker() {
         retentionDays={RETENTION_DAYS}
       />
 
-      {/* Footer Branding */}
-      <footer className="fixed bottom-8 left-1/2 -translate-x-1/2 text-center space-y-2 opacity-20 hover:opacity-100 transition-opacity">
-        <p className="text-[10px] font-black text-white uppercase tracking-[0.5em]">MINN STUDIO 2026</p>
-        <div className="flex items-center justify-center gap-4">
-          <div className="w-1 h-1 bg-[#0097A7] rounded-full" />
-          <div className="w-1 h-1 bg-[#0097A7] rounded-full" />
-          <div className="w-1 h-1 bg-[#0097A7] rounded-full" />
+      {/* Footer */}
+      <footer style={{ borderTop: '1px solid rgba(255,255,255,0.04)', padding: '40px 36px 48px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, marginTop: 60 }}>
+        <img src={MinnLogo} alt="MINN STUDIO" className="h-[18px] w-auto" />
+
+        <div className="flex items-center gap-7">
+          {['Privacy', 'Terms', 'Docs', 'Status'].map((link, i, arr) => (
+            <React.Fragment key={link}>
+              <span className="text-[12px] text-[#2C3A4E] hover:text-[#8A9EAE] cursor-pointer transition-colors tracking-[-0.01em]">
+                {link}
+              </span>
+              {i < arr.length - 1 && (
+                <div className="w-[3px] h-[3px] rounded-full bg-[#1A2535]" />
+              )}
+            </React.Fragment>
+          ))}
         </div>
+
+        <span className="text-[11px] text-[#1A2535] tracking-[-0.005em]">
+          © 2026 Minn Studio. All rights reserved.
+        </span>
       </footer>
     </div>
   );

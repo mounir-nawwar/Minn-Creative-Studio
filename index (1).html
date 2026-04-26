@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Minn Studio — Projects</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; }
+  body {
+    background: #080B0E;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #F2EDE8;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  ::-webkit-scrollbar { width: 3px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #1A2434; border-radius: 3px; }
+  input::placeholder { color: #2C3A4E; }
+  input:focus { outline: none; }
+  button { cursor: pointer; font-family: inherit; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.96) translateY(12px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useRef, useEffect } = React;
+
+/* ─── LOGO SVG ─── */
+const MinnLogo = ({ height = 24 }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 879 117" style={{ height, width: 'auto', display: 'block' }}>
+    <path fill="#0097A7" d="M9.5,1.87S1.56,1.87,1.56,11.39v97.49s-1.26,7.25,7.94,7.25,9.2-6.12,9.2-6.12V28.53s39.99,38.09,68.56,38.09,68.56-38.78,68.56-38.78v82.82s-1.82,5.47,7.66,5.47,9.48-5.79,9.48-5.79V8.89c0-1.31-1.78-7.03-8.51-7.03,0,0-3.87,0-7.42,2.74-.41.32-52.69,44.87-69.8,44.87S18.1,6.76,17.15,5.91c-1.82-1.64-4.94-4.04-7.65-4.04Z"/>
+    <path fill="#0097A7" d="M424.34,32.7v77.72s0,5.71,8.57,5.71,8.57-5.71,8.57-5.71V26.62c0-3.81,8.38-11.43,20.38,0,12,11.43,86.27,76.18,93.89,81.89,5.59,5.71,39.99,7.62,39.99-15.24V7.58s0-5.71-8.57-5.71c-8.57,0-8.57,5.71-8.57,5.71v81.89l-.53,1.39s-1.38,4.33-8.88,3.98c-3.92.35-9.47-3.33-13.18-6.72-17.49-15.98-77.2-69.72-85.96-76.73-9.52-7.62-45.71-24.03-45.71,21.31Z"/>
+    <path fill="#0097A7" d="M809.57,14.04c-.6-.35-.63-1.2-.07-1.6l15-10.57,16.21,11.43-16.21,9.52-14.94-8.77Z"/>
+    <path fill="#0097A7" d="M706.2,10.86v97.09c0,4.02,3.26,7.28,7.28,7.28h3.64c3.43,0,6.21-2.78,6.21-6.21v-49.35c0-3.27,4.16-4.78,6.16-2.19,12.89,16.74,58.6,54.83,130.96,56.73h7.34c5.99,0,8.7-3.92,8.7-8.7h0c0-4.66-3.78-8.44-8.44-8.44h-9.51s-96.77,3.63-133-89.2c-1.41-3.62-4.9-6.02-8.79-6.02h-1.57c-4.97,0-9,4.03-9,9Z"/>
+    <path fill="#0097A7" d="M876.5,9.42v55.44c0,7.28-5.9,13.18-13.18,13.18h-3.96s-85.47-1.72-96.1-65.86c-.89-5.4,3.28-10.31,8.75-10.31h0c4.14,0,7.85,2.6,9.19,6.51,4.95,14.44,21.85,48.05,72.3,50.48,3.2.15,5.86-2.44,5.86-5.64V8.68c0-3.76,3.05-6.81,6.81-6.81h2.78c4.17,0,7.56,3.38,7.56,7.56Z"/>
+    <path fill="#0097A7" d="M298.5,2c-9.5,0-9.5,5-9.5,5v104.07s0,4.93,9.5,4.93,9.5-4.93,9.5-4.93V7s0-5-9.5-5Z"/>
+  </svg>
+);
+
+/* ─── MOCK DATA ─── */
+const PROJECTS = [
+  { id: 1, name: 'Layla Brand Campaign', type: 'Brand',    status: 'active',    client: 'Layla Agency',   date: 'Apr 20, 2025', img: 'assets/brand-image-1.jpg', colors: ['#0097A7','#C9A96E','#F2EDE8'] },
+  { id: 2, name: 'Product Launch Reel',  type: 'Video',    status: 'active',    client: 'Nour Co.',       date: 'Apr 18, 2025', img: 'assets/brand-image-2.jpg', colors: ['#C9A96E','#0097A7','#2C3A4E'] },
+  { id: 3, name: 'Studio Identity',      type: 'Motion',   status: 'completed', client: 'In-House',       date: 'Apr 10, 2025', img: 'assets/brand-image-3.jpg', colors: ['#F2EDE8','#0097A7','#C9A96E'] },
+  { id: 4, name: 'AI Automation Deck',   type: 'Workflow', status: 'active',    client: 'TechForward',    date: 'Apr 5, 2025',  img: null,                        colors: ['#0097A7','#2C3A4E','#1A2535'] },
+  { id: 5, name: 'Social Content Pack',  type: 'Brand',    status: 'archived',  client: 'Bloom Studio',   date: 'Mar 28, 2025', img: 'assets/brand-image-5.jpg', colors: ['#2C3A4E','#C9A96E','#0097A7'] },
+  { id: 6, name: 'Event Visualizer',     type: 'Video',    status: 'active',    client: 'Dubai Events',   date: 'Mar 20, 2025', img: 'assets/brand-image-4.jpg', colors: ['#0097A7','#F2EDE8','#C9A96E'] },
+  { id: 7, name: 'Rebrand System',       type: 'Brand',    status: 'completed', client: 'Forma Agency',   date: 'Mar 12, 2025', img: null,                        colors: ['#C9A96E','#F2EDE8','#0097A7'] },
+  { id: 8, name: 'Cinematic Opener',     type: 'Motion',   status: 'active',    client: 'Reel Studio',    date: 'Mar 5, 2025',  img: 'assets/brand-image-3.jpg', colors: ['#1A2535','#0097A7','#C9A96E'] },
+];
+
+const DELETED = [
+  { id: 'd1', name: 'Old Campaign 2024', type: 'Brand',  client: 'Former Client', deletedDate: 'Apr 1, 2025', daysLeft: 22 },
+  { id: 'd2', name: 'Archive Test',      type: 'Motion', client: 'In-House',      deletedDate: 'Apr 10, 2025', daysLeft: 5  },
+];
+
+/* ─── ICONS ─── */
+const IconSearch  = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>;
+const IconGrid    = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>;
+const IconList    = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>;
+const IconPlus    = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
+const IconEdit    = () => <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>;
+const IconTrash   = () => <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>;
+const IconRestore = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>;
+const IconLogout  = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>;
+const IconUser    = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
+
+/* ─── STATUS CONFIG ─── */
+const STATUS = {
+  active:    { color: '#0097A7', label: 'Active',    dot: '0 0 5px #0097A7' },
+  completed: { color: '#22c55e', label: 'Completed', dot: 'none' },
+  archived:  { color: '#4A6070', label: 'Archived',  dot: 'none' },
+};
+
+/* ─── PROJECT CARD (full-bleed image) ─── */
+function ProjectCard({ project, layout, onEdit, onDelete }) {
+  const [hov, setHov] = useState(false);
+  const s = STATUS[project.status] || STATUS.active;
+
+  if (layout === 'list') {
+    return (
+      <div
+        onMouseEnter={() => setHov(true)}
+        onMouseLeave={() => setHov(false)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 20,
+          padding: '16px 20px',
+          background: hov ? '#0D1219' : 'transparent',
+          border: `1px solid ${hov ? 'rgba(0,151,167,0.2)' : 'rgba(255,255,255,0.04)'}`,
+          borderRadius: 14,
+          transition: 'all 0.2s cubic-bezier(0.22,1,0.36,1)',
+          cursor: 'pointer',
+        }}
+      >
+        {/* Thumb */}
+        <div style={{ width: 52, height: 52, borderRadius: 10, overflow: 'hidden', flexShrink: 0, background: 'linear-gradient(145deg, rgba(0,151,167,0.1), #080B0E)' }}>
+          {project.img && <img src={project.img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.7 }} />}
+        </div>
+
+        {/* Info */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 9, fontWeight: 600, color: '#0097A7', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 4 }}>{project.type}</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: hov ? '#0097A7' : '#F2EDE8', letterSpacing: '-0.025em', transition: 'color 0.18s', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{project.name}</div>
+          {project.client && <div style={{ fontSize: 10, color: '#2C3A4E', marginTop: 3, letterSpacing: '0.02em' }}>{project.client}</div>}
+        </div>
+
+        {/* Status */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          <div style={{ width: 5, height: 5, borderRadius: '50%', background: s.color, boxShadow: s.dot }} />
+          <span style={{ fontSize: 10, fontWeight: 500, color: s.color, letterSpacing: '0.05em' }}>{s.label}</span>
+        </div>
+
+        {/* Date */}
+        <div style={{ fontSize: 10, color: '#2C3A4E', flexShrink: 0, minWidth: 90, textAlign: 'right' }}>{project.date}</div>
+
+        {/* Actions */}
+        <div style={{ display: 'flex', gap: 6, flexShrink: 0, opacity: hov ? 1 : 0, transition: 'opacity 0.15s' }}>
+          <button onClick={e => { e.stopPropagation(); onEdit(project); }} style={{ width: 30, height: 30, borderRadius: 8, background: '#121A24', border: '1px solid #1A2434', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8A9EAE' }}><IconEdit /></button>
+          <button onClick={e => { e.stopPropagation(); onDelete(project); }} style={{ width: 30, height: 30, borderRadius: 8, background: '#121A24', border: '1px solid #1A2434', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(239,68,68,0.6)' }}><IconTrash /></button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        position: 'relative', borderRadius: 16, overflow: 'hidden',
+        height: 280, cursor: 'pointer',
+        border: `1px solid ${hov ? 'rgba(0,151,167,0.3)' : 'rgba(255,255,255,0.05)'}`,
+        transform: hov ? 'scale(1.025) translateY(-3px)' : 'scale(1) translateY(0)',
+        boxShadow: hov ? '0 24px 60px rgba(0,0,0,0.6), 0 0 30px rgba(0,151,167,0.1)' : '0 4px 20px rgba(0,0,0,0.3)',
+        transition: 'all 0.28s cubic-bezier(0.22,1,0.36,1)',
+        animation: 'fadeUp 0.5s cubic-bezier(0.22,1,0.36,1) both',
+      }}
+    >
+      {/* Image / empty */}
+      {project.img
+        ? <img src={project.img} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: hov ? 0.75 : 0.55, transition: 'opacity 0.28s' }} />
+        : <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(145deg, rgba(0,151,167,0.09) 0%, #080B0E 100%)' }} />
+      }
+
+      {/* Gradient overlay */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: 'linear-gradient(to top, rgba(4,6,9,0.97) 0%, rgba(4,6,9,0.75) 35%, rgba(4,6,9,0.2) 65%, transparent 100%)',
+      }} />
+
+      {/* Status pill — top left */}
+      <div style={{
+        position: 'absolute', top: 12, left: 12,
+        background: 'rgba(4,6,9,0.72)', backdropFilter: 'blur(16px)',
+        border: '1px solid rgba(255,255,255,0.07)', borderRadius: 6,
+        padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 5,
+      }}>
+        <div style={{ width: 4, height: 4, borderRadius: '50%', background: s.color, boxShadow: s.dot }} />
+        <span style={{ fontSize: 9, fontWeight: 500, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.07em' }}>{s.label}</span>
+      </div>
+
+      {/* Action buttons — top right, on hover */}
+      <div style={{ position: 'absolute', top: 12, right: 12, display: 'flex', gap: 6, opacity: hov ? 1 : 0, transition: 'opacity 0.18s' }}>
+        <button onClick={e => { e.stopPropagation(); onEdit(project); }} style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(4,6,9,0.72)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.5)' }}><IconEdit /></button>
+        <button onClick={e => { e.stopPropagation(); onDelete(project); }} style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(4,6,9,0.72)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(239,68,68,0.65)' }}><IconTrash /></button>
+      </div>
+
+      {/* Bottom text */}
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '18px 16px' }}>
+        <div style={{ fontSize: 9, fontWeight: 600, color: '#0097A7', letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 5 }}>{project.type}</div>
+        <div style={{ fontSize: 17, fontWeight: 600, color: hov ? '#fff' : '#F2EDE8', letterSpacing: '-0.03em', lineHeight: 1.2, transition: 'color 0.18s' }}>{project.name}</div>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 5 }}>{project.client} · {project.date}</div>
+
+        {/* Color dots */}
+        <div style={{ display: 'flex', gap: 5, marginTop: 10 }}>
+          {project.colors.map((c, i) => (
+            <div key={i} style={{ width: 11, height: 11, borderRadius: '50%', background: c, border: '1px solid rgba(255,255,255,0.08)' }} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── RECYCLE ROW ─── */
+function RecycleRow({ item }) {
+  const [hov, setHov] = useState(false);
+  const urgent = item.daysLeft <= 7;
+  return (
+    <div
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 20,
+        padding: '18px 22px', borderRadius: 14,
+        background: hov ? '#0D1219' : 'transparent',
+        border: `1px solid ${hov ? 'rgba(0,151,167,0.2)' : 'rgba(255,255,255,0.04)'}`,
+        transition: 'all 0.2s cubic-bezier(0.22,1,0.36,1)',
+      }}
+    >
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 9, fontWeight: 600, color: '#4A6070', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 3 }}>{item.type}</div>
+        <div style={{ fontSize: 15, fontWeight: 600, color: '#8A9EAE', letterSpacing: '-0.025em' }}>{item.name}</div>
+        {item.client && <div style={{ fontSize: 10, color: '#2C3A4E', marginTop: 3 }}>{item.client}</div>}
+      </div>
+
+      <div style={{ fontSize: 10, color: '#2C3A4E', flexShrink: 0 }}>Deleted {item.deletedDate}</div>
+
+      {urgent && (
+        <div style={{ padding: '4px 10px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 6, fontSize: 9, fontWeight: 600, color: '#f59e0b', letterSpacing: '0.1em', textTransform: 'uppercase', flexShrink: 0 }}>
+          {item.daysLeft}d left
+        </div>
+      )}
+      {!urgent && (
+        <div style={{ fontSize: 10, color: '#2C3A4E', flexShrink: 0 }}>{item.daysLeft} days left</div>
+      )}
+
+      <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+        <button style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 9, background: '#0097A7', border: 'none', color: '#fff', fontSize: 11, fontWeight: 500, letterSpacing: '-0.01em', boxShadow: '0 0 12px rgba(0,151,167,0.28)' }}>
+          <IconRestore /> Restore
+        </button>
+        <button style={{ width: 34, height: 34, borderRadius: 9, background: '#0D1219', border: '1px solid #1A2434', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(239,68,68,0.6)' }}>
+          <IconTrash />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ─── EMPTY STATE ─── */
+function EmptyState({ filter, onNew }) {
+  const isRecycle = filter === 'recycle-bin';
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '120px 0', gap: 24, animation: 'fadeIn 0.4s ease both' }}>
+      <div style={{ width: 80, height: 80, borderRadius: 24, background: '#0D1219', border: '1px solid #1A2434', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {isRecycle
+          ? <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2C3A4E" strokeWidth="1.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>
+          : <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2C3A4E" strokeWidth="1.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        }
+      </div>
+      <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ fontSize: 20, fontWeight: 600, color: '#F2EDE8', letterSpacing: '-0.03em' }}>
+          {isRecycle ? 'Recycle bin is empty' : 'No projects here'}
+        </div>
+        <div style={{ fontSize: 13, color: '#2C3A4E', letterSpacing: '-0.01em', maxWidth: 340 }}>
+          {isRecycle ? 'Deleted projects will appear here for 30 days before permanent removal.' : 'Create your first project to get started.'}
+        </div>
+      </div>
+      {!isRecycle && (
+        <button onClick={onNew} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 28px', borderRadius: 12, background: '#0097A7', border: 'none', color: '#fff', fontSize: 13, fontWeight: 500, letterSpacing: '-0.01em', boxShadow: '0 0 22px rgba(0,151,167,0.3)', marginTop: 4 }}>
+          <IconPlus /> New Project
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* ─── NEW PROJECT MODAL ─── */
+function NewProjectModal({ onClose }) {
+  const types = ['Brand', 'Video', 'Motion', 'Workflow', 'Web', 'AI'];
+  const [name, setName] = useState('');
+  const [client, setClient] = useState('');
+  const [type, setType] = useState('Brand');
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      {/* Backdrop */}
+      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(4,6,9,0.85)', backdropFilter: 'blur(8px)', animation: 'fadeIn 0.2s ease' }} />
+      {/* Card */}
+      <div style={{
+        position: 'relative', width: '100%', maxWidth: 460,
+        background: '#0D1219', border: '1px solid rgba(255,255,255,0.07)',
+        borderRadius: 20, overflow: 'hidden',
+        boxShadow: '0 40px 100px rgba(0,0,0,0.7), 0 0 50px rgba(0,151,167,0.05)',
+        animation: 'scaleIn 0.3s cubic-bezier(0.22,1,0.36,1) both',
+      }}>
+        {/* Header */}
+        <div style={{ padding: '22px 24px 20px', borderBottom: '1px solid #121A24', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontSize: 17, fontWeight: 600, color: '#F2EDE8', letterSpacing: '-0.025em' }}>New Project</div>
+            <div style={{ fontSize: 11, color: '#2C3A4E', marginTop: 3, letterSpacing: '-0.01em' }}>Set up your creative workspace</div>
+          </div>
+          <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: 9, background: '#121A24', border: '1px solid #1A2434', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4A6070' }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: '22px 24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+          {/* Name */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            <label style={{ fontSize: 10, fontWeight: 600, color: '#2C3A4E', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Project Name</label>
+            <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Layla Brand Campaign"
+              style={{ background: '#080B0E', border: '1px solid #1A2434', borderRadius: 11, padding: '12px 14px', fontSize: 14, color: '#F2EDE8', fontFamily: 'inherit', letterSpacing: '-0.01em', width: '100%' }} />
+          </div>
+
+          {/* Client */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            <label style={{ fontSize: 10, fontWeight: 600, color: '#2C3A4E', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Client</label>
+            <input value={client} onChange={e => setClient(e.target.value)} placeholder="Client or in-house"
+              style={{ background: '#080B0E', border: '1px solid #1A2434', borderRadius: 11, padding: '12px 14px', fontSize: 14, color: '#F2EDE8', fontFamily: 'inherit', letterSpacing: '-0.01em', width: '100%' }} />
+          </div>
+
+          {/* Type */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            <label style={{ fontSize: 10, fontWeight: 600, color: '#2C3A4E', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Type</label>
+            <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+              {types.map(t => (
+                <button key={t} onClick={() => setType(t)} style={{
+                  padding: '7px 14px', borderRadius: 9, fontSize: 11, fontWeight: 500, letterSpacing: '-0.01em',
+                  background: type === t ? '#0097A7' : '#080B0E',
+                  border: `1px solid ${type === t ? '#0097A7' : '#1A2434'}`,
+                  color: type === t ? '#fff' : '#4A6070',
+                  boxShadow: type === t ? '0 0 12px rgba(0,151,167,0.28)' : 'none',
+                  transition: 'all 0.15s',
+                }}>{t}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '16px 24px 22px', borderTop: '1px solid #121A24', display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{ padding: '11px 22px', borderRadius: 11, background: 'transparent', border: '1px solid #1A2434', color: '#4A6070', fontSize: 13, fontWeight: 500, letterSpacing: '-0.01em' }}>Cancel</button>
+          <button onClick={onClose} style={{ padding: '11px 26px', borderRadius: 11, background: '#0097A7', border: 'none', color: '#fff', fontSize: 13, fontWeight: 500, letterSpacing: '-0.01em', boxShadow: '0 0 18px rgba(0,151,167,0.32)' }}>Create Project</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── MAIN APP ─── */
+const FILTERS = ['active', 'all', 'completed', 'archived', 'recycle-bin'];
+
+function ProjectPicker() {
+  const [filter, setFilter]       = useState('active');
+  const [view, setView]           = useState('grid');
+  const [search, setSearch]       = useState('');
+  const [showNew, setShowNew]     = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+
+  const filtered = filter === 'recycle-bin'
+    ? []
+    : PROJECTS.filter(p => {
+        const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.client?.toLowerCase().includes(search.toLowerCase());
+        const matchFilter = filter === 'all' || p.status === filter;
+        return matchSearch && matchFilter;
+      });
+
+  const deletedCount = DELETED.length;
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#080B0E', position: 'relative' }}>
+
+      {/* ── HEADER ── */}
+      <header style={{
+        position: 'fixed', top: 0, left: 0, right: 0, height: 70,
+        background: 'rgba(8,11,14,0.55)', backdropFilter: 'blur(32px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(32px) saturate(180%)',
+        borderBottom: 'none',
+        boxShadow: 'none',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 36px', zIndex: 100,
+      }}>
+        {/* Left — logo + search */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
+          <MinnLogo height={22} />
+
+          <div style={{ width: 1, height: 28, background: 'rgba(255,255,255,0.06)' }} />
+
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <span style={{ position: 'absolute', left: 13, color: '#2C3A4E', display: 'flex' }}><IconSearch /></span>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search projects or clients…"
+              style={{
+                width: 300, padding: '9px 16px 9px 36px',
+                background: '#0D1219', border: '1px solid #1A2434',
+                borderRadius: 11, fontSize: 13, color: '#F2EDE8',
+                fontFamily: 'inherit', letterSpacing: '-0.01em',
+                transition: 'border-color 0.15s',
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Right — profile + new project */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {/* Profile pill */}
+          <div style={{ position: 'relative' }}>
+            <div
+              onClick={() => setProfileOpen(p => !p)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '7px 14px 7px 8px', borderRadius: 999,
+                background: '#0D1219', border: '1px solid #1A2434', cursor: 'pointer',
+              }}
+            >
+              <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#121A24', border: '1.5px solid rgba(0,151,167,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4A6070' }}>
+                <IconUser />
+              </div>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 500, color: '#F2EDE8', letterSpacing: '-0.01em', lineHeight: 1 }}>Mounir</div>
+                <div style={{ fontSize: 10, color: '#2C3A4E', marginTop: 2, letterSpacing: '0.01em' }}>Admin</div>
+              </div>
+            </div>
+            {profileOpen && (
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+                background: '#0D1219', border: '1px solid rgba(255,255,255,0.07)',
+                borderRadius: 14, padding: 6, minWidth: 170,
+                boxShadow: '0 16px 40px rgba(0,0,0,0.6)',
+                animation: 'scaleIn 0.18s cubic-bezier(0.22,1,0.36,1)',
+              }}>
+                <button onClick={() => setProfileOpen(false)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 9, background: 'none', border: 'none', color: 'rgba(239,68,68,0.7)', fontSize: 12, fontWeight: 500, letterSpacing: '-0.01em', textAlign: 'left' }}>
+                  <IconLogout /> Sign Out
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* New Project */}
+          <button
+            onClick={() => setShowNew(true)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '10px 22px', borderRadius: 12,
+              background: '#0097A7', border: 'none', color: '#fff',
+              fontSize: 13, fontWeight: 500, letterSpacing: '-0.01em',
+              boxShadow: '0 0 22px rgba(0,151,167,0.3)',
+              transition: 'all 0.18s',
+            }}
+          >
+            <IconPlus /> New Project
+          </button>
+        </div>
+      </header>
+
+      {/* ── MAIN ── */}
+      <main style={{ paddingTop: 110, paddingBottom: 80, paddingLeft: 36, paddingRight: 36, maxWidth: 1400, margin: '0 auto' }}>
+
+        {/* Filters + view toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 36 }}>
+          {/* Filter tabs */}
+          <div style={{ display: 'flex', gap: 6 }}>
+            {FILTERS.map(f => {
+              const isActive = filter === f;
+              const isRecycle = f === 'recycle-bin';
+              const label = isRecycle ? 'Recycle Bin' : f.charAt(0).toUpperCase() + f.slice(1);
+              return (
+                <button
+                  key={f}
+                  onClick={() => setFilter(f)}
+                  style={{
+                    padding: '8px 18px', borderRadius: 999,
+                    background: isActive ? (isRecycle ? '#0097A7' : '#F2EDE8') : 'transparent',
+                    border: `1px solid ${isActive ? (isRecycle ? '#0097A7' : '#F2EDE8') : 'rgba(255,255,255,0.07)'}`,
+                    color: isActive ? (isRecycle ? '#fff' : '#080B0E') : '#4A6070',
+                    fontSize: 12, fontWeight: 500, letterSpacing: '-0.01em',
+                    display: 'flex', alignItems: 'center', gap: 7,
+                    transition: 'all 0.18s',
+                    boxShadow: isActive && !isRecycle ? '0 2px 12px rgba(242,237,232,0.1)' : 'none',
+                  }}
+                >
+                  {label}
+                  {isRecycle && deletedCount > 0 && (
+                    <span style={{ background: isActive ? 'rgba(255,255,255,0.25)' : 'rgba(0,151,167,0.2)', color: isActive ? '#fff' : '#0097A7', borderRadius: 999, minWidth: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 600, padding: '0 5px' }}>{deletedCount}</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* View toggle */}
+          <div style={{ display: 'flex', gap: 2, background: '#0D1219', border: '1px solid #1A2434', borderRadius: 10, padding: 4 }}>
+            {[['grid', <IconGrid />], ['list', <IconList />]].map(([v, icon]) => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                style={{
+                  width: 32, height: 32, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: view === v ? '#1A2535' : 'transparent',
+                  border: 'none',
+                  color: view === v ? '#F2EDE8' : '#2C3A4E',
+                  transition: 'all 0.15s',
+                }}
+              >{icon}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* Section title */}
+        {filter !== 'recycle-bin' && filtered.length > 0 && (
+          <div style={{ marginBottom: 20, display: 'flex', alignItems: 'baseline', gap: 12 }}>
+            <div style={{ fontSize: 22, fontWeight: 600, color: '#F2EDE8', letterSpacing: '-0.035em' }}>
+              {filter === 'all' ? 'All Projects' : filter.charAt(0).toUpperCase() + filter.slice(1)}
+            </div>
+            <div style={{ fontSize: 13, color: '#2C3A4E', letterSpacing: '-0.01em' }}>{filtered.length} projects</div>
+          </div>
+        )}
+
+        {/* Content */}
+        {filter === 'recycle-bin' ? (
+          DELETED.length === 0
+            ? <EmptyState filter="recycle-bin" onNew={() => setShowNew(true)} />
+            : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, animation: 'fadeIn 0.3s ease' }}>
+                <div style={{ marginBottom: 20, fontSize: 22, fontWeight: 600, color: '#F2EDE8', letterSpacing: '-0.035em' }}>Recycle Bin <span style={{ fontSize: 13, color: '#2C3A4E', fontWeight: 400, letterSpacing: '-0.01em' }}>{DELETED.length} items · 30-day retention</span></div>
+                {DELETED.map(d => <RecycleRow key={d.id} item={d} />)}
+              </div>
+            )
+        ) : filtered.length === 0 ? (
+          <EmptyState filter={filter} onNew={() => setShowNew(true)} />
+        ) : view === 'grid' ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
+            {filtered.map(p => <ProjectCard key={p.id} project={p} layout="grid" onEdit={() => {}} onDelete={() => {}} />)}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {filtered.map(p => <ProjectCard key={p.id} project={p} layout="list" onEdit={() => {}} onDelete={() => {}} />)}
+          </div>
+        )}
+      </main>
+
+      {/* Footer */}
+      <footer style={{
+        borderTop: '1px solid rgba(255,255,255,0.04)',
+        padding: '40px 36px 48px',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20,
+        marginTop: 60,
+      }}>
+        <MinnLogo height={18} />
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
+          {['Privacy', 'Terms', 'Docs', 'Status'].map((link, i, arr) => (
+            <React.Fragment key={link}>
+              <span
+                style={{ fontSize: 12, color: '#2C3A4E', letterSpacing: '-0.01em', cursor: 'pointer', transition: 'color 0.15s' }}
+                onMouseEnter={e => e.target.style.color = '#8A9EAE'}
+                onMouseLeave={e => e.target.style.color = '#2C3A4E'}
+              >{link}</span>
+              {i < arr.length - 1 && (
+                <div style={{ width: 3, height: 3, borderRadius: '50%', background: '#1A2535' }} />
+              )}
+            </React.Fragment>
+          ))}
+        </div>
+
+        <span style={{ fontSize: 11, color: '#1A2535', letterSpacing: '-0.005em' }}>
+          © 2026 Minn Studio. All rights reserved.
+        </span>
+      </footer>
+
+      {/* New Project Modal */}
+      {showNew && <NewProjectModal onClose={() => setShowNew(false)} />}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<ProjectPicker />);
+</script>
+</body>
+</html>

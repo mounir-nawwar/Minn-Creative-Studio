@@ -2,8 +2,20 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { PROJECT_TYPES } from '../../types/project.types';
 import type { StepProps, ProjectStatus } from './types';
+import { Upload } from 'lucide-react';
 
 export default function StepBasicInfo({ formData, updateFormData }: StepProps) {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        updateFormData({ coverImage: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   return (
     <motion.div
       key="step2"
@@ -18,6 +30,35 @@ export default function StepBasicInfo({ formData, updateFormData }: StepProps) {
       </div>
 
       <div className="space-y-6 max-w-2xl mx-auto">
+        {/* Cover Image Upload */}
+        <div className="space-y-3">
+          <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Cover Image</label>
+          <div className="flex items-center gap-4">
+            <label className="relative w-32 h-20 rounded-xl overflow-hidden cursor-pointer bg-[#0D1219] border border-[#1A2434] hover:border-[rgba(0,151,167,0.3)] transition-all group">
+              <input type="file" accept="image/*" onChange={handleImageUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
+              {formData.coverImage ? (
+                <img src={formData.coverImage} alt="Cover" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center text-[#4A6070] group-hover:text-[#0097A7] transition-colors">
+                  <Upload className="w-5 h-5 mb-1" />
+                  <span className="text-[8px]">Upload</span>
+                </div>
+              )}
+            </label>
+            <div className="flex-1">
+              <p className="text-[11px] text-[#4A6070]">Upload a cover image for your project card. If no image is uploaded, a gradient will be displayed instead.</p>
+              {formData.coverImage && (
+                <button
+                  onClick={() => updateFormData({ coverImage: undefined })}
+                  className="text-[10px] text-red-400 hover:text-red-300 mt-2"
+                >
+                  Remove image
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
         <div className="space-y-3">
           <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Subtype</label>
           <div className="flex flex-wrap gap-2">

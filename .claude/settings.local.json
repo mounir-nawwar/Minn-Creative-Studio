@@ -20,7 +20,11 @@
       "Bash(timeout 8 npm run dev)",
       "Bash(find /c/Users/user/Desktop/Minn-Creative-Studio/src -type f \\\\\\( -name \"*.ts\" -o -name \"*.tsx\" -o -name \"*.js\" -o -name \"*.jsx\" \\\\\\) -exec wc -l {} +)",
       "Bash(git branch *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(git checkout *)",
+      "Bash(git merge *)",
+      "WebFetch(domain:api.anthropic.com)",
+      "mcp__plugin_ecc_exa__web_fetch_exa"
     ]
   }
 }
