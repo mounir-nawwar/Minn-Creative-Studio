@@ -3,12 +3,20 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, getRedirectResult, onAuth
 import { getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, or, orderBy, serverTimestamp, Timestamp, limit } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
-// Import the Firebase configuration
-import firebaseConfig from '../firebase-applet-config.json';
+// Firebase config loaded from environment variables (never commit secrets to git)
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+};
 
 // Initialize Firebase SDK
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId || '(default)');
+export const db = getFirestore(app, import.meta.env.VITE_FIREBASE_FIRESTORE_DB_ID || '(default)');
 export const auth = getAuth(app);
 auth.useDeviceLanguage();
 
