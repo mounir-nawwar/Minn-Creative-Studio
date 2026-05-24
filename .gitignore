@@ -7,6 +7,10 @@ coverage/
 .env*
 !.env.example
 
+# Firebase config files (contain API keys — use env vars instead)
+firebase-applet-config.json
+*firebase*config*.json
+
 # Scripts with embedded service account keys
 migrate.mjs
 fix-uids.mjs
