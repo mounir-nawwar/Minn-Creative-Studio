@@ -23,7 +23,7 @@ export const PUBLIC_URL_BASE = process.env.PUBLIC_URL_BASE || '/storage';
 const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 
 // Allowed MIME types for upload
-const ALLOWED_MIME_TYPES = [
+export const ALLOWED_MIME_TYPES = [
   // Images
   'image/jpeg',
   'image/jpg',
