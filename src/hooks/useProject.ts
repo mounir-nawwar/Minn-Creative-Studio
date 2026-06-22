@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { projectsApi, Project as ApiProject } from '../lib/api';
+import { projectsApi, getAccessToken, Project as ApiProject } from '../lib/api';
 import { Project } from '../types/project.types';
 import { useProjectStore } from '../store/useProjectStore';
 import { RETENTION_DAYS } from '../constants';
@@ -88,6 +88,12 @@ export function useProject() {
 
   // Fetch projects
   const fetchProjects = useCallback(async () => {
+    // Never hit the API when logged out — avoids 401 spam in the console
+    // (this hook also runs at the app root, before/after authentication).
+    if (!getAccessToken()) {
+      setLoading(false);
+      return;
+    }
     try {
       const apiProjects = await projectsApi.list();
       const allProjects = apiProjects.map(toProject);

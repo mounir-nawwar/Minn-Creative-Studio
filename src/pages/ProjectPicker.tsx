@@ -15,7 +15,7 @@ const formatDate = (timestamp: any): string => {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
-export default function ProjectPicker() {
+export default function ProjectPicker({ onLogout }: { onLogout: () => void }) {
   const {
     projects,
     archivedProjects,
@@ -93,8 +93,8 @@ export default function ProjectPicker() {
             />
             <div className="flex flex-col">
               <span className="text-[10px] font-black text-white leading-none uppercase">{auth.getCurrentUser()?.displayName}</span>
-              <button 
-                onClick={() => auth.logout()}
+              <button
+                onClick={onLogout}
                 className="text-[8px] font-bold text-gray-600 hover:text-red-500 uppercase tracking-widest text-left"
               >
                 Sign Out

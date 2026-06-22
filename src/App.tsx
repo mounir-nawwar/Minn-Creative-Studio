@@ -234,7 +234,7 @@ export default function App() {
         {showProjects && (
           <motion.div key="projects" {...fade} style={{ position: 'relative', zIndex: 2 }}>
             <Suspense fallback={null}>
-              <ProjectPicker />
+              <ProjectPicker onLogout={handleLogout} />
             </Suspense>
           </motion.div>
         )}
