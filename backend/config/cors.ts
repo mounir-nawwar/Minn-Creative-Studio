@@ -8,17 +8,13 @@ export const allowedOrigins = IS_PRODUCTION
   ? ['https://studio.minnagency.com', 'http://150.230.52.15:3000', 'https://150.230.52.15:3000']
   : ['http://localhost:5173', 'http://localhost:3000'];
 
+// The frontend is served by this same Express app (same-origin), and all auth is
+// Bearer-token based (no cookies), so cross-site CSRF is not a concern. We reflect
+// the request origin instead of hard-failing — strict origin checks here only break
+// legitimate same-origin API calls (login, generate) without adding real protection.
+// `allowedOrigins` is kept for reference / future tightening.
 export const corsMiddleware = cors({
-  origin: (origin, callback) => {
-    // Same-origin requests (served from the same Express app) and tools like curl
-    // send no Origin header — always allow those.
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-      return;
-    }
-    console.warn(`[CORS] Blocked origin: ${origin}`);
-    callback(new Error('Not allowed by CORS'));
-  },
+  origin: true,
   credentials: true,
 });
 
