@@ -1,83 +1,121 @@
-import { useState, useEffect } from 'react';
-import { onAuthStateChanged } from 'firebase/auth';
-import {
-  db,
-  auth,
-  collection,
-  query,
-  where,
-  orderBy,
-  onSnapshot,
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  deleteDoc,
-  serverTimestamp,
-  Timestamp,
-  handleFirestoreError,
-  OperationType
-} from '../firebase';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { projectsApi, Project as ApiProject } from '../lib/api';
 import { Project } from '../types/project.types';
 import { useProjectStore } from '../store/useProjectStore';
 import { RETENTION_DAYS } from '../constants';
+
+// Polling interval in milliseconds
+const POLL_INTERVAL = 5000; // 5 seconds
+
+// Convert API project to local Project type
+function toProject(apiProject: ApiProject): Project {
+  return {
+    id: apiProject.id,
+    userId: apiProject.user_id,
+    name: apiProject.name,
+    description: apiProject.description || '',
+    type: apiProject.settings?.type || 'content',
+    subtype: apiProject.settings?.subtype || 'Other',
+    status: apiProject.settings?.status || 'active',
+    visualMood: apiProject.settings?.visualMood || [],
+    platforms: apiProject.settings?.platforms || [],
+    outputFormats: apiProject.settings?.outputFormats || [],
+    tags: apiProject.settings?.tags || [],
+    aiInstructions: apiProject.settings?.aiInstructions || '',
+    primaryColor: apiProject.settings?.primaryColor || '#0097A7',
+    secondaryColor: apiProject.settings?.secondaryColor || '#000000',
+    accentColor: apiProject.settings?.accentColor || '#FFFFFF',
+    fontStyle: apiProject.settings?.fontStyle || 'geometric',
+    negativeKeywords: apiProject.settings?.negativeKeywords || '',
+    styleKeywords: apiProject.settings?.styleKeywords || '',
+    clientName: apiProject.settings?.clientName,
+    clientIndustry: apiProject.settings?.clientIndustry,
+    collaborators: apiProject.settings?.collaborators || [],
+    usage: {
+      totalCost: apiProject.usage?.totalCost || 0,
+      textCost: apiProject.usage?.textCost || 0,
+      imageCost: apiProject.usage?.imageCost || 0,
+      videoCost: apiProject.usage?.videoCost || 0,
+      audioCost: apiProject.usage?.audioCost || 0,
+      totalTokens: apiProject.usage?.totalTokens || 0,
+      totalImages: apiProject.usage?.totalImages || 0,
+      totalVideos: apiProject.usage?.totalVideos || 0,
+      totalAudio: apiProject.usage?.totalAudio || 0,
+      lastUpdated: apiProject.usage?.lastUpdated,
+    },
+    createdAt: apiProject.created_at,
+    updatedAt: apiProject.updated_at,
+    deletedAt: apiProject.settings?.deletedAt,
+    deletedBy: apiProject.settings?.deletedBy,
+  } as Project;
+}
+
+// Convert local Project to API format
+function toApiProject(project: Partial<Project>): any {
+  return {
+    name: project.name,
+    description: project.description,
+    settings: {
+      type: project.type,
+      subtype: project.subtype,
+      status: project.status,
+      visualMood: project.visualMood,
+      platforms: project.platforms,
+      outputFormats: project.outputFormats,
+      tags: project.tags,
+      aiInstructions: project.aiInstructions,
+      primaryColor: project.primaryColor,
+      secondaryColor: project.secondaryColor,
+      accentColor: project.accentColor,
+      fontStyle: project.fontStyle,
+      negativeKeywords: project.negativeKeywords,
+      styleKeywords: project.styleKeywords,
+      clientName: project.clientName,
+      clientIndustry: project.clientIndustry,
+      collaborators: project.collaborators,
+      deletedAt: project.deletedAt,
+      deletedBy: project.deletedBy,
+    }
+  };
+}
 
 export function useProject() {
   const { currentProject, setCurrentProject, updateProject, clearProject } = useProjectStore();
   const [projects, setProjects] = useState<Project[]>([]);
   const [archivedProjects, setArchivedProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Load active projects — re-subscribe whenever auth state changes.
-  // The [] effect runs once at mount when auth.currentUser may still be null,
-  // so we use onAuthStateChanged to set up (and tear down) the Firestore
-  // snapshot only after a real user is available.
+  // Fetch projects
+  const fetchProjects = useCallback(async () => {
+    try {
+      const apiProjects = await projectsApi.list();
+      const allProjects = apiProjects.map(toProject);
+      
+      const activeProjects = allProjects.filter(p => p.status !== 'archived');
+      const archived = allProjects.filter(p => p.status === 'archived');
+
+      setProjects(activeProjects);
+      setArchivedProjects(archived);
+      setLoading(false);
+    } catch (error) {
+      console.error('Failed to fetch projects:', error);
+      setLoading(false);
+    }
+  }, []);
+
+  // Initial fetch and polling
   useEffect(() => {
-    let unsubscribeSnapshot: (() => void) | null = null;
-
-    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      // Tear down any existing snapshot when auth changes
-      if (unsubscribeSnapshot) {
-        unsubscribeSnapshot();
-        unsubscribeSnapshot = null;
-      }
-
-      if (!user) {
-        setProjects([]);
-        setArchivedProjects([]);
-        setLoading(false);
-        return;
-      }
-
-      const q = query(
-        collection(db, 'projects'),
-        orderBy('createdAt', 'desc')
-      );
-
-      unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
-        const allProjects = snapshot.docs.map(d => ({
-          id: d.id,
-          ...d.data()
-        })) as Project[];
-
-        const activeProjects = allProjects.filter(p => p.status !== 'archived');
-        const archived = allProjects.filter(p => p.status === 'archived');
-
-        setProjects(activeProjects);
-        setArchivedProjects(archived);
-        setLoading(false);
-      }, (error) => {
-        console.error('Firestore error in useProject:', error);
-        setLoading(false);
-        handleFirestoreError(error, OperationType.LIST, 'projects');
-      });
-    });
+    fetchProjects();
+    pollingRef.current = setInterval(fetchProjects, POLL_INTERVAL);
 
     return () => {
-      unsubscribeAuth();
-      if (unsubscribeSnapshot) unsubscribeSnapshot();
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
     };
-  }, []);
+  }, [fetchProjects]);
 
   // Sync currentProject with updates from projects list
   useEffect(() => {
@@ -104,49 +142,37 @@ export function useProject() {
   }, [projects]);
 
   const createProject = async (projectData: Partial<Project>): Promise<Project> => {
-    if (!auth.currentUser) throw new Error('User not authenticated');
-
-    const newProjectRef = doc(collection(db, 'projects'));
-    const now = serverTimestamp();
+    const now = new Date().toISOString();
     
-    const project = {
-      ...projectData,
-      id: newProjectRef.id,
-      userId: auth.currentUser.uid,
-      status: 'active' as const,
-      createdAt: now,
-      updatedAt: now,
+    const apiProject = await projectsApi.create({
       name: projectData.name || 'Untitled Project',
-      type: projectData.type || 'content',
-      subtype: projectData.subtype || 'Other',
-      visualMood: projectData.visualMood || [],
-      platforms: projectData.platforms || [],
-      outputFormats: projectData.outputFormats || [],
-      tags: projectData.tags || [],
-      aiInstructions: projectData.aiInstructions || '',
-      primaryColor: projectData.primaryColor || '#0097A7',
-      secondaryColor: projectData.secondaryColor || '#000000',
-      accentColor: projectData.accentColor || '#FFFFFF',
-      fontStyle: projectData.fontStyle || 'geometric',
-      negativeKeywords: projectData.negativeKeywords || '',
-      styleKeywords: projectData.styleKeywords || '',
-      collaborators: [],
-      usage: {
-        totalCost: 0,
-        textCost: 0,
-        imageCost: 0,
-        videoCost: 0,
-        audioCost: 0,
-        totalTokens: 0,
-        totalImages: 0,
-        totalVideos: 0,
-        totalAudio: 0,
-        lastUpdated: now,
-      },
-    };
-
-    await setDoc(newProjectRef, project);
-    return project as Project;
+      description: projectData.description,
+      settings: {
+        type: projectData.type || 'content',
+        subtype: projectData.subtype || 'Other',
+        visualMood: projectData.visualMood || [],
+        platforms: projectData.platforms || [],
+        outputFormats: projectData.outputFormats || [],
+        tags: projectData.tags || [],
+        aiInstructions: projectData.aiInstructions || '',
+        primaryColor: projectData.primaryColor || '#0097A7',
+        secondaryColor: projectData.secondaryColor || '#000000',
+        accentColor: projectData.accentColor || '#FFFFFF',
+        fontStyle: projectData.fontStyle || 'geometric',
+        negativeKeywords: projectData.negativeKeywords || '',
+        styleKeywords: projectData.styleKeywords || '',
+        clientName: projectData.clientName,
+        clientIndustry: projectData.clientIndustry,
+        collaborators: [],
+      }
+    });
+    
+    const project = toProject(apiProject);
+    
+    // Refresh projects list
+    await fetchProjects();
+    
+    return project;
   };
 
   const selectProject = (project: Project) => {
@@ -159,45 +185,52 @@ export function useProject() {
   };
 
   const updateProjectById = async (projectId: string, updates: Partial<Project>): Promise<void> => {
-    const projectRef = doc(db, 'projects', projectId);
-    const now = serverTimestamp();
-    const fullUpdates = { ...updates, updatedAt: now };
-    await updateDoc(projectRef, fullUpdates);
+    const now = new Date().toISOString();
+    const apiUpdates = toApiProject(updates);
+    
+    await projectsApi.update(projectId, {
+      ...apiUpdates,
+      updated_at: now
+    });
+    
     if (currentProject?.id === projectId) {
-      updateProject(fullUpdates);
+      updateProject({ ...updates, updatedAt: now });
     }
+    
+    // Refresh projects list
+    await fetchProjects();
   };
 
   const deleteProject = async (projectId: string): Promise<void> => {
-    if (!auth.currentUser) throw new Error('User not authenticated');
+    const now = new Date().toISOString();
     
-    const projectRef = doc(db, 'projects', projectId);
-    const now = serverTimestamp();
-    
-    await updateDoc(projectRef, {
-      status: 'archived',
-      deletedAt: now,
-      deletedBy: auth.currentUser.uid,
-      updatedAt: now
+    await projectsApi.update(projectId, {
+      settings: { status: 'archived', deletedAt: now },
+      updated_at: now
     });
     
     if (currentProject?.id === projectId) {
       clearProject();
     }
+    
+    // Refresh projects list
+    await fetchProjects();
   };
 
   const restoreProject = async (projectId: string): Promise<void> => {
-    const projectRef = doc(db, 'projects', projectId);
-    const now = serverTimestamp();
+    const now = new Date().toISOString();
     
-    await updateDoc(projectRef, {
-      status: 'active',
-      updatedAt: now
+    await projectsApi.update(projectId, {
+      settings: { status: 'active' },
+      updated_at: now
     });
+    
+    // Refresh projects list
+    await fetchProjects();
   };
 
   const permanentDeleteProject = async (projectId: string): Promise<void> => {
-    await deleteDoc(doc(db, 'projects', projectId));
+    await projectsApi.delete(projectId);
     
     setArchivedProjects(prev => prev.filter(p => p.id !== projectId));
     
@@ -213,9 +246,7 @@ export function useProject() {
     
     const expired = archivedProjects.filter(p => {
       if (!p.deletedAt) return false;
-      const deletedDate = p.deletedAt instanceof Timestamp 
-        ? p.deletedAt.toDate() 
-        : new Date(p.deletedAt as any);
+      const deletedDate = new Date(p.deletedAt as any);
       return deletedDate < cutoffDate;
     });
 
@@ -230,10 +261,7 @@ export function useProject() {
   const getDaysUntilDeletion = (project: Project): number | null => {
     if (!project.deletedAt) return null;
     
-    const deletedDate = project.deletedAt instanceof Timestamp 
-      ? project.deletedAt.toDate() 
-      : new Date(project.deletedAt as any);
-    
+    const deletedDate = new Date(project.deletedAt as any);
     const deletionDate = new Date(deletedDate);
     deletionDate.setDate(deletionDate.getDate() + RETENTION_DAYS);
     

@@ -1,4 +1,5 @@
-import { Timestamp, FieldValue } from 'firebase/firestore';
+// Project types for Minn Creative Studio
+// No Firebase dependencies - uses ISO date strings
 
 export type ProjectStatus = 'active' | 'archived' | 'completed';
 
@@ -16,7 +17,7 @@ export interface ProjectUsage {
   totalImages: number;
   totalVideos: number;
   totalAudio: number;
-  lastUpdated?: Timestamp | FieldValue;
+  lastUpdated?: string; // ISO date string
 }
 
 export interface Project {
@@ -27,12 +28,12 @@ export interface Project {
   subtype: string;
   status: ProjectStatus;
   userId: string;
-  createdAt: Timestamp | FieldValue;
-  updatedAt: Timestamp | FieldValue;
+  createdAt: string; // ISO date string
+  updatedAt: string; // ISO date string
   coverImage?: string;
   
   // Soft delete fields
-  deletedAt?: Timestamp | FieldValue;
+  deletedAt?: string; // ISO date string
   deletedBy?: string;
   
   // Brand / Client Info
@@ -60,7 +61,7 @@ export interface Project {
   
   // Deliverables
   deliverables?: string;
-  deadline?: Timestamp | FieldValue;
+  deadline?: string; // ISO date string
   budget?: string;
   
   // Tags
@@ -82,9 +83,9 @@ export interface Asset {
   tags: string[];
   nodeId?: string;
   workflowId?: string;
-  createdAt: Timestamp;
+  createdAt: string; // ISO date string
   isFavorited: boolean;
-  deletedAt?: Timestamp | FieldValue;
+  deletedAt?: string; // ISO date string
   deletedBy?: string;
   metadata: {
     width?: number;

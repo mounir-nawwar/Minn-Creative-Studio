@@ -1,7 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import { requireAuth } from '../middleware/auth.ts';
-import { getWorkingBucket, isAdminInitialized } from '../services/firebase.ts';
+import { uploadFile } from '../services/storage.ts';
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
@@ -23,23 +23,25 @@ router.post('/', requireAuth, upload.single('file'), async (req, res) => {
   }
 
   try {
-    if (!isAdminInitialized()) throw new Error('Firebase Admin is not initialized.');
-    const bucket = await getWorkingBucket();
-    const destination = `projects/${req.body.projectId || 'default'}/assets/${Date.now()}-${req.file.originalname}`;
-    await bucket.file(destination).save(req.file.buffer, { metadata: { contentType: req.file.mimetype }, public: true });
+    const result = await uploadFile(
+      req.body.projectId || 'default',
+      req.user!.id,
+      {
+        buffer: req.file.buffer,
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+      }
+    );
     return res.json({
       success: true,
-      url: `https://storage.googleapis.com/${bucket.name}/${destination}`,
-      fileName: destination,
+      url: result.url,
+      fileName: result.storagePath,
+      id: result.id,
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    const isBucketMissing = message.includes('does not exist') || (err as any)?.code === 404;
-    return res.status(500).json({
-      error: isBucketMissing
-        ? 'Firebase Storage bucket not found. Enable it in Firebase Console: Build → Storage → Get Started.'
-        : message,
-    });
+    return res.status(500).json({ error: message });
   }
 });
 

@@ -1,54 +1,92 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'motion/react';
 import { Plus, MessageSquare, History, Trash2 } from 'lucide-react';
 import { useProjectStore } from '../../store/useProjectStore';
 import { useStore } from '../../store/useStore';
-import {
-  db, auth, collection, query, where, orderBy, onSnapshot,
-  addDoc, deleteDoc, doc, serverTimestamp
-} from '../../firebase';
+import { chatsApi, auth, Chat } from '../../lib/api';
 import { Skeleton } from '../Skeleton';
 
 export default function ChatsTab() {
   const { currentProject } = useProjectStore();
   const { setChatOpen, setActiveChatId, activeChatId } = useStore();
-  const [chats, setChats] = useState<any[]>([]);
+  const [chats, setChats] = useState<Chat[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    if (!currentProject || !auth.currentUser) {
+  const fetchChats = useCallback(async () => {
+    const user = auth.getCurrentUser();
+    if (!currentProject || !user) {
+      setChats([]);
       setIsLoading(false);
       return;
     }
-    setIsLoading(true);
-    const q = query(
-      collection(db, 'chats'),
-      where('projectId', '==', currentProject.id),
-      orderBy('createdAt', 'desc')
-    );
-    return onSnapshot(q, (snapshot) => {
-      setChats(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+
+    try {
+      const allChats = await chatsApi.list();
+      // Filter by current project ID
+      const projectChats = allChats.filter(
+        chat => chat.project_id === currentProject.id
+      );
+      // Sort by created_at descending
+      projectChats.sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      setChats(projectChats);
+    } catch (err) {
+      console.error('Error fetching chats:', err);
+    } finally {
       setIsLoading(false);
-    });
+    }
   }, [currentProject?.id]);
 
+  useEffect(() => {
+    const user = auth.getCurrentUser();
+    if (!currentProject || !user) {
+      setChats([]);
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    fetchChats();
+
+    // Poll every 5 seconds
+    pollingRef.current = setInterval(fetchChats, 5000);
+
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, [fetchChats]);
+
   const createNewChat = async () => {
-    if (!currentProject || !auth.currentUser) return;
-    const docRef = await addDoc(collection(db, 'chats'), {
-      title: 'New Creative Session',
-      projectId: currentProject.id,
-      userId: auth.currentUser.uid,
-      createdAt: serverTimestamp(),
-    });
-    setActiveChatId(docRef.id);
-    setChatOpen(true);
+    const user = auth.getCurrentUser();
+    if (!currentProject || !user) return;
+
+    try {
+      const newChat = await chatsApi.create({
+        title: 'New Creative Session',
+        projectId: currentProject.id,
+      });
+      setActiveChatId(newChat.id);
+      setChatOpen(true);
+      // Refresh chats list
+      fetchChats();
+    } catch (err) {
+      console.error('Error creating chat:', err);
+    }
   };
 
   const deleteChat = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     if (!window.confirm('Delete this chat?')) return;
+
     try {
-      await deleteDoc(doc(db, 'chats', id));
+      await chatsApi.delete(id);
+      // Refresh chats list
+      fetchChats();
     } catch (err) {
       console.error('Error deleting chat:', err);
     }
@@ -105,7 +143,7 @@ export default function ChatsTab() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <h4 className="text-[11px] font-black text-white uppercase truncate group-hover:text-[#0097A7] transition-colors">{chat.title}</h4>
-                  <p className="text-[9px] text-gray-600 truncate mt-0.5">{chat.lastMessage || 'No messages yet'}</p>
+                  <p className="text-[9px] text-gray-600 truncate mt-0.5">{chat.last_message || 'No messages yet'}</p>
                 </div>
               </div>
               <button

@@ -18,7 +18,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useStore } from '../store/useStore';
 import { useProjectStore } from '../store/useProjectStore';
 import AssetGrid from './AssetGrid';
-import { useFirebaseChat } from '../hooks/useFirebaseChat';
+import { useChat } from '../hooks/useChat';
 
 function parseInline(text: string): React.ReactNode {
   const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g);
@@ -97,7 +97,7 @@ function renderMarkdown(text: string): React.ReactNode {
 export default function ChatDrawer() {
   const { isChatOpen: isOpen, setChatOpen: setIsOpen, activeChatId, setActiveChatId } = useStore();
   const { currentProject } = useProjectStore();
-  const { chats, messages, isTyping, createNewChat, deleteChat, sendMessage } = useFirebaseChat();
+  const { chats, messages, isTyping, createNewChat, deleteChat, sendMessage } = useChat();
 
   const [inputText, setInputText] = useState('');
   const [showAssetPicker, setShowAssetPicker] = useState(false);

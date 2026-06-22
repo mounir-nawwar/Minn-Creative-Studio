@@ -5,13 +5,9 @@ import { GoogleGenAI } from '@google/genai';
 import { requireAuth } from '../middleware/auth.ts';
 import { aiLimiter } from '../config/cors.ts';
 import { calculateCost } from '../config/pricing.ts';
-import {
-  resolveImageUrls,
-  trackProjectCost,
-  uploadInlineData,
-  getWorkingBucket,
-  isAdminInitialized,
-} from '../services/firebase.ts';
+import { uploadBase64, STORAGE_PATH, PUBLIC_URL_BASE } from '../services/storage.ts';
+import { trackProjectCost, projects } from '../services/database.ts';
+import { resolveImageUrls, processInlineData, getExtensionFromMimeType } from '../utils/media.ts';
 import {
   VERTEX_PROJECT,
   vertexAuth,
@@ -23,6 +19,8 @@ import {
   vertexPredict,
   vertexRest,
 } from '../services/vertex.ts';
+import * as fs from 'fs';
+import * as path from 'path';
 
 // Always use Vertex AI for all AI calls
 const USE_VERTEX_AI = true;
@@ -31,9 +29,42 @@ const router = express.Router();
 
 const trackedOperations = new Set<string>();
 
+/**
+ * Upload generated inline data to local storage
+ * Replaces Firebase uploadInlineData with local storage version
+ */
+async function uploadInlineDataToStorage(
+  parts: any[],
+  projectId: string,
+  userId: string
+): Promise<any[]> {
+  return Promise.all(parts.map(async (part: any, i: number) => {
+    if (!part.inlineData?.data) return part;
+
+    const { data, mimeType } = part.inlineData;
+    const { buffer, mimeType: processedMimeType, extension } = processInlineData(data, mimeType);
+
+    const filename = `${Date.now()}-${i}-generated.${extension}`;
+    const result = await uploadBase64(projectId, userId, {
+      base64: data,
+      mimeType: processedMimeType,
+      filename
+    });
+
+    console.log(`[Upload] ${Math.round(buffer.byteLength / 1024)}KB → ${result.url}`);
+    return { ...part, inlineData: { storageUrl: result.url, mimeType: processedMimeType } };
+  }));
+}
+
 router.post('/', requireAuth, aiLimiter, async (req, res) => {
   const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
   if (!USE_VERTEX_AI && !apiKey) return res.status(500).json({ error: 'API key not configured' });
+
+  // User is already authenticated via requireAuth middleware
+  const userId = (req as any).user?.id;
+  if (!userId) {
+    return res.status(401).json({ error: 'User not authenticated' });
+  }
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 58000);
@@ -71,22 +102,22 @@ router.post('/', requireAuth, aiLimiter, async (req, res) => {
           if (config.scale) instance.scale = config.scale;
           const url = `https://us-central1-aiplatform.googleapis.com/v1/projects/${VERTEX_PROJECT}/locations/us-central1/publishers/google/models/${model}:predictLongRunning`;
           const op = await vertexRest(url, 'POST', { instances: [instance], parameters: { sampleCount: 1 } });
-          
+
           // Store context for cost tracking when operation completes
-          return res.json({ 
-            success: true, 
-            data: { 
-              operation: op.name, 
+          return res.json({
+            success: true,
+            data: {
+              operation: op.name,
               isLro: true,
               _audioModel: model,
-              _projectId: projectId 
-            } 
+              _projectId: projectId
+            }
           });
         } else {
           response = await vertexPredict(sdkParams);
-          
+
           // Track cost for non-pro audio immediately
-          if (projectId && isAdminInitialized()) {
+          if (projectId) {
             const cost = calculateCost(sdkParams.model, {});
             if (cost > 0) {
               await trackProjectCost(projectId, cost, { type: 'audio', audioCount: 1 });
@@ -112,7 +143,8 @@ router.post('/', requireAuth, aiLimiter, async (req, res) => {
         console.log(`[Usage] model=${sdkParams.model} projectId=${projectId ?? 'none'} images=${imageCount} | no usageMetadata`);
       }
 
-      if (imageCount > 0 && projectId && isAdminInitialized() && usageMetadata) {
+      // Track image generation costs
+      if (imageCount > 0 && projectId && usageMetadata) {
         const cost = calculateCost(sdkParams.model, {
           promptTokenCount: usageMetadata.promptTokenCount,
           candidatesTokenCount: usageMetadata.candidatesTokenCount,
@@ -127,7 +159,8 @@ router.post('/', requireAuth, aiLimiter, async (req, res) => {
         }
       }
 
-      if (!imageCount && projectId && isAdminInitialized()) {
+      // Track TTS and text costs
+      if (!imageCount && projectId) {
         if (sdkParams.model?.includes('tts')) {
           // TTS: billed per input character
           const allParts = Array.isArray(sdkParams.contents)
@@ -155,9 +188,12 @@ router.post('/', requireAuth, aiLimiter, async (req, res) => {
         }
       }
 
-      if (projectId && isAdminInitialized()) {
+      // Upload inline data to local storage
+      if (projectId) {
         for (const c of candidates) {
-          if (c?.content?.parts) c.content.parts = await uploadInlineData(c.content.parts, projectId);
+          if (c?.content?.parts) {
+            c.content.parts = await uploadInlineDataToStorage(c.content.parts, projectId, userId);
+          }
         }
       }
 
@@ -177,20 +213,22 @@ router.post('/', requireAuth, aiLimiter, async (req, res) => {
       const imageCount = genData.generatedImages?.length || 1;
 
       const cost = calculateCost(sdkParams.model, {}, { numberOfImages: imageCount, sampleCount: sdkParams.config?.numberOfImages || 1 });
-      if (cost > 0 && projectId && isAdminInitialized()) {
+      if (cost > 0 && projectId) {
         await trackProjectCost(projectId, cost, { type: 'image', imageCount });
       }
 
-      if (projectId && isAdminInitialized()) {
+      // Upload generated images to local storage
+      if (projectId) {
         for (const img of (genData.generatedImages ?? [])) {
           if (img.image?.imageBytes) {
             try {
-              const bucket = await getWorkingBucket();
-              const buf = Buffer.from(img.image.imageBytes, 'base64');
-              const dest = `projects/${projectId}/assets/${Date.now()}-generated.png`;
-              await bucket.file(dest).save(buf, { metadata: { contentType: 'image/png' }, public: true });
-              (img.image as any).storageUrl = `https://storage.googleapis.com/${bucket.name}/${dest}`;
-              console.log(`[Upload] Imagen ${Math.round(buf.byteLength / 1024)}KB → ${(img.image as any).storageUrl}`);
+              const result = await uploadBase64(projectId, userId, {
+                base64: img.image.imageBytes,
+                mimeType: 'image/png',
+                filename: `${Date.now()}-generated.png`
+              });
+              (img.image as any).storageUrl = result.url;
+              console.log(`[Upload] Imagen ${Math.round(Buffer.from(img.image.imageBytes, 'base64').byteLength / 1024)}KB → ${result.url}`);
               delete img.image.imageBytes;
             } catch (e) {
               console.error('Storage upload failed:', e);
@@ -213,17 +251,17 @@ router.post('/', requireAuth, aiLimiter, async (req, res) => {
     if (method === 'getOperation') {
       const { projectId, model, config, operation: opParam, _audioModel, _projectId } = params;
       const opName = typeof opParam === 'string' ? opParam : opParam?.name;
-      const result = USE_VERTEX_AI 
-        ? await vertexGetOperation(opParam ?? params) 
+      const result = USE_VERTEX_AI
+        ? await vertexGetOperation(opParam ?? params)
         : await devAi!.operations.getVideosOperation(params);
-      
+
       const effectiveProjectId = projectId || _projectId;
       const isAudioOp = _audioModel?.includes('lyria');
       const isVideoOp = !isAudioOp && (_audioModel?.includes('veo') || !model?.includes('lyria'));
-      
-      if (result?.done && effectiveProjectId && isAdminInitialized() && opName && !trackedOperations.has(opName)) {
+
+      if (result?.done && effectiveProjectId && opName && !trackedOperations.has(opName)) {
         trackedOperations.add(opName);
-        
+
         // Video cost tracking
         if (isVideoOp) {
           const videoModel = model || 'veo-3.1-generate-001';
@@ -241,7 +279,7 @@ router.post('/', requireAuth, aiLimiter, async (req, res) => {
             });
           }
         }
-        
+
         // Audio cost tracking (Lyria Pro)
         if (isAudioOp && _audioModel) {
           const audioCost = calculateCost(_audioModel, {});
@@ -259,12 +297,19 @@ router.post('/', requireAuth, aiLimiter, async (req, res) => {
     if (method === 'fetchVideoFile') {
       const { url, projectId } = params;
 
-      // Stream directly to Firebase Storage when projectId is available
-      if (projectId && isAdminInitialized()) {
+      // Stream directly to local storage when projectId is available
+      if (projectId) {
         try {
-          const bucket = await getWorkingBucket();
-          const dest = `projects/${projectId}/assets/${Date.now()}-generated-video.mp4`;
-          const file = bucket.file(dest);
+          const projectDir = path.join(STORAGE_PATH, 'projects', projectId, 'videos');
+          if (!fs.existsSync(projectDir)) {
+            fs.mkdirSync(projectDir, { recursive: true });
+          }
+
+          const filename = `${Date.now()}-generated-video.mp4`;
+          const storagePath = path.join(projectDir, filename);
+          const relativePath = path.relative(STORAGE_PATH, storagePath);
+          const publicUrl = `${PUBLIC_URL_BASE}/${relativePath.replace(/\\/g, '/')}`;
+
           let contentType: string;
           let resStream: any;
 
@@ -272,8 +317,9 @@ router.post('/', requireAuth, aiLimiter, async (req, res) => {
             const [header, b64] = url.split(',');
             contentType = header.split(':')[1]?.split(';')[0] || 'video/mp4';
             const buf = Buffer.from(b64, 'base64');
-            await file.save(buf, { metadata: { contentType }, public: true });
-            return res.json({ success: true, data: { storageUrl: `https://storage.googleapis.com/${bucket.name}/${dest}` } });
+            fs.writeFileSync(storagePath, buf);
+            console.log(`[Veo] Saved ${Math.round(buf.byteLength / 1024)}KB → ${publicUrl}`);
+            return res.json({ success: true, data: { storageUrl: publicUrl } });
           }
 
           if (USE_VERTEX_AI && url?.startsWith('gs://')) {
@@ -299,11 +345,10 @@ router.post('/', requireAuth, aiLimiter, async (req, res) => {
           }
 
           if (resStream) {
-            const writeStream = file.createWriteStream({ metadata: { contentType }, public: true });
+            const writeStream = fs.createWriteStream(storagePath);
             await pipeline(Readable.fromWeb(resStream), writeStream);
-            const storageUrl = `https://storage.googleapis.com/${bucket.name}/${dest}`;
-            console.log(`[Veo] Streamed to Storage: ${storageUrl}`);
-            return res.json({ success: true, data: { storageUrl } });
+            console.log(`[Veo] Streamed to Storage: ${publicUrl}`);
+            return res.json({ success: true, data: { storageUrl: publicUrl } });
           }
         } catch (uploadErr: any) {
           console.error('[Veo] Streaming upload failed:', uploadErr.message);

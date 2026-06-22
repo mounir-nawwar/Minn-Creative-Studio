@@ -19,3 +19,11 @@ fix-uids.mjs
 *.yaml
 key.json
 cors.json
+
+# SQLite database files
+*.db
+*.db-shm
+*.db-wal
+
+# Local file storage
+storage/

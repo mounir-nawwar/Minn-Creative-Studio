@@ -3,7 +3,6 @@ import { AnimatePresence } from 'motion/react';
 import { useStore } from '../store/useStore';
 import AssetPreviewModal from './AssetPreviewModal';
 import { Asset } from '../types/project.types';
-import { Timestamp } from 'firebase/firestore';
 
 /**
  * Global asset expansion modal - rendered once at root level
@@ -19,7 +18,7 @@ export const AssetExpandModal = () => {
     type: expandedAsset.type,
     url: expandedAsset.url,
     thumbnailUrl: expandedAsset.url,
-    createdAt: Timestamp.now(),
+    createdAt: new Date().toISOString(),
     isFavorited: false,
     metadata: {},
     tags: [],

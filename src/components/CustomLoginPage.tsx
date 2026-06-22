@@ -5,7 +5,7 @@ import MinnLogo from '../assets/Minn.svg';
 import AuthLayout, { SF } from './AuthLayout';
 
 interface CustomLoginPageProps {
-  onLoginSuccess: () => void;
+  onLoginSuccess: (user: any) => void;
 }
 
 export default function CustomLoginPage({ onLoginSuccess }: CustomLoginPageProps) {
@@ -20,17 +20,21 @@ export default function CustomLoginPage({ onLoginSuccess }: CustomLoginPageProps
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE}/login`, {
+      const response = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       });
 
       const data = await response.json();
-      if (data.success) {
-        onLoginSuccess();
+      if (data.success && data.user) {
+        // Store tokens in localStorage
+        localStorage.setItem('accessToken', data.accessToken);
+        localStorage.setItem('refreshToken', data.refreshToken);
+        localStorage.setItem('currentUser', JSON.stringify(data.user));
+        onLoginSuccess(data.user);
       } else {
-        setError(data.message || 'Invalid credentials');
+        setError(data.error || 'Invalid credentials');
       }
     } catch (err) {
       setError('An error occurred. Please try again.');

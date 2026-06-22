@@ -1,13 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'motion/react';
 import { Plus, Layout, Clock, Copy, Trash2 } from 'lucide-react';
 import { Node, Edge } from 'reactflow';
 import { useProjectStore } from '../../store/useProjectStore';
 import { useStore } from '../../store/useStore';
-import {
-  db, auth, collection, query, where, orderBy, onSnapshot,
-  addDoc, deleteDoc, doc, serverTimestamp, Timestamp
-} from '../../firebase';
+import { workflowsApi, auth } from '../../lib/api';
 import { validateWorkflow } from '../../lib/workflowValidation';
 import { Skeleton } from '../Skeleton';
 
@@ -16,60 +13,99 @@ export default function WorkflowsTab() {
   const { setNodes, setEdges } = useStore();
   const [workflows, setWorkflows] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    if (!currentProject || !auth.currentUser) {
+  const fetchWorkflows = useCallback(async () => {
+    if (!currentProject) {
+      setWorkflows([]);
       setIsLoading(false);
       return;
     }
-    setIsLoading(true);
-    const q = query(
-      collection(db, 'workflows'),
-      where('projectId', '==', currentProject.id),
-      orderBy('createdAt', 'desc')
-    );
-    return onSnapshot(q, (snapshot) => {
-      setWorkflows(snapshot.docs.map(d => ({ ...d.data(), id: d.id })));
+
+    const user = auth.getCurrentUser();
+    if (!user) {
+      setWorkflows([]);
       setIsLoading(false);
-    });
+      return;
+    }
+
+    try {
+      const data = await workflowsApi.list(currentProject.id);
+      setWorkflows(data);
+    } catch (err) {
+      console.error('Error fetching workflows:', err);
+    } finally {
+      setIsLoading(false);
+    }
   }, [currentProject?.id]);
 
+  useEffect(() => {
+    // Initial fetch
+    fetchWorkflows();
+
+    // Set up polling every 5 seconds
+    pollingRef.current = setInterval(fetchWorkflows, 5000);
+
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+      }
+    };
+  }, [fetchWorkflows]);
+
   const createNewWorkflow = async () => {
-    if (!currentProject || !auth.currentUser) return;
-    await addDoc(collection(db, 'workflows'), {
-      name: `Workflow ${new Date().toLocaleTimeString()}`,
-      projectId: currentProject.id,
-      userId: auth.currentUser.uid,
-      createdAt: serverTimestamp(),
-      nodes: [],
-      edges: []
-    });
+    if (!currentProject) return;
+
+    const user = auth.getCurrentUser();
+    if (!user) return;
+
+    try {
+      await workflowsApi.create({
+        projectId: currentProject.id,
+        name: `Workflow ${new Date().toLocaleTimeString()}`,
+        nodes: [],
+        edges: []
+      });
+      // Immediately refresh after creation
+      fetchWorkflows();
+    } catch (err) {
+      console.error('Error creating workflow:', err);
+    }
   };
 
   const duplicateWorkflow = async (e: React.MouseEvent, workflow: any) => {
     e.stopPropagation();
-    if (!currentProject || !auth.currentUser) return;
-    await addDoc(collection(db, 'workflows'), {
-      name: `${workflow.name} (Copy)`,
-      projectId: currentProject.id,
-      userId: auth.currentUser.uid,
-      createdAt: serverTimestamp(),
-      nodes: workflow.nodes || [],
-      edges: workflow.edges || [],
-      thumbnailUrl: workflow.thumbnailUrl || null
-    });
+    if (!currentProject) return;
+
+    const user = auth.getCurrentUser();
+    if (!user) return;
+
+    try {
+      await workflowsApi.create({
+        projectId: currentProject.id,
+        name: `${workflow.name} (Copy)`,
+        nodes: workflow.nodes || [],
+        edges: workflow.edges || []
+      });
+      // Immediately refresh after duplication
+      fetchWorkflows();
+    } catch (err) {
+      console.error('Error duplicating workflow:', err);
+    }
   };
 
   const deleteWorkflow = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     if (!window.confirm('Delete this workflow?')) return;
     try {
-      await deleteDoc(doc(db, 'workflows', id));
+      await workflowsApi.delete(id);
       if (currentWfId === id) {
         setActiveWorkflowId(null);
         setNodes([]);
         setEdges([]);
       }
+      // Immediately refresh after deletion
+      fetchWorkflows();
     } catch (err) {
       console.error('Error deleting workflow:', err);
     }
@@ -84,6 +120,17 @@ export default function WorkflowsTab() {
     setNodes(validated.nodes as unknown as Node[]);
     setEdges(validated.edges as unknown as Edge[]);
     setActiveWorkflowId(validated.id || null);
+  };
+
+  // Helper to format date from ISO string or Date
+  const formatDate = (dateValue: string | Date | undefined): string => {
+    if (!dateValue) return 'Just now';
+    try {
+      const date = typeof dateValue === 'string' ? new Date(dateValue) : dateValue;
+      return date.toLocaleDateString();
+    } catch {
+      return 'Just now';
+    }
   };
 
   return (
@@ -144,7 +191,7 @@ export default function WorkflowsTab() {
                   <div className="flex items-center gap-2 mt-1">
                     <Clock className="w-3 h-3 text-gray-600" />
                     <span className="text-[9px] font-bold text-gray-600 uppercase tracking-tighter">
-                      {wf.createdAt instanceof Timestamp ? new Date(wf.createdAt.seconds * 1000).toLocaleDateString() : 'Just now'}
+                      {formatDate(wf.created_at || wf.createdAt)}
                     </span>
                   </div>
                 </div>

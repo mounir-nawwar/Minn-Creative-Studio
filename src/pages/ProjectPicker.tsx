@@ -6,12 +6,12 @@ import ProjectCard from '../components/ProjectCard';
 import ProjectCreationOverlay from '../components/ProjectCreationOverlay';
 import DeleteProjectModal from '../components/DeleteProjectModal';
 import { Project } from '../types/project.types';
-import { auth, signOut } from '../firebase';
+import { auth } from '../lib/api';
 import MinnLogo from '../assets/Minn.svg';
 
 const formatDate = (timestamp: any): string => {
   if (!timestamp) return 'Unknown';
-  const date = timestamp.toDate?.() ?? new Date(timestamp);
+  const date = new Date(timestamp);
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
@@ -87,14 +87,14 @@ export default function ProjectPicker() {
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-3 bg-[#111111] p-1.5 pr-4 rounded-full border border-white/5">
             <img 
-              src={auth.currentUser?.photoURL || ''} 
+              src={auth.getCurrentUser()?.photoUrl || ''} 
               alt="User" 
               className="w-8 h-8 rounded-full border border-[#0097A7]"
             />
             <div className="flex flex-col">
-              <span className="text-[10px] font-black text-white leading-none uppercase">{auth.currentUser?.displayName}</span>
+              <span className="text-[10px] font-black text-white leading-none uppercase">{auth.getCurrentUser()?.displayName}</span>
               <button 
-                onClick={() => signOut()}
+                onClick={() => auth.logout()}
                 className="text-[8px] font-bold text-gray-600 hover:text-red-500 uppercase tracking-widest text-left"
               >
                 Sign Out

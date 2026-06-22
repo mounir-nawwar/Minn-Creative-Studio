@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { User } from 'firebase/auth';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { User, workflowsApi } from '../lib/api';
 import {
   Play,
   Save,
@@ -16,20 +16,6 @@ import {
 import ToggleSwitch from './ToggleSwitch';
 import { useStore } from '../store/useStore';
 import { useProjectStore } from '../store/useProjectStore';
-import { db, auth } from '../firebase';
-import { 
-  collection, 
-  addDoc, 
-  query, 
-  where, 
-  onSnapshot, 
-  orderBy, 
-  Timestamp, 
-  doc, 
-  updateDoc, 
-  deleteDoc,
-  serverTimestamp
-} from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { API_BASE } from '../constants';
 import { stripUndefined } from '../lib/utils';
@@ -76,18 +62,22 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  // Fetch Workflows
+  // Fetch Workflows with polling
+  const fetchWorkflows = useCallback(async () => {
+    if (!currentProject || !user) return;
+    try {
+      const data = await workflowsApi.list(currentProject.id);
+      setWorkflows(data);
+    } catch (err) {
+      console.error('Failed to fetch workflows:', err);
+    }
+  }, [currentProject, user]);
+
   useEffect(() => {
-    if (!currentProject || !auth.currentUser) return;
-    const q = query(
-      collection(db, 'workflows'),
-      where('projectId', '==', currentProject.id),
-      orderBy('updatedAt', 'desc')
-    );
-    return onSnapshot(q, (snapshot) => {
-      setWorkflows(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
-    });
-  }, [currentProject]);
+    fetchWorkflows();
+    const interval = setInterval(fetchWorkflows, 5000); // Poll every 5 seconds
+    return () => clearInterval(interval);
+  }, [fetchWorkflows]);
 
   // Track unsaved changes
   useEffect(() => {
@@ -121,7 +111,7 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
   }, []);
 
   const handleSave = () => {
-    if (!auth.currentUser || !currentProject) return;
+    if (!user || !currentProject) return;
     if (activeWorkflowId) {
       const currentWf = workflows.find(w => w.id === activeWorkflowId);
       setWorkflowName(currentWf?.name || '');
@@ -133,7 +123,7 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
   };
 
   const confirmSave = async (isAuto = false) => {
-    if (!currentProject || !auth.currentUser) return;
+    if (!currentProject || !user) return;
     setIsSaving(true);
 
     try {
@@ -170,7 +160,7 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
         data.progress = 0;
 
         // Only save plain safe fields — spreading { ...node } includes React Flow internal
-        // properties (positionAbsolute, selected, dragging, __rf, etc.) that Firestore rejects
+        // properties (positionAbsolute, selected, dragging, __rf, etc.) that API may reject
         return {
           id: node.id,
           type: node.type,
@@ -190,19 +180,20 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
         data: e.data ? stripUndefined(e.data) : null,
       }));
 
-      const workflowData = { nodes: sanitizedNodes, edges: sanitizedEdges, updatedAt: serverTimestamp() };
-
       if (activeWorkflowId) {
-        await updateDoc(doc(db, 'workflows', activeWorkflowId), workflowData);
-      } else {
-        const newDoc = await addDoc(collection(db, 'workflows'), {
-          ...workflowData,
-          name: workflowName || `Workflow ${new Date().toLocaleDateString()}`,
-          projectId: currentProject.id,
-          userId: auth.currentUser.uid,
-          createdAt: serverTimestamp(),
+        await workflowsApi.update(activeWorkflowId, {
+          name: workflows.find(w => w.id === activeWorkflowId)?.name || `Workflow ${new Date().toLocaleDateString()}`,
+          nodes: sanitizedNodes,
+          edges: sanitizedEdges,
         });
-        setActiveWorkflowId(newDoc.id);
+      } else {
+        const newWorkflow = await workflowsApi.create({
+          projectId: currentProject.id,
+          name: workflowName || `Workflow ${new Date().toLocaleDateString()}`,
+          nodes: sanitizedNodes,
+          edges: sanitizedEdges,
+        });
+        setActiveWorkflowId(newWorkflow.id);
       }
 
       setLastSaved(new Date());
@@ -221,7 +212,7 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
   const deleteWorkflow = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     if (activeWorkflowId === id) setActiveWorkflowId(null);
-    await deleteDoc(doc(db, 'workflows', id));
+    await workflowsApi.delete(id);
   };
 
   const loadWorkflow = (workflow: unknown) => {
@@ -266,9 +257,10 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
     }
 
     try {
-      await updateDoc(doc(db, 'workflows', activeWorkflowId), {
+      await workflowsApi.update(activeWorkflowId, {
         name: tempName.trim(),
-        updatedAt: serverTimestamp()
+        nodes: currentWf?.nodes || [],
+        edges: currentWf?.edges || [],
       });
       setIsEditingName(false);
     } catch (err) {

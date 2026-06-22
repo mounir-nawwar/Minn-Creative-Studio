@@ -104,6 +104,8 @@ service cloud.firestore {
     match /projects/{projectId} {
       allow read, update, delete: if isOwner(resource.data.userId) || isAdmin();
       allow create: if isAuthenticated() && isValidProject(request.resource.data);
+      // Ensure userId cannot be changed on update
+      allow update: if request.resource.data.userId == resource.data.userId;
 
       match /assets/{assetId} {
         allow read, update, delete: if isOwner(resource.data.userId) || isAdmin();

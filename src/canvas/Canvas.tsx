@@ -15,7 +15,7 @@ import { useStore } from '../store/useStore';
 import { useProjectStore } from '../store/useProjectStore';
 import { nodeTypes } from '../utils/nodeTypes';
 import { motion, AnimatePresence } from 'motion/react';
-import { db, updateDoc, doc } from '../firebase';
+import { workflowsApi } from '../lib/api';
 import { stripUndefined } from '../lib/utils';
 import { Loader2, CloudCheck, CloudOff } from 'lucide-react';
 import { useConnectionContext } from '../contexts/ConnectionContext';
@@ -60,12 +60,10 @@ const CanvasContent = () => {
     const saveWorkflow = async () => {
       setSaveStatus('saving');
       try {
-        const wfRef = doc(db, 'workflows', activeWorkflowId);
-        await updateDoc(wfRef, {
+        await workflowsApi.update(activeWorkflowId, {
           nodes: nodes.map(n => {
             const nodeData = { ...n.data };
-            // Strip transient base64 data URLs — they exceed Firestore's 1MB/10MB limits
-            // and are replaced by Firebase Storage URLs after server-side upload
+            // Strip transient base64 data URLs — they exceed size limits
             if (typeof nodeData.output === 'string' && nodeData.output.startsWith('data:')) {
               delete nodeData.output;
             }
@@ -89,8 +87,7 @@ const CanvasContent = () => {
             type: e.type ?? null,
             animated: e.animated ?? false,
             data: e.data ? stripUndefined(e.data) : null,
-          })),
-          updatedAt: new Date()
+          }))
         });
         setSaveStatus('saved');
         setTimeout(() => setSaveStatus('idle'), 2000);
