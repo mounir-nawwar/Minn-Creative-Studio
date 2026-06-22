@@ -27,3 +27,6 @@ cors.json
 
 # Local file storage
 storage/
+
+# Personal local notes (never committed)
+*.local.md

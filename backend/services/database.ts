@@ -278,6 +278,18 @@ export const projects = {
     }));
   },
 
+  // Shared workspace: all projects are visible to every authorized user.
+  // The frontend marks a project "shared" when its user_id !== current user.
+  findAll: () => {
+    const stmt = db.prepare('SELECT * FROM projects ORDER BY updated_at DESC');
+    const projectList = stmt.all() as any[];
+    return projectList.map(p => ({
+      ...p,
+      settings: p.settings ? JSON.parse(p.settings) : null,
+      usage: p.usage ? JSON.parse(p.usage) : {}
+    }));
+  },
+
   update: (id: string, data: { name?: string; description?: string; settings?: any; usage?: any }) => {
     const fields: string[] = [];
     const values: any[] = [];

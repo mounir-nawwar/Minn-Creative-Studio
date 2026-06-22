@@ -26,7 +26,7 @@ import { ConnectionProvider } from './contexts/ConnectionContext';
 import AssetExpandModal from './components/AssetExpandModal';
 import { ToastContainer } from './components/ToastContainer';
 import { OfflineIndicator } from './components/OfflineIndicator';
-import { auth, User } from './lib/api';
+import { auth, clearTokens, User } from './lib/api';
 
 declare global {
   interface Window {
@@ -49,7 +49,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
   const [signInError, setSignInError] = useState<string | null>(null);
-  const { currentProject, isSettingsOpen, closeSettings, settingsMode } = useProjectStore();
+  const { currentProject, isSettingsOpen, closeSettings, settingsMode, clearProject } = useProjectStore();
   const { updateCurrentProject } = useProject();
   const setNodes = useStore((state) => state.setNodes);
   const setEdges = useStore((state) => state.setEdges);
@@ -107,11 +107,14 @@ export default function App() {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await auth.logout();
-    } catch {}
+  const handleLogout = () => {
+    // Update UI synchronously so the screen switches to login immediately —
+    // never block the logout on the network round-trip (caused "needs refresh").
+    clearTokens();
+    clearProject();
     setUser(null);
+    // Notify the server in the background; failure is harmless (tokens already cleared).
+    void auth.logout();
   };
 
   const handleLoginSuccess = (loggedInUser: User) => {

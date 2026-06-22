@@ -15,12 +15,12 @@ router.use(authMiddleware);
 
 /**
  * GET /api/projects
- * Get all projects for the authenticated user
+ * Shared workspace — returns every project to any authenticated user.
+ * The frontend flags projects created by the other account as "shared".
  */
-router.get('/', (req: any, res: any) => {
+router.get('/', (_req: any, res: any) => {
   try {
-    const userId = req.user.id;
-    const projectList = projects.findByUserId(userId);
+    const projectList = projects.findAll();
     res.json(projectList);
   } catch (error: any) {
     console.error('Error fetching projects:', error);
@@ -35,19 +35,14 @@ router.get('/', (req: any, res: any) => {
 router.get('/:id', (req: any, res: any) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id;
-    
+
     const project = projects.findById(id);
-    
+
     if (!project) {
       return res.status(404).json({ error: 'Project not found' });
     }
-    
-    // Ensure user owns this project
-    if (project.user_id !== userId) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-    
+
+    // Shared workspace — any authenticated user may open any project.
     res.json(project);
   } catch (error: any) {
     console.error('Error fetching project:', error);
@@ -85,19 +80,15 @@ router.post('/', (req: any, res: any) => {
 router.put('/:id', (req: any, res: any) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id;
     const { name, description, settings, usage } = req.body;
-    
+
     const project = projects.findById(id);
-    
+
     if (!project) {
       return res.status(404).json({ error: 'Project not found' });
     }
-    
-    if (project.user_id !== userId) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-    
+
+    // Shared workspace — any authenticated user may edit any project.
     projects.update(id, { name, description, settings, usage });
     const updated = projects.findById(id);
     
@@ -115,18 +106,14 @@ router.put('/:id', (req: any, res: any) => {
 router.delete('/:id', async (req: any, res: any) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id;
-    
+
     const project = projects.findById(id);
-    
+
     if (!project) {
       return res.status(404).json({ error: 'Project not found' });
     }
-    
-    if (project.user_id !== userId) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-    
+
+    // Shared workspace — any authenticated user may delete any project.
     // Delete all project files
     await deleteProjectFiles(id);
     
@@ -147,18 +134,14 @@ router.delete('/:id', async (req: any, res: any) => {
 router.get('/:id/usage', (req: any, res: any) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id;
-    
+
     const project = projects.findById(id);
-    
+
     if (!project) {
       return res.status(404).json({ error: 'Project not found' });
     }
-    
-    if (project.user_id !== userId) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-    
+
+    // Shared workspace — usage is visible to any authenticated user.
     const logs = usageLogs.getByProjectId(id);
     res.json(logs);
   } catch (error: any) {
