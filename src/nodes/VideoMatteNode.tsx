@@ -3,6 +3,7 @@ import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
 import { Video, Loader2 } from 'lucide-react';
 import { API_BASE } from '../constants';
+import { authHeader } from '../lib/api';
 
 const VideoMatteNode = ({ id, data }: any) => {
   const [blur, setBlur] = useState(data.config?.blur || 0);
@@ -29,7 +30,7 @@ const VideoMatteNode = ({ id, data }: any) => {
     try {
       const response = await fetch(`${API_BASE}/video/process`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeader() },
         body: JSON.stringify({ videoUrl, type: 'matte', config: { blur, threshold } })
       });
 

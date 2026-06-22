@@ -3,6 +3,7 @@ import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
 import { Video, Loader2, Type } from 'lucide-react';
 import { API_BASE } from '../constants';
+import { authHeader } from '../lib/api';
 
 const VideoMaskByTextNode = ({ id, data }: any) => {
   const [prompt, setPrompt] = useState(data.config?.prompt || 'the subject');
@@ -28,7 +29,7 @@ const VideoMaskByTextNode = ({ id, data }: any) => {
     try {
       const response = await fetch(`${API_BASE}/video/process`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeader() },
         body: JSON.stringify({ videoUrl, type: 'mask', config: { prompt } })
       });
 

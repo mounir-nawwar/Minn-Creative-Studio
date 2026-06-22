@@ -300,7 +300,7 @@ export default function ProjectPicker() {
                   key={project.id}
                   project={project}
                   layout={viewMode}
-                  isShared={project.userId !== auth.currentUser?.uid}
+                  isShared={project.userId !== auth.getCurrentUser()?.id}
                   onClick={() => selectProject(project)}
                   onEdit={() => setEditingProject(project)}
                   onDelete={() => setProjectToDelete(project)}

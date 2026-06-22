@@ -262,7 +262,7 @@ export default function ChatDrawer() {
                               ? <svg className="absolute -right-[7px] bottom-0" width="8" height="10" viewBox="0 0 8 10"><path d="M0 0 L0 10 L8 10 Z" fill="#0097A7"/></svg>
                               : <svg className="absolute -left-[7px] bottom-0" width="8" height="10" viewBox="0 0 8 10"><path d="M8 0 L8 10 L0 10 Z" fill="#2c2c2e"/></svg>
                             }
-                            {msg.role === 'user' ? msg.text : renderMarkdown(msg.text)}
+                            {msg.role === 'user' ? msg.content : renderMarkdown(msg.content)}
                           </div>
                         </div>
                       ))}

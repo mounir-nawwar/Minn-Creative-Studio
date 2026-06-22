@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Handle, Position } from 'reactflow';
 import { Maximize, Layout, Check, Loader2, Download, ExternalLink } from 'lucide-react';
 import { API_BASE } from '../constants';
+import { authHeader } from '../lib/api';
 import { downloadFile } from '../lib/utils';
 
 const SIZES = [
@@ -30,7 +31,7 @@ const BatchOutputSizerNode = ({ data, id }: any) => {
     try {
       const response = await fetch(`${API_BASE}/batchsize`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeader() },
         body: JSON.stringify({
           imageUrl: data.imageUrl,
           sizes: selectedSizes

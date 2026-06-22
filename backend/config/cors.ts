@@ -5,13 +5,19 @@ import { AUTH_CONFIG } from './auth.ts';
 const IS_PRODUCTION = AUTH_CONFIG.isProduction;
 
 export const allowedOrigins = IS_PRODUCTION
-  ? ['https://studio.minnagency.com', 'https://minn-creative-studio-491780181711.europe-west1.run.app', 'http://158.101.240.220:3000', 'https://158.101.240.220:3000']
+  ? ['https://studio.minnagency.com', 'http://150.230.52.15:3000', 'https://150.230.52.15:3000']
   : ['http://localhost:5173', 'http://localhost:3000'];
 
 export const corsMiddleware = cors({
   origin: (origin, callback) => {
-    // Allow all origins in production for now (debug)
-    callback(null, true);
+    // Same-origin requests (served from the same Express app) and tools like curl
+    // send no Origin header — always allow those.
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+    console.warn(`[CORS] Blocked origin: ${origin}`);
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
 });

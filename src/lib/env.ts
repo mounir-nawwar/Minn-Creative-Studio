@@ -32,13 +32,9 @@ const envSchema: EnvSchema = {
     description: 'Secret key for session management',
     validate: (value) => !!(value && value.length >= 32),
   },
-  FIREBASE_STORAGE_BUCKET: {
+  GOOGLE_CLOUD_PROJECT: {
     required: false,
-    description: 'Firebase Storage bucket name',
-  },
-  FIREBASE_SERVICE_ACCOUNT: {
-    required: false,
-    description: 'Firebase service account JSON (base64 encoded)',
+    description: 'Google Cloud project ID used for Vertex AI',
   },
 };
 

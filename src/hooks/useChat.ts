@@ -193,6 +193,3 @@ export function useChat() {
 
   return { chats, messages, isTyping, createNewChat, deleteChat, sendMessage };
 }
-
-// Legacy export for backward compatibility
-export { useChat as useFirebaseChat };

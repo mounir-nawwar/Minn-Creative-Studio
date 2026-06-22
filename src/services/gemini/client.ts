@@ -1,4 +1,5 @@
 import { API_BASE } from "../../constants";
+import { authHeader } from "../../lib/api";
 
 export const MAX_RETRIES = 3;
 export const RETRY_DELAY_MS = 1000;
@@ -17,7 +18,7 @@ export async function callBackend(method: string, params: any, signal?: AbortSig
   try {
     const response = await fetch(`${API_BASE}/gemini/proxy`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeader() },
       body: JSON.stringify({ method, params }),
       signal
     });
@@ -84,11 +85,11 @@ export async function callBackend(method: string, params: any, signal?: AbortSig
 }
 
 export async function urlToBase64(url: string): Promise<{ data: string; mimeType: string }> {
-  // Firebase Storage URLs can't be fetched directly from the browser due to CORS — proxy through backend
-  if (url.includes('firebasestorage.googleapis.com') || url.includes('storage.googleapis.com')) {
+  // Google Cloud Storage (Vertex GCS) URLs can't be fetched directly from the browser due to CORS — proxy through backend
+  if (url.includes('storage.googleapis.com')) {
     const res = await fetch(`${API_BASE}/proxy-image`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeader() },
       body: JSON.stringify({ url }),
     });
     if (!res.ok) throw new Error(`Image proxy failed: ${res.status}`);

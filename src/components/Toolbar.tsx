@@ -18,6 +18,7 @@ import { useStore } from '../store/useStore';
 import { useProjectStore } from '../store/useProjectStore';
 import { motion, AnimatePresence } from 'motion/react';
 import { API_BASE } from '../constants';
+import { authHeader } from '../lib/api';
 import { stripUndefined } from '../lib/utils';
 import { validateWorkflow } from '../lib/workflowValidation';
 
@@ -142,7 +143,7 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
             formData.append('file', file);
             formData.append('projectId', currentProject.id);
 
-            const response = await fetch(`${API_BASE}/upload`, { method: 'POST', body: formData });
+            const response = await fetch(`${API_BASE}/upload`, { method: 'POST', headers: { ...authHeader() }, body: formData });
             if (response.ok) {
               const { url } = await response.json();
               data.output = url;
@@ -386,8 +387,8 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
             onClick={() => setShowProfileMenu((prev) => !prev)}
             className="w-9 h-9 rounded-full overflow-hidden border-2 border-[#0097A7]/40 hover:border-[#0097A7] transition-all focus:outline-none flex-shrink-0"
           >
-            {user?.photoURL ? (
-              <img src={user.photoURL} alt={user.displayName || ''} className="w-full h-full object-cover" />
+            {user?.photoUrl ? (
+              <img src={user.photoUrl} alt={user.displayName || ''} className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full bg-[#111111] flex items-center justify-center">
                 <UserIcon className="w-4 h-4 text-gray-400" />
@@ -406,8 +407,8 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
               >
                 <div className="px-4 py-3 border-b border-white/5 flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full overflow-hidden border border-[#0097A7]/30 flex-shrink-0">
-                    {user?.photoURL ? (
-                      <img src={user.photoURL} alt="" className="w-full h-full object-cover" />
+                    {user?.photoUrl ? (
+                      <img src={user.photoUrl} alt="" className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full bg-[#1a1a1a] flex items-center justify-center">
                         <UserIcon className="w-3.5 h-3.5 text-gray-500" />

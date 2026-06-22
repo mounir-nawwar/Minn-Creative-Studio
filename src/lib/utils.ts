@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { authHeader } from "./api";
 
 export function cn(...inputs: ClassValue[]): string {
   return twMerge(clsx(inputs));
@@ -31,7 +32,7 @@ export function stripUndefined<T>(obj: T): T | null {
 
 /**
  * Robustly downloads a file by fetching it as a blob.
- * Firebase Storage URLs are proxied through the backend to avoid CORS restrictions.
+ * Google Cloud Storage URLs are proxied through the backend to avoid CORS restrictions.
  */
 export async function downloadFile(url: string, filename: string): Promise<void> {
   try {
@@ -45,14 +46,11 @@ export async function downloadFile(url: string, filename: string): Promise<void>
       const arr = new Uint8Array(bytes.length);
       for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
       blob = new Blob([arr], { type: mime });
-    } else if (
-      url.includes('firebasestorage.googleapis.com') ||
-      url.includes('storage.googleapis.com')
-    ) {
-      // Firebase Storage URLs have CORS restrictions — proxy through backend
+    } else if (url.includes('storage.googleapis.com')) {
+      // Google Cloud Storage URLs have CORS restrictions — proxy through backend
       const res = await fetch('/api/proxy-image', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeader() },
         body: JSON.stringify({ url }),
       });
       if (!res.ok) throw new Error(`Proxy failed: ${res.status}`);

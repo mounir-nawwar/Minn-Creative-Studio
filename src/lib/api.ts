@@ -22,6 +22,10 @@ export interface Project {
   settings?: any;
   usage: {
     totalCost?: number;
+    textCost?: number;
+    imageCost?: number;
+    videoCost?: number;
+    audioCost?: number;
     totalImages?: number;
     totalVideos?: number;
     totalAudio?: number;
@@ -98,6 +102,15 @@ export function clearTokens(): void {
 
 export function getAccessToken(): string | null {
   return accessToken;
+}
+
+/**
+ * Build an Authorization header for the current access token.
+ * Spread into any fetch() that hits a backend route protected by requireAuth.
+ * Returns an empty object when logged out so callers can spread unconditionally.
+ */
+export function authHeader(): Record<string, string> {
+  return accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
 }
 
 // API request helper

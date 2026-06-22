@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Tag, Plus, Loader2 } from 'lucide-react';
 import { API_BASE } from '../constants';
+import { authHeader } from '../lib/api';
 import BaseNode from './BaseNode';
 
 const PromptLibraryNode = ({ data, id }: any) => {
@@ -16,7 +17,7 @@ const PromptLibraryNode = ({ data, id }: any) => {
   const fetchPrompts = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/prompts`);
+      const response = await fetch(`${API_BASE}/prompts`, { headers: { ...authHeader() } });
       const result = await response.json();
       setPrompts(result);
     } catch (err) {
