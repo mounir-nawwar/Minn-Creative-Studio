@@ -28,9 +28,9 @@ export default function CustomLoginPage({ onLoginSuccess }: CustomLoginPageProps
 
       const data = await response.json();
       if (data.success && data.user) {
-        // Store tokens in localStorage
-        localStorage.setItem('accessToken', data.accessToken);
-        localStorage.setItem('refreshToken', data.refreshToken);
+        // Import and use setTokens to update the module variable
+        const { setTokens } = await import('../lib/api');
+        setTokens(data.accessToken, data.refreshToken);
         localStorage.setItem('currentUser', JSON.stringify(data.user));
         onLoginSuccess(data.user);
       } else {
