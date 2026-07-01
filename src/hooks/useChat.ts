@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useProjectStore } from '../store/useProjectStore';
 import { useStore } from '../store/useStore';
+import { buildProjectContext } from '../lib/projectContext';
 import { toast } from '../store/useToastStore';
 import { chatsApi, Chat, ChatMessage } from '../lib/api';
 import { generateText } from '../services/geminiService';
@@ -150,15 +151,7 @@ export function useChat() {
       // Generate AI response
       setIsTyping(true);
       try {
-        const projectContext = `
-          Current Project: ${currentProject.name}
-          Type: ${currentProject.type}
-          Description: ${currentProject.description}
-          Brand: ${currentProject.clientName || 'N/A'}
-          Industry: ${currentProject.clientIndustry || 'N/A'}
-          AI Instructions: ${currentProject.aiInstructions || 'N/A'}
-          Style Keywords: ${currentProject.styleKeywords || 'N/A'}
-        `;
+        const projectContext = buildProjectContext(currentProject);
 
         const imageUrls = assets.filter(a => a.type === 'image').map(a => a.url);
 

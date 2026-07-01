@@ -1,89 +1,81 @@
-import React from 'react';
-import { motion } from 'motion/react';
-import { Globe } from 'lucide-react';
 import { PROJECT_TYPES } from '../../types/project.types';
 import type { StepProps } from './types';
-import { PLATFORMS } from './types';
+import { StepShell, StepHeader, FieldLabel } from './ui';
 
 interface StepReviewProps extends StepProps {
   mode: 'create' | 'edit';
 }
 
 export default function StepReview({ formData, mode }: StepReviewProps) {
+  const typeLabel = PROJECT_TYPES[formData.type as keyof typeof PROJECT_TYPES]?.label;
+  const moods = formData.visualMood ?? [];
+
   return (
-    <motion.div
-      key="step7"
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -20 }}
-      className="space-y-8"
-    >
-      <div className="text-center space-y-2">
-        <h3 className="text-4xl font-black text-white tracking-tighter">
-          {mode === 'edit' ? 'Update your mission' : 'Your project is ready'}
-        </h3>
-        <p className="text-gray-500 text-sm">
-          {mode === 'edit' ? 'Review and save your changes.' : 'Review everything before launching.'}
-        </p>
-      </div>
+    <StepShell>
+      <StepHeader
+        title={mode === 'edit' ? 'Review your changes' : 'Your project is ready'}
+        subtitle={mode === 'edit' ? 'Confirm everything looks right before saving.' : 'Review everything before launching.'}
+      />
 
-      <div className="max-w-2xl mx-auto bg-[#111111] border border-white/5 rounded-[40px] p-10 space-y-8 shadow-2xl">
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
+      <div className="mx-auto max-w-2xl space-y-6 rounded-2xl bg-white/[0.03] p-8 ring-1 ring-white/10">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 space-y-2">
             <div className="flex items-center gap-2">
-              <span className="px-3 py-1 bg-[#0097A7]/20 text-[#0097A7] rounded-full text-[9px] font-black uppercase tracking-widest">
-                {PROJECT_TYPES[formData.type as keyof typeof PROJECT_TYPES]?.label}
-              </span>
-              <span className="text-[10px] text-gray-600 uppercase font-bold">{formData.subtype}</span>
+              <span className="rounded-full bg-[#0097A7]/15 px-2.5 py-1 text-[11px] font-medium text-[#0097A7]">{typeLabel}</span>
+              <span className="text-xs text-gray-500">{formData.subtype}</span>
             </div>
-            <h4 className="text-3xl font-black text-white tracking-tighter">{formData.name}</h4>
-          </div>
-          <div className="flex gap-2">
-            <div className="w-8 h-8 rounded-full border border-white/10" style={{ backgroundColor: formData.primaryColor }} />
-            <div className="w-8 h-8 rounded-full border border-white/10" style={{ backgroundColor: formData.secondaryColor }} />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-8">
-          <div className="space-y-4">
-            <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Visual Mood</label>
-            <div className="flex flex-wrap gap-2">
-              {formData.visualMood?.map(m => (
-                <span key={m} className="px-3 py-1 bg-white/5 text-gray-400 rounded-lg text-[9px] font-bold uppercase">{m}</span>
-              ))}
-            </div>
-          </div>
-          <div className="space-y-4">
-            <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Platforms</label>
-            <div className="flex flex-wrap gap-3">
-              {formData.platforms?.map(p => {
-                const PlatformIcon = PLATFORMS.find(pl => pl.id === p)?.icon || Globe;
-                return <PlatformIcon key={p} className="w-5 h-5 text-gray-500" />;
-              })}
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Collaborators</label>
-          <div className="flex flex-wrap gap-2">
-            {formData.collaborators?.length === 0 ? (
-              <span className="text-xs text-gray-600 italic">No collaborators</span>
-            ) : (
-              formData.collaborators?.map(email => (
-                <span key={email} className="px-3 py-1 bg-[#0097A7]/10 text-[#0097A7] rounded-lg text-[9px] font-bold">{email}</span>
-              ))
+            <h3 className="truncate text-2xl font-semibold tracking-tight text-white">{formData.name || 'Untitled project'}</h3>
+            {formData.clientName && (
+              <p className="text-sm text-gray-500">
+                {formData.clientName}
+                {formData.clientIndustry ? ` · ${formData.clientIndustry}` : ''}
+              </p>
             )}
           </div>
+          <div className="flex shrink-0 gap-1.5 pt-1">
+            {[formData.primaryColor, formData.secondaryColor, formData.accentColor].map((c, i) => (
+              <span key={i} className="h-7 w-7 rounded-full ring-1 ring-inset ring-white/10" style={{ backgroundColor: c }} />
+            ))}
+          </div>
         </div>
 
-        <div className="space-y-4">
-          <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">AI Instructions Preview</label>
-          <p className="text-xs text-gray-400 leading-relaxed italic line-clamp-3">
-            "{formData.aiInstructions || 'No instructions generated yet.'}"
+        <div className="grid grid-cols-2 gap-6 border-t border-white/5 pt-6">
+          <div className="space-y-2.5">
+            <FieldLabel>Visual mood</FieldLabel>
+            <div className="flex flex-wrap gap-1.5">
+              {moods.length === 0 ? (
+                <span className="text-sm text-gray-600">—</span>
+              ) : (
+                moods.map((m) => (
+                  <span key={m} className="rounded-md bg-white/[0.06] px-2 py-1 text-[11px] text-gray-300">{m}</span>
+                ))
+              )}
+            </div>
+          </div>
+          <div className="space-y-2.5">
+            <FieldLabel>Brand tone</FieldLabel>
+            <p className="text-sm text-gray-300">{formData.brandPersonality || '—'}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-6 border-t border-white/5 pt-6">
+          <div className="space-y-2.5">
+            <FieldLabel>Style keywords</FieldLabel>
+            <p className="text-sm text-gray-300">{formData.styleKeywords || '—'}</p>
+          </div>
+          <div className="space-y-2.5">
+            <FieldLabel>Avoid</FieldLabel>
+            <p className="text-sm text-gray-300">{formData.negativeKeywords || '—'}</p>
+          </div>
+        </div>
+
+        <div className="space-y-2.5 border-t border-white/5 pt-6">
+          <FieldLabel>AI instructions</FieldLabel>
+          <p className="line-clamp-4 text-sm leading-relaxed text-gray-400">
+            {formData.aiInstructions || 'No instructions yet — add some on the previous step for best results.'}
           </p>
         </div>
       </div>
-    </motion.div>
+    </StepShell>
   );
 }
