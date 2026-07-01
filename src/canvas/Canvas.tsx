@@ -333,11 +333,11 @@ const CanvasContent = () => {
         >
         <Background color="#1a1a1a" gap={30} size={1} variant={BackgroundVariant.Dots} />
         <Controls
-          className="bg-[#111111] border border-[#1a1a1a] rounded-lg overflow-hidden fill-gray-400"
+          className="overflow-hidden rounded-lg fill-gray-400 ring-1 ring-white/10 [&_button]:border-white/5 [&_button]:bg-[#111111]"
           showInteractive={false}
         />
         <MiniMap
-          className="bg-[#111111] border border-[#1a1a1a] rounded-lg overflow-hidden"
+          className="overflow-hidden rounded-lg ring-1 ring-white/10 [&>svg]:bg-[#111111]"
           maskColor="rgba(0, 0, 0, 0.7)"
           nodeColor="#0097A7"
           nodeStrokeWidth={3}
@@ -347,39 +347,19 @@ const CanvasContent = () => {
         <Panel
           position="bottom-left"
           style={{ marginLeft: '52px' }}
-          className="bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-4"
+          className="flex items-center gap-3 rounded-full border border-white/10 bg-black/60 px-3 py-1.5 backdrop-blur-md"
         >
-          <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">
-            {nodes.length} Nodes • {edges.length} Connections
+          <p className="text-[11px] text-gray-400">
+            <span className="tabular-nums">{nodes.length}</span> nodes · <span className="tabular-nums">{edges.length}</span> connections
           </p>
-          
+
           <div className="h-3 w-px bg-white/10" />
-          
+
           <div className="flex items-center gap-1.5">
-            {saveStatus === 'saving' && (
-              <>
-                <Loader2 className="w-3 h-3 text-[#0097A7] animate-spin" />
-                <span className="text-[8px] text-[#0097A7] font-black uppercase tracking-widest">Saving Changes</span>
-              </>
-            )}
-            {saveStatus === 'saved' && (
-              <>
-                <CloudCheck className="w-3 h-3 text-green-500" />
-                <span className="text-[8px] text-green-500 font-black uppercase tracking-widest">Workflow Saved</span>
-              </>
-            )}
-            {saveStatus === 'error' && (
-              <>
-                <CloudOff className="w-3 h-3 text-red-500" />
-                <span className="text-[8px] text-red-500 font-black uppercase tracking-widest">Save Failed</span>
-              </>
-            )}
-            {saveStatus === 'idle' && (
-              <>
-                <CloudCheck className="w-3 h-3 text-gray-600" />
-                <span className="text-[8px] text-gray-600 font-black uppercase tracking-widest">Cloud Sync Active</span>
-              </>
-            )}
+            {saveStatus === 'saving' && (<><Loader2 className="h-3 w-3 animate-spin text-[#0097A7]" /><span className="text-[11px] text-[#0097A7]">Saving…</span></>)}
+            {saveStatus === 'saved' && (<><CloudCheck className="h-3 w-3 text-emerald-500" /><span className="text-[11px] text-emerald-500">Saved</span></>)}
+            {saveStatus === 'error' && (<><CloudOff className="h-3 w-3 text-red-500" /><span className="text-[11px] text-red-500">Save failed</span></>)}
+            {saveStatus === 'idle' && (<><CloudCheck className="h-3 w-3 text-gray-600" /><span className="text-[11px] text-gray-500">Synced</span></>)}
           </div>
         </Panel>
       </ReactFlow>
@@ -388,37 +368,33 @@ const CanvasContent = () => {
         {pendingNodeType && (
           <>
             <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 0.45, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="fixed pointer-events-none z-[9999] border-2 border-[#0097A7] bg-[#111111] rounded-3xl p-6 w-[280px] shadow-2xl"
-              style={{
-                left: 0,
-                top: 0,
-                transform: `translate(${ghostPos.x - 140}px, ${ghostPos.y - 60}px)`,
-              }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.5 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.12 }}
+              className="pointer-events-none fixed z-[9999] w-[280px] rounded-xl bg-[#111111] p-5 shadow-2xl ring-1 ring-[#0097A7]/60"
+              style={{ left: 0, top: 0, transform: `translate(${ghostPos.x - 140}px, ${ghostPos.y - 60}px)` }}
             >
-              <div className="flex items-center justify-between mb-3">
-                <div className="w-20 h-2 bg-white/10 rounded-full" />
-                <div className="w-4 h-4 bg-[#0097A7]/30 rounded-lg" />
+              <div className="mb-3 flex items-center justify-between">
+                <div className="h-2 w-20 rounded-full bg-white/10" />
+                <div className="h-4 w-4 rounded-md bg-[#0097A7]/30" />
               </div>
               <div className="space-y-2">
-                <div className="w-full h-3 bg-white/5 rounded-lg" />
-                <div className="w-2/3 h-3 bg-white/5 rounded-lg" />
+                <div className="h-3 w-full rounded-md bg-white/5" />
+                <div className="h-3 w-2/3 rounded-md bg-white/5" />
               </div>
-              <p className="mt-4 text-[10px] font-black text-[#0097A7] uppercase tracking-widest text-center">
-                {pendingNodeData?.label || pendingNodeType}
-              </p>
+              <p className="mt-4 text-center text-[11px] font-medium text-[#0097A7]">{pendingNodeData?.label || pendingNodeType}</p>
             </motion.div>
 
             <motion.div
-              initial={{ y: -20, opacity: 0 }}
+              initial={{ y: -8, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              exit={{ y: -20, opacity: 0 }}
-              className="fixed top-36 left-1/2 -translate-x-1/2 z-[10000] bg-[#0097A7] text-white px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-2xl border border-white/20 flex items-center gap-2"
+              exit={{ y: -8, opacity: 0 }}
+              transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}
+              className="fixed left-1/2 top-36 z-[10000] inline-flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/15 bg-[#0097A7] px-4 py-2 text-[12px] font-medium text-white shadow-[0_8px_24px_-6px_rgba(0,151,167,0.7)]"
             >
-              <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
-              Click to place — Esc to cancel
+              <span className="h-1.5 w-1.5 rounded-full bg-white" />
+              Click to place · Esc to cancel
             </motion.div>
           </>
         )}

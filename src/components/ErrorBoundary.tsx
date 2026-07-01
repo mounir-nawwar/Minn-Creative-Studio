@@ -62,33 +62,30 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
       // Default error UI
       return (
-        <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-6 m-4">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
-              <span className="text-white text-xs font-bold">!</span>
-            </div>
-            <h2 className="text-red-400 font-bold text-lg">Something went wrong</h2>
+        <div className="m-4 rounded-2xl bg-red-500/[0.08] p-6 ring-1 ring-red-500/25">
+          <div className="mb-3 flex items-center gap-2.5">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">!</div>
+            <h2 className="text-base font-semibold text-red-400">Something went wrong</h2>
           </div>
-          
-          <div className="bg-red-950/30 border border-red-500/30 rounded p-3 mb-4">
-            <p className="text-red-300 font-mono text-sm">
+
+          <div className="mb-4 rounded-lg bg-black/30 p-3 ring-1 ring-red-500/20">
+            <p className="font-mono text-sm text-red-300">
               {this.state.error?.message || 'An unexpected error occurred'}
             </p>
           </div>
-          
+
           <div className="flex gap-2">
             <button
               onClick={this.resetError}
-              className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 text-red-300 rounded-lg text-sm font-medium transition-colors"
+              className="inline-flex h-9 items-center rounded-lg bg-red-500/15 px-4 text-sm font-medium text-red-300 ring-1 ring-red-500/30 transition-[transform,background-color] duration-150 hover:bg-red-500/20 active:scale-[0.96]"
             >
-              Try Again
+              Try again
             </button>
-            
             <button
               onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/50 text-blue-300 rounded-lg text-sm font-medium transition-colors"
+              className="inline-flex h-9 items-center rounded-lg bg-white/[0.06] px-4 text-sm font-medium text-gray-300 ring-1 ring-white/10 transition-[transform,color,background-color] duration-150 hover:bg-white/10 hover:text-white active:scale-[0.96]"
             >
-              Reload Page
+              Reload page
             </button>
           </div>
         </div>

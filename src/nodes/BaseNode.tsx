@@ -143,10 +143,9 @@ const BaseNode: React.FC<BaseNodeProps> = ({
       transition={{ duration: 0.15 }}
       onAnimationComplete={() => updateNodeInternals(id)}
       className={cn(
-        "w-[320px] bg-[#111111] border border-[#1a1a1a] rounded-xl shadow-2xl transition-all duration-300",
-        "relative", // Add positioning context for absolute handles
-        data.isRunning && "border-[#0097A7] shadow-[0_0_15px_rgba(0,151,167,0.3)]",
-        data.error && "border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)]",
+        "relative w-[320px] rounded-xl bg-[#111111] ring-1 ring-white/[0.07] shadow-[0_1px_2px_rgba(0,0,0,0.4)] transition-shadow duration-200",
+        data.isRunning && "ring-[#0097A7]/70 shadow-[0_0_20px_rgba(0,151,167,0.25)]",
+        data.error && "ring-red-500/70 shadow-[0_0_20px_rgba(239,68,68,0.2)]",
         className
       )}
       style={{ position: 'relative' }} // Ensure handles can be absolutely positioned
@@ -158,50 +157,51 @@ const BaseNode: React.FC<BaseNodeProps> = ({
         </>
       )}
       
-      <div className="px-4 py-2 bg-[#1a1a1a] flex items-center justify-between group/header relative overflow-hidden rounded-t-xl">
+      <div className="group/header relative flex items-center justify-between overflow-hidden rounded-t-xl border-b border-white/5 bg-white/[0.03] px-3.5 py-2">
         {data.isRunning && (
-          <div 
+          <div
             className="absolute bottom-0 left-0 h-[2px] w-[200%] bg-gradient-to-r from-transparent via-[#0097A7] to-transparent"
             style={{ animation: 'shimmer 1.5s infinite linear' }}
           />
         )}
-        <div className="flex items-center gap-2 z-10">
-          {Icon && <Icon className="w-4 h-4 text-gray-400" />}
-          <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{data.label}</span>
+        <div className="z-10 flex items-center gap-2">
+          {Icon && <Icon className="h-3.5 w-3.5 text-gray-400" />}
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-300">{data.label}</span>
         </div>
-        <div className="flex items-center gap-2 z-10">
+        <div className="z-10 flex items-center gap-2">
           {data.isRunning && (
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-[#0097A7] tabular-nums">{typeof data.progress === 'string' ? data.progress : `${data.progress || 0}%`}</span>
-              <Loader2 className="w-4 h-4 text-[#0097A7] animate-spin" />
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-medium tabular-nums text-[#0097A7]">{typeof data.progress === 'string' ? data.progress : `${data.progress || 0}%`}</span>
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-[#0097A7]" />
             </div>
           )}
-          {data.error && <AlertCircle className="w-4 h-4 text-red-500" />}
-          <button 
+          {data.error && <AlertCircle className="h-3.5 w-3.5 text-red-500" />}
+          <button
             onClick={(e) => {
               e.stopPropagation();
               deleteNode(id);
             }}
-            className="opacity-0 group-hover/header:opacity-100 p-1 hover:bg-white/10 rounded transition-all"
+            className="inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-500 opacity-0 transition-[transform,color,background-color] duration-150 hover:bg-white/10 hover:text-white active:scale-[0.96] group-hover/header:opacity-100"
           >
-            <X className="w-3 h-3 text-gray-500 hover:text-white" />
+            <X className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
 
-      <div className="p-4 space-y-4 overflow-hidden">
+      <div className="space-y-4 overflow-hidden p-4">
         {children}
       </div>
 
       <AnimatePresence>
         {data.error && (
-          <motion.div 
+          <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="px-4 py-2 bg-red-950/20 border-t border-red-500/30"
+            transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}
+            className="border-t border-red-500/20 bg-red-500/[0.08] px-4 py-2"
           >
-            <p className="text-[10px] text-red-400 leading-tight">{data.error}</p>
+            <p className="text-[11px] leading-tight text-red-400">{data.error}</p>
           </motion.div>
         )}
       </AnimatePresence>

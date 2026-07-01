@@ -1,5 +1,3 @@
-import React from 'react';
-
 interface ParameterSliderProps {
   label: string;
   value: number;
@@ -12,19 +10,19 @@ interface ParameterSliderProps {
 
 const ParameterSlider = ({ label, value, min, max, step = 1, onChange, color = '#0097A7' }: ParameterSliderProps) => {
   return (
-    <div className="space-y-1">
-      <div className="flex justify-between items-center">
-        <label className="text-[10px] text-gray-500 uppercase font-bold">{label}</label>
-        <span className="text-[10px] font-bold" style={{ color }}>{value}</span>
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-medium uppercase tracking-wide text-gray-400">{label}</span>
+        <span className="text-[11px] font-medium tabular-nums" style={{ color }}>{value}</span>
       </div>
-      <input 
-        type="range" 
-        min={min} 
-        max={max} 
-        step={step} 
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full h-1 bg-[#1a1a1a] rounded-lg appearance-none cursor-pointer accent-[#0097A7]"
+        className="h-1 w-full cursor-pointer appearance-none rounded-full bg-white/10"
         style={{ accentColor: color }}
       />
     </div>

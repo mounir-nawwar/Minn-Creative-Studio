@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Sparkles, Loader2, ArrowRight } from 'lucide-react';
 import { suggestNodeConfig } from '../services/geminiService';
 import { useProjectStore } from '../store/useProjectStore';
@@ -10,7 +10,7 @@ interface AskAIButtonProps {
   label?: string;
 }
 
-export default function AskAIButton({ nodeType, currentConfig, onSuggestion, label = "Ask AI to Fill" }: AskAIButtonProps) {
+export default function AskAIButton({ nodeType, currentConfig, onSuggestion, label = 'Ask AI to fill' }: AskAIButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [goal, setGoal] = useState('');
   const [loading, setLoading] = useState(false);
@@ -20,58 +20,53 @@ export default function AskAIButton({ nodeType, currentConfig, onSuggestion, lab
     if (!goal.trim()) return;
     setLoading(true);
     try {
-      const suggestion = await suggestNodeConfig({
-        nodeType,
-        userGoal: goal,
-        currentConfig,
-        projectId: currentProject?.id,
-      });
+      const suggestion = await suggestNodeConfig({ nodeType, userGoal: goal, currentConfig, projectId: currentProject?.id });
       onSuggestion(suggestion);
       setIsOpen(false);
       setGoal('');
     } catch (err) {
-      console.error("Ask AI failed", err);
+      console.error('Ask AI failed', err);
     } finally {
       setLoading(false);
     }
   };
 
+  if (!isOpen) {
+    return (
+      <button
+        onClick={() => setIsOpen(true)}
+        className="inline-flex h-8 w-full items-center justify-center gap-2 rounded-lg bg-[#0097A7]/10 text-[12px] font-medium text-[#0097A7] ring-1 ring-[#0097A7]/25 transition-[transform,background-color] duration-150 hover:bg-[#0097A7]/15 active:scale-[0.98]"
+      >
+        <Sparkles className="h-3.5 w-3.5" />
+        {label}
+      </button>
+    );
+  }
+
   return (
-    <div className="relative">
-      {!isOpen ? (
+    <div className="space-y-2 rounded-xl bg-[#0d0d0d] p-2 ring-1 ring-[#0097A7]/25">
+      <div className="flex items-center justify-between px-0.5">
+        <p className="text-[11px] font-medium text-[#0097A7]">What's your goal?</p>
+        <button onClick={() => setIsOpen(false)} className="text-[11px] text-gray-500 transition-colors hover:text-white">Cancel</button>
+      </div>
+      <div className="relative">
+        <input
+          autoFocus
+          type="text"
+          value={goal}
+          onChange={(e) => setGoal(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleAsk()}
+          placeholder="e.g. A dramatic space battle"
+          className="w-full rounded-lg bg-black/40 py-2 pl-2.5 pr-10 text-[12px] text-white placeholder:text-gray-600 ring-1 ring-white/10 transition-shadow duration-150 focus:outline-none focus:ring-[1.5px] focus:ring-[#0097A7]/60"
+        />
         <button
-          onClick={() => setIsOpen(true)}
-          className="w-full py-1.5 px-3 bg-[#0097A7]/10 hover:bg-[#0097A7]/20 border border-[#0097A7]/30 rounded-lg flex items-center justify-center gap-2 text-[10px] text-[#0097A7] font-black uppercase tracking-widest transition-all"
+          onClick={handleAsk}
+          disabled={loading || !goal.trim()}
+          className="absolute bottom-1 right-1 top-1 inline-flex w-8 items-center justify-center rounded-md bg-[#0097A7] text-white transition-[transform,background-color] duration-150 hover:bg-[#00a9bb] active:scale-[0.96] disabled:opacity-50"
         >
-          <Sparkles className="w-3 h-3" />
-          {label}
+          {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowRight className="h-3.5 w-3.5" />}
         </button>
-      ) : (
-        <div className="p-2 bg-[#111111] border border-[#0097A7]/30 rounded-xl space-y-2 shadow-2xl animate-in fade-in zoom-in duration-200">
-          <div className="flex items-center justify-between">
-            <p className="text-[9px] text-[#0097A7] font-black uppercase tracking-widest">What's your goal?</p>
-            <button onClick={() => setIsOpen(false)} className="text-[10px] text-gray-600 hover:text-white">Cancel</button>
-          </div>
-          <div className="relative">
-            <input
-              autoFocus
-              type="text"
-              value={goal}
-              onChange={(e) => setGoal(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleAsk()}
-              placeholder="e.g. A dramatic space battle"
-              className="w-full bg-black border border-[#2a2a2a] rounded-lg p-2 pr-10 text-[11px] text-white focus:outline-none focus:border-[#0097A7]"
-            />
-            <button
-              onClick={handleAsk}
-              disabled={loading || !goal.trim()}
-              className="absolute right-1 top-1 bottom-1 px-2 bg-[#0097A7] text-white rounded-md disabled:opacity-50"
-            >
-              {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <ArrowRight className="w-3 h-3" />}
-            </button>
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 }
