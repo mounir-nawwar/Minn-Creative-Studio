@@ -3,6 +3,8 @@ import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
 import { useAssetExpand } from '../hooks/useAssetExpand';
 import { ExpandableAssetWrapper } from '../components/ExpandableAssetWrapper';
+import ParameterSlider from '../components/ParameterSlider';
+import { RunButton } from './ui';
 
 const LevelsNode = ({ id, data }: any) => {
   const [brightness, setBrightness] = useState(data.config?.brightness || 100);
@@ -60,70 +62,18 @@ const LevelsNode = ({ id, data }: any) => {
   return (
     <BaseNode id={id} data={data} onRun={handleRun}>
       <div className="space-y-3">
-        <div className="space-y-1">
-          <div className="flex justify-between">
-            <label className="text-[10px] text-gray-500 uppercase font-bold">Brightness</label>
-            <span className="text-[10px] text-[#0097A7]">{brightness}%</span>
-          </div>
-          <input 
-            type="range" min="0" max="200" value={brightness}
-            onChange={(e) => {
-              setBrightness(Number(e.target.value));
-              updateNodeData(id, { config: { ...data.config, brightness: Number(e.target.value) } });
-            }}
-            className="w-full h-1 bg-[#1a1a1a] rounded-lg appearance-none cursor-pointer accent-[#0097A7]"
-          />
-        </div>
+        <ParameterSlider label="Brightness" value={brightness} min={0} max={200} onChange={(v) => { setBrightness(v); updateNodeData(id, { config: { ...data.config, brightness: v } }); }} />
+        <ParameterSlider label="Contrast" value={contrast} min={0} max={200} onChange={(v) => { setContrast(v); updateNodeData(id, { config: { ...data.config, contrast: v } }); }} />
+        <ParameterSlider label="Saturation" value={saturation} min={0} max={200} onChange={(v) => { setSaturation(v); updateNodeData(id, { config: { ...data.config, saturation: v } }); }} />
 
-        <div className="space-y-1">
-          <div className="flex justify-between">
-            <label className="text-[10px] text-gray-500 uppercase font-bold">Contrast</label>
-            <span className="text-[10px] text-[#0097A7]">{contrast}%</span>
-          </div>
-          <input 
-            type="range" min="0" max="200" value={contrast}
-            onChange={(e) => {
-              setContrast(Number(e.target.value));
-              updateNodeData(id, { config: { ...data.config, contrast: Number(e.target.value) } });
-            }}
-            className="w-full h-1 bg-[#1a1a1a] rounded-lg appearance-none cursor-pointer accent-[#0097A7]"
-          />
-        </div>
-
-        <div className="space-y-1">
-          <div className="flex justify-between">
-            <label className="text-[10px] text-gray-500 uppercase font-bold">Saturation</label>
-            <span className="text-[10px] text-[#0097A7]">{saturation}%</span>
-          </div>
-          <input 
-            type="range" min="0" max="200" value={saturation}
-            onChange={(e) => {
-              setSaturation(Number(e.target.value));
-              updateNodeData(id, { config: { ...data.config, saturation: Number(e.target.value) } });
-            }}
-            className="w-full h-1 bg-[#1a1a1a] rounded-lg appearance-none cursor-pointer accent-[#0097A7]"
-          />
-        </div>
-
-        <button
-          onClick={handleRun}
-          disabled={data.isRunning}
-          className="w-full py-2 bg-[#0097A7] hover:bg-[#00838F] text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50"
-        >
-          {data.isRunning ? "PROCESSING..." : "APPLY LEVELS"}
-        </button>
+        <RunButton onClick={handleRun} running={data.isRunning}>{data.isRunning ? 'Processing…' : 'Apply levels'}</RunButton>
 
         <canvas ref={canvasRef} className="hidden" />
 
         {data.output && (
-          <div className="mt-2 rounded-lg overflow-hidden border border-[#2a2a2a]">
-            <ExpandableAssetWrapper
-              onClick={() => setExpandedAsset(data.output, 'image')}
-              type="image"
-            >
-              <img src={data.output} alt="Processed" className="w-full h-auto" />
-            </ExpandableAssetWrapper>
-          </div>
+          <ExpandableAssetWrapper onClick={() => setExpandedAsset(data.output, 'image')} type="image">
+            <img src={data.output} alt="Processed" className="h-auto w-full" />
+          </ExpandableAssetWrapper>
         )}
       </div>
     </BaseNode>

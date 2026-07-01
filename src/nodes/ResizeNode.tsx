@@ -1,8 +1,9 @@
-import React, { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
 import { useAssetExpand } from '../hooks/useAssetExpand';
 import { ExpandableAssetWrapper } from '../components/ExpandableAssetWrapper';
+import { NodeField, NodeInput, RunButton } from './ui';
 
 const ResizeNode = ({ id, data }: any) => {
   const [width, setWidth] = useState(data.config?.width || 1024);
@@ -59,49 +60,22 @@ const ResizeNode = ({ id, data }: any) => {
     <BaseNode id={id} data={data} onRun={handleRun}>
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-2">
-          <div className="space-y-1">
-            <label className="text-[10px] text-gray-500 uppercase font-bold">Width</label>
-            <input 
-              type="number" value={width}
-              onChange={(e) => {
-                setWidth(Number(e.target.value));
-                updateNodeData(id, { config: { ...data.config, width: Number(e.target.value) } });
-              }}
-              className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-1.5 text-xs text-gray-300 focus:outline-none"
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] text-gray-500 uppercase font-bold">Height</label>
-            <input 
-              type="number" value={height}
-              onChange={(e) => {
-                setHeight(Number(e.target.value));
-                updateNodeData(id, { config: { ...data.config, height: Number(e.target.value) } });
-              }}
-              className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-1.5 text-xs text-gray-300 focus:outline-none"
-            />
-          </div>
+          <NodeField label="Width">
+            <NodeInput type="number" value={width} onChange={(e) => { setWidth(Number(e.target.value)); updateNodeData(id, { config: { ...data.config, width: Number(e.target.value) } }); }} />
+          </NodeField>
+          <NodeField label="Height">
+            <NodeInput type="number" value={height} onChange={(e) => { setHeight(Number(e.target.value)); updateNodeData(id, { config: { ...data.config, height: Number(e.target.value) } }); }} />
+          </NodeField>
         </div>
 
-        <button
-          onClick={handleRun}
-          disabled={data.isRunning}
-          className="w-full py-2 bg-[#0097A7] hover:bg-[#00838F] text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50"
-        >
-          {data.isRunning ? "RESIZING..." : "APPLY RESIZE"}
-        </button>
+        <RunButton onClick={handleRun} running={data.isRunning}>{data.isRunning ? 'Resizing…' : 'Apply resize'}</RunButton>
 
         <canvas ref={canvasRef} className="hidden" />
 
         {data.output && (
-          <div className="mt-2 rounded-lg overflow-hidden border border-[#2a2a2a]">
-            <ExpandableAssetWrapper
-              onClick={() => setExpandedAsset(data.output, 'image')}
-              type="image"
-            >
-              <img src={data.output} alt="Processed" className="w-full h-auto" />
-            </ExpandableAssetWrapper>
-          </div>
+          <ExpandableAssetWrapper onClick={() => setExpandedAsset(data.output, 'image')} type="image">
+            <img src={data.output} alt="Processed" className="h-auto w-full" />
+          </ExpandableAssetWrapper>
         )}
       </div>
     </BaseNode>

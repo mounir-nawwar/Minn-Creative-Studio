@@ -1,8 +1,9 @@
-import React, { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
 import { useAssetExpand } from '../hooks/useAssetExpand';
 import { ExpandableAssetWrapper } from '../components/ExpandableAssetWrapper';
+import { NodeField, NodeSelect, RunButton } from './ui';
 
 const CropNode = ({ id, data }: any) => {
   const [aspectRatio, setAspectRatio] = useState(data.config?.aspectRatio || '1:1');
@@ -73,43 +74,24 @@ const CropNode = ({ id, data }: any) => {
   return (
     <BaseNode id={id} data={data} onRun={handleRun}>
       <div className="space-y-3">
-        <div className="space-y-1">
-          <label className="text-[10px] text-gray-500 uppercase font-bold">Aspect Ratio</label>
-          <select 
-            className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-1.5 text-[10px] text-gray-400 focus:outline-none"
-            value={aspectRatio}
-            onChange={(e) => {
-              setAspectRatio(e.target.value);
-              updateNodeData(id, { config: { ...data.config, aspectRatio: e.target.value } });
-            }}
-          >
+        <NodeField label="Aspect ratio">
+          <NodeSelect value={aspectRatio} onChange={(e) => { setAspectRatio(e.target.value); updateNodeData(id, { config: { ...data.config, aspectRatio: e.target.value } }); }}>
             <option value="1:1">1:1 Square</option>
             <option value="16:9">16:9 Landscape</option>
             <option value="9:16">9:16 Portrait</option>
             <option value="4:3">4:3 Classic</option>
             <option value="21:9">21:9 Ultrawide</option>
-          </select>
-        </div>
+          </NodeSelect>
+        </NodeField>
 
-        <button
-          onClick={handleRun}
-          disabled={data.isRunning}
-          className="w-full py-2 bg-[#0097A7] hover:bg-[#00838F] text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50"
-        >
-          {data.isRunning ? "CROPPING..." : "APPLY CROP"}
-        </button>
+        <RunButton onClick={handleRun} running={data.isRunning}>{data.isRunning ? 'Cropping…' : 'Apply crop'}</RunButton>
 
         <canvas ref={canvasRef} className="hidden" />
 
         {data.output && (
-          <div className="mt-2 rounded-lg overflow-hidden border border-[#2a2a2a]">
-            <ExpandableAssetWrapper
-              onClick={() => setExpandedAsset(data.output, 'image')}
-              type="image"
-            >
-              <img src={data.output} alt="Processed" className="w-full h-auto" />
-            </ExpandableAssetWrapper>
-          </div>
+          <ExpandableAssetWrapper onClick={() => setExpandedAsset(data.output, 'image')} type="image">
+            <img src={data.output} alt="Processed" className="h-auto w-full" />
+          </ExpandableAssetWrapper>
         )}
       </div>
     </BaseNode>

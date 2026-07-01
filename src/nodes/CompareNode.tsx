@@ -29,7 +29,7 @@ const CompareNode = ({ id, data }: any) => {
   }, []);
 
   const renderMedia = (url: string, label: string) => {
-    if (!url) return <div className="flex items-center justify-center h-full bg-zinc-900 text-zinc-500 text-xs italic">No {label}</div>;
+    if (!url) return <div className="flex h-full items-center justify-center bg-black/40 text-xs text-gray-500">No {label}</div>;
     const isVideo = url.match(/\.(mp4|webm|ogg)$/) || url.includes('video');
     
     if (isVideo) {
@@ -48,7 +48,7 @@ const CompareNode = ({ id, data }: any) => {
   };
 
   return (
-    <BaseNode id={id} data={{ ...data, label: 'Compare' }} inputs={true} outputs={false} className="border-orange-500">
+    <BaseNode id={id} data={{ ...data, label: 'Compare' }} inputs={true} outputs={false}>
       <div className="space-y-4">
         <div 
           ref={containerRef}
@@ -74,7 +74,7 @@ const CompareNode = ({ id, data }: any) => {
                 {renderMedia(data.inputA, 'A')}
                </div>
             </div>
-            <div className="absolute bottom-2 left-2 px-2 py-1 bg-orange-500/80 rounded text-[10px] text-white font-bold">A</div>
+            <div className="absolute bottom-2 left-2 rounded bg-[#0097A7]/80 px-2 py-1 text-[10px] font-medium text-white">A</div>
           </div>
 
           {/* Slider Line */}
@@ -88,9 +88,9 @@ const CompareNode = ({ id, data }: any) => {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
-           <div className="text-[10px] text-zinc-500 uppercase tracking-tighter">Input A (Left)</div>
-           <div className="text-[10px] text-zinc-500 uppercase tracking-tighter text-right">Input B (Right)</div>
+        <div className="grid grid-cols-2 gap-2 text-[11px] text-gray-500">
+          <div>Input A (left)</div>
+          <div className="text-right">Input B (right)</div>
         </div>
       </div>
     </BaseNode>

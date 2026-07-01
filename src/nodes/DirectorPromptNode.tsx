@@ -3,6 +3,7 @@ import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
 import { Clapperboard, Sparkles } from 'lucide-react';
 import AskAIButton from '../components/AskAIButton';
+import { NodeField, NodeInput, NodeTextArea, NodeSelect } from './ui';
 
 const DirectorPromptNode = ({ id, data }: any) => {
   const [subject, setSubject] = useState(data.config?.subject || '');
@@ -52,77 +53,36 @@ const DirectorPromptNode = ({ id, data }: any) => {
   }, [subject, action, style, lighting, camera]);
 
   return (
-    <BaseNode id={id} data={data} color="#673AB7" icon={Clapperboard}>
+    <BaseNode id={id} data={data} color="#0097A7" icon={Clapperboard}>
       <div className="space-y-3">
-        <AskAIButton 
-          nodeType="Director's Prompt" 
-          currentConfig={{ subject, action, style, lighting, camera }}
-          onSuggestion={handleAISuggestion}
-          label="Ask AI for Scene"
-        />
+        <AskAIButton nodeType="Director's Prompt" currentConfig={{ subject, action, style, lighting, camera }} onSuggestion={handleAISuggestion} label="Ask AI for scene" />
 
-        <div className="space-y-1">
-          <label className="text-[10px] text-gray-500 uppercase font-bold">Subject</label>
-          <input
-            type="text"
-            className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-2 text-xs text-gray-300 focus:outline-none focus:border-[#673AB7]"
-            placeholder="e.g. A majestic lion"
-            value={subject}
-            onChange={(e) => setSubject(e.target.value)}
-          />
-        </div>
+        <NodeField label="Subject">
+          <NodeInput type="text" placeholder="e.g. A majestic lion" value={subject} onChange={(e) => setSubject(e.target.value)} />
+        </NodeField>
 
-        <div className="space-y-1">
-          <label className="text-[10px] text-gray-500 uppercase font-bold">Action / Setting</label>
-          <textarea
-            className="w-full h-16 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-2 text-xs text-gray-300 focus:outline-none focus:border-[#673AB7] resize-none"
-            placeholder="e.g. walking through a futuristic neon city"
-            value={action}
-            onChange={(e) => setAction(e.target.value)}
-          />
-        </div>
+        <NodeField label="Action / setting">
+          <NodeTextArea className="h-16" placeholder="e.g. walking through a futuristic neon city" value={action} onChange={(e) => setAction(e.target.value)} />
+        </NodeField>
 
         <div className="grid grid-cols-2 gap-2">
-          <div className="space-y-1">
-            <label className="text-[10px] text-gray-500 uppercase font-bold">Style</label>
-            <select 
-              className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-1.5 text-[10px] text-gray-400 focus:outline-none"
-              value={style}
-              onChange={(e) => setStyle(e.target.value)}
-            >
-              {styles.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] text-gray-500 uppercase font-bold">Lighting</label>
-            <select 
-              className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-1.5 text-[10px] text-gray-400 focus:outline-none"
-              value={lighting}
-              onChange={(e) => setLighting(e.target.value)}
-            >
-              {lightings.map(l => <option key={l} value={l}>{l}</option>)}
-            </select>
-          </div>
+          <NodeField label="Style">
+            <NodeSelect value={style} onChange={(e) => setStyle(e.target.value)}>{styles.map((s) => <option key={s} value={s}>{s}</option>)}</NodeSelect>
+          </NodeField>
+          <NodeField label="Lighting">
+            <NodeSelect value={lighting} onChange={(e) => setLighting(e.target.value)}>{lightings.map((l) => <option key={l} value={l}>{l}</option>)}</NodeSelect>
+          </NodeField>
         </div>
 
-        <div className="space-y-1">
-          <label className="text-[10px] text-gray-500 uppercase font-bold">Camera Movement</label>
-          <select 
-            className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-1.5 text-[10px] text-gray-400 focus:outline-none"
-            value={camera}
-            onChange={(e) => setCamera(e.target.value)}
-          >
-            {cameras.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </div>
+        <NodeField label="Camera movement">
+          <NodeSelect value={camera} onChange={(e) => setCamera(e.target.value)}>{cameras.map((c) => <option key={c} value={c}>{c}</option>)}</NodeSelect>
+        </NodeField>
 
-        <div className="p-2 bg-[#1a1a1a] rounded-lg border border-[#2a2a2a]">
-          <p className="text-[9px] text-gray-500 uppercase font-bold mb-1 flex items-center gap-1">
-            <Sparkles className="w-2 h-2" /> Generated Prompt
+        <div className="rounded-lg bg-black/30 p-2.5 ring-1 ring-white/10">
+          <p className="mb-1 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-gray-500">
+            <Sparkles className="h-3 w-3 text-[#0097A7]" /> Generated prompt
           </p>
-          <p className="text-[10px] text-gray-400 italic line-clamp-3">
-            {data.output || 'Waiting for input...'}
-          </p>
+          <p className="line-clamp-3 text-[11px] italic text-gray-400">{data.output || 'Waiting for input…'}</p>
         </div>
       </div>
     </BaseNode>

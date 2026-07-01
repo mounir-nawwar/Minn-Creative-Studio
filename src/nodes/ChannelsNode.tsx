@@ -3,6 +3,7 @@ import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
 import { useAssetExpand } from '../hooks/useAssetExpand';
 import { ExpandableAssetWrapper } from '../components/ExpandableAssetWrapper';
+import { RunButton } from './ui';
 
 const ChannelsNode = ({ id, data }: any) => {
   const [red, setRed] = useState(data.config?.red ?? true);
@@ -72,68 +73,32 @@ const ChannelsNode = ({ id, data }: any) => {
     <BaseNode id={id} data={data} onRun={handleRun}>
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-2">
-          <div className="flex items-center gap-2">
-            <input 
-              type="checkbox" id={`red-${id}`} checked={red}
-              onChange={(e) => {
-                setRed(e.target.checked);
-                updateNodeData(id, { config: { ...data.config, red: e.target.checked } });
-              }}
-              className="w-3 h-3 accent-red-500"
-            />
-            <label htmlFor={`red-${id}`} className="text-[10px] text-gray-400 font-bold uppercase">Red</label>
-          </div>
-          <div className="flex items-center gap-2">
-            <input 
-              type="checkbox" id={`green-${id}`} checked={green}
-              onChange={(e) => {
-                setGreen(e.target.checked);
-                updateNodeData(id, { config: { ...data.config, green: e.target.checked } });
-              }}
-              className="w-3 h-3 accent-green-500"
-            />
-            <label htmlFor={`green-${id}`} className="text-[10px] text-gray-400 font-bold uppercase">Green</label>
-          </div>
-          <div className="flex items-center gap-2">
-            <input 
-              type="checkbox" id={`blue-${id}`} checked={blue}
-              onChange={(e) => {
-                setBlue(e.target.checked);
-                updateNodeData(id, { config: { ...data.config, blue: e.target.checked } });
-              }}
-              className="w-3 h-3 accent-blue-500"
-            />
-            <label htmlFor={`blue-${id}`} className="text-[10px] text-gray-400 font-bold uppercase">Blue</label>
-          </div>
-          <div className="flex items-center gap-2">
-            <input 
-              type="checkbox" id={`alpha-${id}`} checked={alpha}
-              onChange={(e) => {
-                setAlpha(e.target.checked);
-                updateNodeData(id, { config: { ...data.config, alpha: e.target.checked } });
-              }}
-              className="w-3 h-3 accent-gray-500"
-            />
-            <label htmlFor={`alpha-${id}`} className="text-[10px] text-gray-400 font-bold uppercase">Alpha</label>
-          </div>
+          {([
+            ['red', red, setRed, 'accent-red-500', 'Red'],
+            ['green', green, setGreen, 'accent-green-500', 'Green'],
+            ['blue', blue, setBlue, 'accent-blue-500', 'Blue'],
+            ['alpha', alpha, setAlpha, 'accent-gray-400', 'Alpha'],
+          ] as const).map(([key, val, setter, accent, label]) => (
+            <label key={key} htmlFor={`${key}-${id}`} className="flex cursor-pointer items-center gap-2 rounded-lg bg-white/[0.03] px-2.5 py-2 ring-1 ring-white/10">
+              <input
+                type="checkbox"
+                id={`${key}-${id}`}
+                checked={val}
+                onChange={(e) => { setter(e.target.checked); updateNodeData(id, { config: { ...data.config, [key]: e.target.checked } }); }}
+                className={`h-3.5 w-3.5 ${accent}`}
+              />
+              <span className="text-[11px] text-gray-300">{label}</span>
+            </label>
+          ))}
         </div>
 
-        <button
-          onClick={handleRun}
-          disabled={data.isRunning}
-          className="w-full py-2 bg-[#0097A7] hover:bg-[#00838F] text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50"
-        >
-          {data.isRunning ? "PROCESSING..." : "APPLY CHANNELS"}
-        </button>
+        <RunButton onClick={handleRun} running={data.isRunning}>{data.isRunning ? 'Processing…' : 'Apply channels'}</RunButton>
 
         <canvas ref={canvasRef} className="hidden" />
 
         {data.output && (
-          <ExpandableAssetWrapper
-            onClick={() => setExpandedAsset(data.output, 'image')}
-            type="image"
-          >
-            <img src={data.output} alt="Processed" className="w-full h-auto" />
+          <ExpandableAssetWrapper onClick={() => setExpandedAsset(data.output, 'image')} type="image">
+            <img src={data.output} alt="Processed" className="h-auto w-full" />
           </ExpandableAssetWrapper>
         )}
       </div>

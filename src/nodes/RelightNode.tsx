@@ -6,6 +6,7 @@ import { useAssets } from '../hooks/useAssets';
 import { Sun, Loader2, Download } from 'lucide-react';
 import ParameterSlider from '../components/ParameterSlider';
 import { relightImage } from '../services/geminiService';
+import { NodeField, NodeLabel, NodeSelect, RunButton } from './ui';
 import { downloadFile } from '../lib/utils';
 import { useAssetExpand } from '../hooks/useAssetExpand';
 import { ExpandableAssetWrapper } from '../components/ExpandableAssetWrapper';
@@ -77,97 +78,60 @@ const RelightNode = ({ id, data }: any) => {
   };
 
   return (
-    <BaseNode id={id} data={data} onRun={handleRun} color="#FF9800" icon={Sun}>
+    <BaseNode id={id} data={data} onRun={handleRun} color="#0097A7" icon={Sun}>
       <div className="space-y-3">
-        <label className="text-[10px] text-gray-500 uppercase font-bold">Light Direction</label>
-        <div className="grid grid-cols-3 gap-1">
-          {directions.map((dir) => (
-            <button
-              key={dir.id}
-              onClick={() => {
-                setLightDirection(dir.id);
-                updateNodeData(id, { config: { ...data.config, lightDirection: dir.id } });
-              }}
-              className={'w-full aspect-square flex items-center justify-center rounded text-sm transition-all ' + (lightDirection === dir.id ? 'bg-[#FF9800] text-white' : 'text-gray-600 hover:bg-[#1a1a1a]')}
-            >
-              {dir.label}
-            </button>
-          ))}
+        <div className="space-y-1.5">
+          <NodeLabel>Light direction</NodeLabel>
+          <div className="grid grid-cols-3 gap-1">
+            {directions.map((dir) => (
+              <button
+                key={dir.id}
+                onClick={() => { setLightDirection(dir.id); updateNodeData(id, { config: { ...data.config, lightDirection: dir.id } }); }}
+                className={`flex aspect-square w-full items-center justify-center rounded-md text-sm transition-[color,background-color] duration-150 ${lightDirection === dir.id ? 'bg-[#0097A7] text-white' : 'text-gray-500 hover:bg-white/[0.06]'}`}
+              >
+                {dir.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-2">
-          <div className="space-y-1">
-            <label className="text-[10px] text-gray-500 uppercase font-bold">Color</label>
-            <input 
-              type="color" 
+          <NodeField label="Color">
+            <input
+              type="color"
               value={lightColor}
-              onChange={(e) => {
-                setLightColor(e.target.value);
-                updateNodeData(id, { config: { ...data.config, lightColor: e.target.value } });
-              }}
-              className="w-full h-8 bg-[#0a0a0a] border border-[#2a2a2a] rounded cursor-pointer"
+              onChange={(e) => { setLightColor(e.target.value); updateNodeData(id, { config: { ...data.config, lightColor: e.target.value } }); }}
+              className="h-9 w-full cursor-pointer rounded-lg bg-black/30 ring-1 ring-white/10"
             />
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] text-gray-500 uppercase font-bold">Style</label>
-            <select 
-              value={style}
-              onChange={(e) => {
-                setStyle(e.target.value);
-                updateNodeData(id, { config: { ...data.config, style: e.target.value } });
-              }}
-              className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded p-1.5 text-[10px] text-gray-400 focus:outline-none"
-            >
-              <option value="Natural">Natural</option>
-              <option value="Dramatic">Dramatic</option>
-              <option value="Soft">Soft</option>
-              <option value="Harsh">Harsh</option>
-              <option value="Studio">Studio</option>
-              <option value="Outdoor">Outdoor</option>
-            </select>
-          </div>
+          </NodeField>
+          <NodeField label="Style">
+            <NodeSelect value={style} onChange={(e) => { setStyle(e.target.value); updateNodeData(id, { config: { ...data.config, style: e.target.value } }); }}>
+              {['Natural', 'Dramatic', 'Soft', 'Harsh', 'Studio', 'Outdoor'].map((s) => <option key={s} value={s}>{s}</option>)}
+            </NodeSelect>
+          </NodeField>
         </div>
 
-        <ParameterSlider 
-          label="Intensity" 
-          value={intensity} 
-          min={0} 
-          max={100} 
-          onChange={(v) => {
-            setIntensity(v);
-            updateNodeData(id, { config: { ...data.config, intensity: v } });
-          }} 
-          color="#FF9800"
+        <ParameterSlider
+          label="Intensity"
+          value={intensity}
+          min={0}
+          max={100}
+          onChange={(v) => { setIntensity(v); updateNodeData(id, { config: { ...data.config, intensity: v } }); }}
         />
 
-        <button
-          onClick={handleRun}
-          disabled={data.isRunning}
-          className="w-full py-2 bg-[#FF9800] hover:bg-[#F57C00] text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-        >
-          {data.isRunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sun className="w-3 h-3" />}
-          {data.isRunning ? 'RELIGHTING...' : 'RUN RELIGHTER'}
-        </button>
+        <RunButton onClick={handleRun} running={data.isRunning} icon={Sun}>{data.isRunning ? 'Relighting…' : 'Run relighter'}</RunButton>
 
         {data.output && (
-          <div className="mt-2 rounded-lg overflow-hidden border border-[#2a2a2a] bg-[#0a0a0a]">
-            <ExpandableAssetWrapper
-              onClick={() => setExpandedAsset(data.output, 'image')}
-              type="image"
-            >
-              <img 
-                src={data.output} 
-                alt="Relit" 
-                className="w-full h-auto object-contain max-h-48"
-                referrerPolicy="no-referrer"
-              />
+          <div className="space-y-2">
+            <ExpandableAssetWrapper onClick={() => setExpandedAsset(data.output, 'image')} type="image">
+              <img src={data.output} alt="Relit" className="h-auto max-h-48 w-full object-contain" referrerPolicy="no-referrer" />
             </ExpandableAssetWrapper>
             <button
               onClick={handleDownload}
-              className="w-full py-1.5 bg-[#1a1a1a] hover:bg-[#0097A7] border-t border-[#2a2a2a] text-gray-300 hover:text-white text-[10px] font-bold transition-colors flex items-center justify-center gap-2"
+              className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-white/[0.04] text-[12px] font-medium text-gray-300 ring-1 ring-white/10 transition-[transform,color,background-color] duration-150 hover:bg-white/[0.07] hover:text-white active:scale-[0.98]"
             >
-              <Download className="w-3 h-3" />
-              DOWNLOAD
+              <Download className="h-3.5 w-3.5" />
+              Download
             </button>
           </div>
         )}

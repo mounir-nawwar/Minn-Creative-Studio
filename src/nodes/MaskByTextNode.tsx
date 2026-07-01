@@ -4,6 +4,7 @@ import { useStore } from '../store/useStore';
 import { generateMask } from '../services/geminiService';
 import { useAssetExpand } from '../hooks/useAssetExpand';
 import { ExpandableAssetWrapper } from '../components/ExpandableAssetWrapper';
+import { NodeField, NodeInput, RunButton } from './ui';
 
 const MaskByTextNode = ({ id, data }: any) => {
   const [prompt, setPrompt] = useState(data.config?.prompt || 'the main subject');
@@ -77,39 +78,23 @@ const MaskByTextNode = ({ id, data }: any) => {
   return (
     <BaseNode id={id} data={data} onRun={handleRun}>
       <div className="space-y-3">
-        <div className="space-y-1">
-          <label className="text-[10px] text-gray-500 uppercase font-bold">Mask Prompt</label>
-          <input
+        <NodeField label="Mask prompt">
+          <NodeInput
             type="text"
-            className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-2 text-xs text-gray-300 focus:outline-none focus:border-[#0097A7]"
-            placeholder="e.g. 'the red car', 'the person's face'..."
+            placeholder="e.g. 'the red car', 'the person's face'…"
             value={prompt}
-            onChange={(e) => {
-              setPrompt(e.target.value);
-              updateNodeData(id, { config: { ...data.config, prompt: e.target.value } });
-            }}
+            onChange={(e) => { setPrompt(e.target.value); updateNodeData(id, { config: { ...data.config, prompt: e.target.value } }); }}
           />
-        </div>
+        </NodeField>
 
-        <button
-          onClick={handleRun}
-          disabled={data.isRunning}
-          className="w-full py-2 bg-[#0097A7] hover:bg-[#00838F] text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50"
-        >
-          {data.isRunning ? "GENERATING MASK..." : "GENERATE MASK"}
-        </button>
+        <RunButton onClick={handleRun} running={data.isRunning}>{data.isRunning ? 'Generating mask…' : 'Generate mask'}</RunButton>
 
         <canvas ref={canvasRef} className="hidden" />
 
         {data.output && (
-          <div className="mt-2 rounded-lg overflow-hidden border border-[#2a2a2a] bg-black">
-            <ExpandableAssetWrapper
-              onClick={() => setExpandedAsset(data.output, 'image')}
-              type="image"
-            >
-              <img src={data.output} alt="Mask" className="w-full h-auto" />
-            </ExpandableAssetWrapper>
-          </div>
+          <ExpandableAssetWrapper onClick={() => setExpandedAsset(data.output, 'image')} type="image">
+            <img src={data.output} alt="Mask" className="h-auto w-full" />
+          </ExpandableAssetWrapper>
         )}
       </div>
     </BaseNode>

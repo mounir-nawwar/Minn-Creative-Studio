@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
 import { Eraser, Pencil, Trash2 } from 'lucide-react';
+import { NodeField, NodeLabel } from './ui';
 
 const PainterNode = ({ id, data }: any) => {
   const [isDrawing, setIsDrawing] = useState(false);
@@ -91,55 +92,51 @@ const PainterNode = ({ id, data }: any) => {
   return (
     <BaseNode id={id} data={data} inputs={false}>
       <div className="space-y-3">
-        <div className="flex gap-2 p-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg">
+        <div className="flex gap-1 rounded-lg bg-black/30 p-1 ring-1 ring-white/10">
           <button
             onClick={() => setMode('draw')}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-[10px] font-bold transition-all ${mode === 'draw' ? 'bg-[#0097A7] text-white' : 'text-gray-500 hover:text-gray-300'}`}
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 text-[11px] font-medium transition-[color,background-color] duration-150 ${mode === 'draw' ? 'bg-[#0097A7] text-white' : 'text-gray-500 hover:text-gray-300'}`}
           >
-            <Pencil className="w-3 h-3" />
-            DRAW
+            <Pencil className="h-3 w-3" /> Draw
           </button>
           <button
             onClick={() => setMode('erase')}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-[10px] font-bold transition-all ${mode === 'erase' ? 'bg-[#0097A7] text-white' : 'text-gray-500 hover:text-gray-300'}`}
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 text-[11px] font-medium transition-[color,background-color] duration-150 ${mode === 'erase' ? 'bg-[#0097A7] text-white' : 'text-gray-500 hover:text-gray-300'}`}
           >
-            <Eraser className="w-3 h-3" />
-            ERASE
+            <Eraser className="h-3 w-3" /> Erase
           </button>
-          <button
-            onClick={clear}
-            className="p-1.5 text-gray-500 hover:text-red-500 transition-colors"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
+          <button onClick={clear} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:text-red-400" title="Clear">
+            <Trash2 className="h-3.5 w-3.5" />
           </button>
         </div>
 
         <div className="grid grid-cols-2 gap-2">
-          <div className="space-y-1">
-            <label className="text-[10px] text-gray-500 uppercase font-bold">Color</label>
-            <input 
-              type="color" value={color}
-              onChange={(e) => {
-                setColor(e.target.value);
-                updateNodeData(id, { config: { ...data.config, color: e.target.value } });
-              }}
-              className="w-full h-8 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg cursor-pointer p-1"
+          <NodeField label="Color">
+            <input
+              type="color"
+              value={color}
+              onChange={(e) => { setColor(e.target.value); updateNodeData(id, { config: { ...data.config, color: e.target.value } }); }}
+              className="h-9 w-full cursor-pointer rounded-lg bg-black/30 p-1 ring-1 ring-white/10"
             />
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] text-gray-500 uppercase font-bold">Size: {brushSize}px</label>
-            <input 
-              type="range" min="1" max="50" value={brushSize}
-              onChange={(e) => {
-                setBrushSize(Number(e.target.value));
-                updateNodeData(id, { config: { ...data.config, brushSize: Number(e.target.value) } });
-              }}
-              className="w-full h-1 bg-[#1a1a1a] rounded-lg appearance-none cursor-pointer accent-[#0097A7] mt-3"
+          </NodeField>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <NodeLabel>Brush size</NodeLabel>
+              <span className="text-[11px] font-medium tabular-nums text-[#0097A7]">{brushSize}px</span>
+            </div>
+            <input
+              type="range"
+              min="1"
+              max="50"
+              value={brushSize}
+              onChange={(e) => { setBrushSize(Number(e.target.value)); updateNodeData(id, { config: { ...data.config, brushSize: Number(e.target.value) } }); }}
+              className="h-1 w-full cursor-pointer appearance-none rounded-full bg-white/10"
+              style={{ accentColor: '#0097A7' }}
             />
           </div>
         </div>
 
-        <div className="aspect-square bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg overflow-hidden relative cursor-crosshair touch-none">
+        <div className="relative aspect-square cursor-crosshair touch-none overflow-hidden rounded-lg bg-black ring-1 ring-inset ring-white/10">
           <canvas
             ref={canvasRef}
             onMouseDown={startDrawing}
@@ -149,11 +146,11 @@ const PainterNode = ({ id, data }: any) => {
             onTouchStart={startDrawing}
             onTouchMove={draw}
             onTouchEnd={stopDrawing}
-            className="w-full h-full"
+            className="h-full w-full"
           />
         </div>
 
-        <p className="text-[9px] text-gray-600 text-center italic">Draw a mask or sketch to use as input.</p>
+        <p className="text-center text-[10px] text-gray-600">Draw a mask or sketch to use as input.</p>
       </div>
     </BaseNode>
   );

@@ -130,70 +130,52 @@ const VideoUploadNode = ({ id, data }: any) => {
           <button
             onClick={triggerUpload}
             disabled={isUploading}
-            className="w-full py-8 border-2 border-dashed border-[#2a2a2a] rounded-xl flex flex-col items-center justify-center gap-2 hover:border-[#0097A7] hover:bg-[#0097A7]/5 transition-all group"
+            className="group flex w-full flex-col items-center justify-center gap-2 rounded-xl bg-black/30 py-8 ring-1 ring-dashed ring-white/15 transition-[color,box-shadow] duration-150 hover:ring-[#0097A7]/50"
           >
             {isUploading ? (
-              <Loader2 className="w-8 h-8 text-[#0097A7] animate-spin" />
+              <Loader2 className="h-8 w-8 animate-spin text-[#0097A7]" />
             ) : (
-              <Upload className="w-8 h-8 text-gray-600 group-hover:text-[#0097A7] transition-colors" />
+              <Upload className="h-8 w-8 text-gray-600 transition-colors group-hover:text-[#0097A7]" />
             )}
             <div className="text-center">
-              <p className="text-[10px] uppercase font-bold tracking-widest text-gray-500 group-hover:text-gray-300">
-                {isUploading ? 'Reading Video...' : 'Upload Video'}
-              </p>
-              <p className="text-[8px] text-gray-600 mt-1 uppercase">Max 20MB</p>
+              <p className="text-[12px] font-medium text-gray-400 group-hover:text-gray-200">{isUploading ? 'Reading video…' : 'Upload video'}</p>
+              <p className="mt-0.5 text-[10px] text-gray-600">Max 20MB</p>
             </div>
           </button>
         ) : (
-          <ExpandableAssetWrapper
-            onClick={() => data.output && setExpandedAsset(data.output, 'video')}
-            type="video"
-          >
-            <div className="relative group">
-              <div className="rounded-lg overflow-hidden border border-[#2a2a2a] bg-[#0a0a0a] aspect-video flex items-center justify-center">
-                <video 
-                  src={data.output} 
-                  className="w-full h-full object-contain"
-                  controls
-                />
+          <ExpandableAssetWrapper onClick={() => data.output && setExpandedAsset(data.output, 'video')} type="video">
+            <div className="group relative">
+              <div className="flex aspect-video items-center justify-center bg-black">
+                <video src={data.output} className="h-full w-full object-contain" controls />
               </div>
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  clearVideo();
-                }}
-                className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                onClick={(e) => { e.stopPropagation(); clearVideo(); }}
+                className="absolute -right-2 -top-2 z-10 inline-flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100"
               >
-                <X className="w-3 h-3" />
+                <X className="h-3 w-3" />
               </button>
-              {data.config?.fileName && (
-                <p className="text-[9px] text-gray-500 mt-1 truncate px-1">
-                  {data.config.fileName}
-                </p>
-              )}
             </div>
           </ExpandableAssetWrapper>
         )}
 
+        {data.config?.fileName && data.output && <p className="truncate px-1 text-[11px] text-gray-500">{data.config.fileName}</p>}
+
         {isUploading && (
           <button
             onClick={handleCancelUpload}
-            className="w-full py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-lg text-[10px] font-bold text-red-400 hover:text-red-300 transition-all flex items-center justify-center gap-2"
+            className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-red-500/10 text-[12px] font-medium text-red-400 ring-1 ring-red-500/25 transition-[transform,background-color] duration-150 hover:bg-red-500/15 active:scale-[0.98]"
           >
-            <X className="w-3 h-3" />
-            CANCEL UPLOAD
+            <X className="h-3.5 w-3.5" />
+            Cancel upload
           </button>
         )}
 
-        {/* Cloud Upload Toggle */}
-        <div className="flex items-center justify-between px-1">
-          <span className="text-[8px] font-black uppercase tracking-widest text-gray-600">Cloud Upload</span>
+        <div className="flex items-center justify-between px-0.5">
+          <span className="text-[10px] font-medium uppercase tracking-wide text-gray-500">Cloud upload</span>
           <ToggleSwitch checked={nodeUploadEnabled} onChange={toggleNodeUpload} size="node" />
         </div>
 
-        <p className="text-[9px] text-gray-600 italic text-center">
-          Connect this to Video Describer or Video Upscaler nodes.
-        </p>
+        <p className="text-center text-[10px] text-gray-600">Connect to Video Describer or Video Upscaler nodes.</p>
       </div>
     </BaseNode>
   );

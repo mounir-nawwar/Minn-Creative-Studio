@@ -174,81 +174,62 @@ const ImageUploadNode = ({ id, data }: any) => {
   return (
     <BaseNode id={id} data={data} inputs={false} color="#0097A7">
       <div className="space-y-3">
-        <input 
-          type="file" 
-          ref={fileInputRef} 
-          onChange={handleFileChange} 
-          accept="image/*" 
-          className="hidden" 
-        />
-        
-        {/* Cloud Upload Toggle */}
-        <div className="flex items-center justify-between px-1">
-          <span className="text-[8px] font-black uppercase tracking-widest text-gray-600">Cloud Upload</span>
+        <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
+
+        {/* Cloud upload toggle */}
+        <div className="flex items-center justify-between px-0.5">
+          <span className="text-[10px] font-medium uppercase tracking-wide text-gray-500">Cloud upload</span>
           <ToggleSwitch checked={nodeUploadEnabled} onChange={toggleNodeUpload} size="node" />
         </div>
 
         {/* Tabs */}
-        <div className="flex bg-black/40 p-1 rounded-xl border border-white/5">
-          <button
-            onClick={() => setActiveTab('upload')}
-            className={`flex-1 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${activeTab === 'upload' ? 'bg-[#0097A7] text-white' : 'text-gray-500 hover:text-gray-300'}`}
-          >
-            Upload
-          </button>
-          <button
-            onClick={() => setActiveTab('assets')}
-            className={`flex-1 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${activeTab === 'assets' ? 'bg-[#0097A7] text-white' : 'text-gray-500 hover:text-gray-300'}`}
-          >
-            From Assets
-          </button>
+        <div className="flex gap-1 rounded-lg bg-black/40 p-1 ring-1 ring-white/10">
+          {(['upload', 'assets'] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`flex-1 rounded-md py-1.5 text-[11px] font-medium transition-[color,background-color] duration-150 ${
+                activeTab === tab ? 'bg-[#0097A7] text-white' : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              {tab === 'upload' ? 'Upload' : 'From assets'}
+            </button>
+          ))}
         </div>
 
         {activeTab === 'upload' ? (
           !imageUrl ? (
-            <div className="h-[150px] bg-[#0a0a0a] border border-[#2a2a2a] rounded-xl overflow-hidden">
+            <div className="h-[150px] overflow-hidden rounded-xl bg-black/30 ring-1 ring-dashed ring-white/15">
               <button
                 onClick={triggerUpload}
                 disabled={isUploading}
-                className="w-full h-full flex flex-col items-center justify-center gap-2 text-gray-500 hover:text-[#0097A7] transition-all group"
+                className="flex h-full w-full flex-col items-center justify-center gap-2 text-gray-500 transition-colors hover:text-[#0097A7]"
               >
                 {isUploading ? (
-                  <Loader2 className="w-6 h-6 animate-spin text-[#0097A7]" />
+                  <Loader2 className="h-6 w-6 animate-spin text-[#0097A7]" />
                 ) : (
                   <>
-                    <Upload className="w-6 h-6 group-hover:scale-110 transition-transform" />
-                    <span className="text-[10px] font-bold uppercase tracking-wider">Drop or Click to Upload</span>
+                    <Upload className="h-6 w-6" />
+                    <span className="text-[11px] font-medium">Drop or click to upload</span>
                   </>
                 )}
               </button>
             </div>
           ) : (
-            <ExpandableAssetWrapper
-              onClick={() => imageUrl && setExpandedAsset(imageUrl, 'image')}
-              type="image"
-              className="max-h-[300px]"
-            >
-              <div className="relative group/image">
-                <img
-                  src={imageUrl}
-                  alt="Uploaded"
-                  className="w-full h-auto max-h-[300px] object-contain"
-                  referrerPolicy="no-referrer"
-                />
+            <ExpandableAssetWrapper onClick={() => imageUrl && setExpandedAsset(imageUrl, 'image')} type="image" className="max-h-[300px]">
+              <div className="group/image relative">
+                <img src={imageUrl} alt="Uploaded" className="h-auto max-h-[300px] w-full object-contain" referrerPolicy="no-referrer" />
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleClear();
-                  }}
-                  className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 rounded-lg text-white opacity-0 group-hover/image:opacity-100 transition-opacity"
+                  onClick={(e) => { e.stopPropagation(); handleClear(); }}
+                  className="absolute right-2 top-2 z-10 inline-flex h-7 w-7 items-center justify-center rounded-lg bg-black/60 text-white opacity-0 transition-[opacity,background-color] duration-150 hover:bg-black/80 group-hover/image:opacity-100"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="h-3.5 w-3.5" />
                 </button>
               </div>
             </ExpandableAssetWrapper>
           )
         ) : (
-          <div className="h-[240px] bg-[#0a0a0a] border border-[#2a2a2a] rounded-xl overflow-hidden flex flex-col">
+          <div className="flex h-[240px] flex-col overflow-hidden rounded-xl bg-black/30 ring-1 ring-white/10">
             <AssetGrid isPicker onAssetClick={handleAssetSelect} />
           </div>
         )}
@@ -256,24 +237,24 @@ const ImageUploadNode = ({ id, data }: any) => {
         {activeTab === 'upload' && isUploading && (
           <button
             onClick={handleCancelUpload}
-            className="w-full py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-lg text-[10px] font-bold text-red-400 hover:text-red-300 transition-all flex items-center justify-center gap-2"
+            className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-red-500/10 text-[12px] font-medium text-red-400 ring-1 ring-red-500/25 transition-[transform,background-color] duration-150 hover:bg-red-500/15 active:scale-[0.98]"
           >
-            <X className="w-3 h-3" />
-            CANCEL UPLOAD
+            <X className="h-3.5 w-3.5" />
+            Cancel upload
           </button>
         )}
 
         {imageUrl && activeTab === 'upload' && !isUploading && (
           <button
             onClick={triggerUpload}
-            className="w-full py-2 bg-[#1a1a1a] hover:bg-[#222222] border border-[#2a2a2a] rounded-lg text-[10px] font-bold text-gray-400 hover:text-white transition-all flex items-center justify-center gap-2"
+            className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-white/[0.04] text-[12px] font-medium text-gray-300 ring-1 ring-white/10 transition-[transform,color,background-color] duration-150 hover:bg-white/[0.07] hover:text-white active:scale-[0.98]"
           >
-            <ImageIcon className="w-3 h-3" />
-            REPLACE IMAGE
+            <ImageIcon className="h-3.5 w-3.5" />
+            Replace image
           </button>
         )}
 
-        <p className="text-[9px] text-gray-600 text-center italic">
+        <p className="text-center text-[10px] text-gray-600">
           {activeTab === 'upload' ? 'Supports JPG, PNG, WEBP' : 'Select an image from your project assets'}
         </p>
       </div>

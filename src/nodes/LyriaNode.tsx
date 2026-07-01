@@ -15,6 +15,7 @@ import { toast } from '../store/useToastStore';
 import { motion, AnimatePresence } from 'motion/react';
 import { NodeProps } from '../types/nodeProps';
 import { MUSICAL_KEYS } from './lyriaConstants';
+import { NodeField, NodeLabel, NodeInput, NodeSelect } from './ui';
 
 interface LyriaNodeData {
   type: 'lyria';
@@ -188,95 +189,54 @@ const LyriaNode = ({ id, data }: NodeProps<LyriaNodeData>) => {
   };
 
   return (
-    <BaseNode id={id} data={{ ...data, label: data.label as string ?? 'Audio Generator' }} inputs={true} onRun={handleRun} className="border-[#0097A7]">
+    <BaseNode id={id} data={{ ...data, label: (data.label as string) ?? 'Audio Generator' }} inputs={true} onRun={handleRun}>
       <div className="space-y-3">
-        <div className="space-y-1">
-          <label className="text-[10px] text-gray-500 uppercase font-bold">Model</label>
-          <select 
-            className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-1.5 text-[10px] text-gray-400 focus:outline-none focus:border-[#0097A7]"
-            value={model}
-            onChange={(e) => { setModel(e.target.value); updateConfig('model', e.target.value); }}
-          >
+        <NodeField label="Model">
+          <NodeSelect value={model} onChange={(e) => { setModel(e.target.value); updateConfig('model', e.target.value); }}>
             <option value="lyria-3-pro-preview">Lyria 3 Pro ($0.08/song)</option>
             <option value="lyria-3-clip-preview">Lyria 3 Clip ($0.04/30s)</option>
-            <option value="gemini-2.5-flash-preview-tts">Text to Speech</option>
-          </select>
-        </div>
+            <option value="gemini-2.5-flash-preview-tts">Text to speech</option>
+          </NodeSelect>
+        </NodeField>
 
         {isLyria ? (
           <>
             <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <label className="text-[10px] text-gray-500 uppercase font-bold">Genre</label>
-                <input 
-                  className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-1.5 text-[10px] text-gray-300 focus:outline-none focus:border-[#0097A7]"
-                  value={genre}
-                  onChange={(e) => { setGenre(e.target.value); updateConfig('genre', e.target.value); }}
-                  placeholder="e.g. Synthwave"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] text-gray-500 uppercase font-bold">Mood</label>
-                <input 
-                  className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-1.5 text-[10px] text-gray-300 focus:outline-none focus:border-[#0097A7]"
-                  value={mood}
-                  onChange={(e) => { setMood(e.target.value); updateConfig('mood', e.target.value); }}
-                  placeholder="e.g. Nostalgic"
-                />
-              </div>
+              <NodeField label="Genre">
+                <NodeInput value={genre} onChange={(e) => { setGenre(e.target.value); updateConfig('genre', e.target.value); }} placeholder="e.g. Synthwave" />
+              </NodeField>
+              <NodeField label="Mood">
+                <NodeInput value={mood} onChange={(e) => { setMood(e.target.value); updateConfig('mood', e.target.value); }} placeholder="e.g. Nostalgic" />
+              </NodeField>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-[10px] text-gray-500 uppercase font-bold">Instrumentation</label>
-              <input 
-                className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-1.5 text-[10px] text-gray-300 focus:outline-none focus:border-[#0097A7]"
-                value={instrumentation}
-                onChange={(e) => { setInstrumentation(e.target.value); updateConfig('instrumentation', e.target.value); }}
-                placeholder="e.g. Electric Guitar, Drums"
-              />
-            </div>
+            <NodeField label="Instrumentation">
+              <NodeInput value={instrumentation} onChange={(e) => { setInstrumentation(e.target.value); updateConfig('instrumentation', e.target.value); }} placeholder="e.g. Electric Guitar, Drums" />
+            </NodeField>
 
             <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <label className="text-[10px] text-gray-500 uppercase font-bold">Language</label>
-                <select 
-                  className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-1.5 text-[10px] text-gray-400 focus:outline-none"
-                  value={language}
-                  onChange={(e) => { setLanguage(e.target.value); updateConfig('language', e.target.value); }}
-                >
-                  {['English', 'Spanish', 'French', 'German', 'Hindi', 'Japanese', 'Korean', 'Portuguese', 'Arabic', 'Italian'].map(l => (
+              <NodeField label="Language">
+                <NodeSelect value={language} onChange={(e) => { setLanguage(e.target.value); updateConfig('language', e.target.value); }}>
+                  {['English', 'Spanish', 'French', 'German', 'Hindi', 'Japanese', 'Korean', 'Portuguese', 'Arabic', 'Italian'].map((l) => (
                     <option key={l} value={l}>{l}</option>
                   ))}
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] text-gray-500 uppercase font-bold">Vocal Style</label>
-                <input 
-                  className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-1.5 text-[10px] text-gray-300 focus:outline-none focus:border-[#0097A7]"
-                  value={vocalStyle}
-                  onChange={(e) => { setVocalStyle(e.target.value); updateConfig('vocalStyle', e.target.value); }}
-                  placeholder="e.g. Rasping Male"
-                />
-              </div>
+                </NodeSelect>
+              </NodeField>
+              <NodeField label="Vocal style">
+                <NodeInput value={vocalStyle} onChange={(e) => { setVocalStyle(e.target.value); updateConfig('vocalStyle', e.target.value); }} placeholder="e.g. Rasping Male" />
+              </NodeField>
             </div>
 
             {isPro && (
-              <ParameterSlider 
-                label="Duration (Seconds)" 
-                value={duration} 
-                min={10} 
-                max={184} 
-                onChange={(v) => { setDuration(v); updateConfig('duration', v); }}
-                color="#0097A7"
-              />
+              <ParameterSlider label="Duration (seconds)" value={duration} min={10} max={184} onChange={(v) => { setDuration(v); updateConfig('duration', v); }} />
             )}
 
             <button
               onClick={() => setShowSoundDesign(!showSoundDesign)}
-              className="w-full flex items-center justify-between py-1.5 px-2 bg-[#111] rounded-lg border border-[#2a2a2a] text-[10px] text-gray-400 hover:text-white hover:border-[#0097A7]/50 transition-colors"
+              className="flex w-full items-center justify-between rounded-lg bg-white/[0.03] px-2.5 py-2 text-[11px] font-medium text-gray-400 ring-1 ring-white/10 transition-[color,box-shadow] duration-150 hover:text-white hover:ring-white/20"
             >
-              <span className="font-bold uppercase">Sound Design</span>
-              {showSoundDesign ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+              <span>Sound design</span>
+              {showSoundDesign ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
             </button>
 
             <AnimatePresence>
@@ -285,65 +245,28 @@ const LyriaNode = ({ id, data }: NodeProps<LyriaNodeData>) => {
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: 'auto', opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="overflow-hidden space-y-3"
+                  transition={{ duration: 0.2, ease: [0.2, 0, 0, 1] }}
+                  className="space-y-3 overflow-hidden"
                 >
-                  <ParameterSlider 
-                    label="BPM" 
-                    value={bpm} 
-                    min={60} 
-                    max={200} 
-                    onChange={(v) => { setBpm(v); updateConfig('bpm', v); }}
-                    color="#0097A7"
-                  />
-                  <ParameterSlider 
-                    label="Guidance" 
-                    value={guidance} 
-                    min={0} 
-                    max={6} 
-                    step={0.1}
-                    onChange={(v) => { setGuidance(v); updateConfig('guidance', v); }}
-                    color="#0097A7"
-                  />
-                  <ParameterSlider 
-                    label="Density" 
-                    value={density} 
-                    min={0} 
-                    max={1} 
-                    step={0.05}
-                    onChange={(v) => { setDensity(v); updateConfig('density', v); }}
-                    color="#0097A7"
-                  />
-                  <ParameterSlider 
-                    label="Brightness" 
-                    value={brightness} 
-                    min={0} 
-                    max={1} 
-                    step={0.05}
-                    onChange={(v) => { setBrightness(v); updateConfig('brightness', v); }}
-                    color="#0097A7"
-                  />
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-gray-500 uppercase font-bold">Musical Key</label>
-                    <select 
-                      className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-1.5 text-[10px] text-gray-400 focus:outline-none"
-                      value={scale}
-                      onChange={(e) => { setScale(e.target.value); updateConfig('scale', e.target.value); }}
-                    >
-                      {MUSICAL_KEYS.map(k => <option key={k} value={k}>{k}</option>)}
-                    </select>
-                  </div>
+                  <ParameterSlider label="BPM" value={bpm} min={60} max={200} onChange={(v) => { setBpm(v); updateConfig('bpm', v); }} />
+                  <ParameterSlider label="Guidance" value={guidance} min={0} max={6} step={0.1} onChange={(v) => { setGuidance(v); updateConfig('guidance', v); }} />
+                  <ParameterSlider label="Density" value={density} min={0} max={1} step={0.05} onChange={(v) => { setDensity(v); updateConfig('density', v); }} />
+                  <ParameterSlider label="Brightness" value={brightness} min={0} max={1} step={0.05} onChange={(v) => { setBrightness(v); updateConfig('brightness', v); }} />
+                  <NodeField label="Musical key">
+                    <NodeSelect value={scale} onChange={(e) => { setScale(e.target.value); updateConfig('scale', e.target.value); }}>
+                      {MUSICAL_KEYS.map((k) => <option key={k} value={k}>{k}</option>)}
+                    </NodeSelect>
+                  </NodeField>
                 </motion.div>
               )}
             </AnimatePresence>
 
             <button
               onClick={() => setShowAdvanced(!showAdvanced)}
-              className="w-full flex items-center justify-between py-1.5 px-2 bg-[#111] rounded-lg border border-[#2a2a2a] text-[10px] text-gray-400 hover:text-white hover:border-[#0097A7]/50 transition-colors"
+              className="flex w-full items-center justify-between rounded-lg bg-white/[0.03] px-2.5 py-2 text-[11px] font-medium text-gray-400 ring-1 ring-white/10 transition-[color,box-shadow] duration-150 hover:text-white hover:ring-white/20"
             >
-              <span className="font-bold uppercase">Advanced</span>
-              {showAdvanced ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+              <span>Advanced</span>
+              {showAdvanced ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
             </button>
 
             <AnimatePresence>
@@ -352,108 +275,57 @@ const LyriaNode = ({ id, data }: NodeProps<LyriaNodeData>) => {
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: 'auto', opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="overflow-hidden space-y-3"
+                  transition={{ duration: 0.2, ease: [0.2, 0, 0, 1] }}
+                  className="space-y-3 overflow-hidden"
                 >
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-gray-500 uppercase font-bold">Negative Prompt</label>
-                    <input 
-                      className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-1.5 text-[10px] text-gray-300 focus:outline-none focus:border-[#0097A7]"
-                      value={negativePrompt}
-                      onChange={(e) => { setNegativePrompt(e.target.value); updateConfig('negativePrompt', e.target.value); }}
-                      placeholder="Instruments/styles to avoid..."
-                    />
-                  </div>
-
-                  <ParameterSlider 
-                    label="Temperature" 
-                    value={temperature} 
-                    min={0} 
-                    max={3} 
-                    step={0.1}
-                    onChange={(v) => { setTemperature(v); updateConfig('temperature', v); }}
-                    color="#0097A7"
-                  />
-                  <ParameterSlider 
-                    label="Top P" 
-                    value={topP} 
-                    min={0} 
-                    max={1} 
-                    step={0.05}
-                    onChange={(v) => { setTopP(v); updateConfig('topP', v); }}
-                    color="#0097A7"
-                  />
-                  <ParameterSlider 
-                    label="Top K" 
-                    value={topK} 
-                    min={1} 
-                    max={64} 
-                    step={1}
-                    onChange={(v) => { setTopK(v); updateConfig('topK', v); }}
-                    color="#0097A7"
-                  />
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-gray-500 uppercase font-bold">Seed</label>
-                    <input 
+                  <NodeField label="Negative prompt">
+                    <NodeInput value={negativePrompt} onChange={(e) => { setNegativePrompt(e.target.value); updateConfig('negativePrompt', e.target.value); }} placeholder="Instruments/styles to avoid…" />
+                  </NodeField>
+                  <ParameterSlider label="Temperature" value={temperature} min={0} max={3} step={0.1} onChange={(v) => { setTemperature(v); updateConfig('temperature', v); }} />
+                  <ParameterSlider label="Top P" value={topP} min={0} max={1} step={0.05} onChange={(v) => { setTopP(v); updateConfig('topP', v); }} />
+                  <ParameterSlider label="Top K" value={topK} min={1} max={64} step={1} onChange={(v) => { setTopK(v); updateConfig('topK', v); }} />
+                  <NodeField label="Seed">
+                    <NodeInput
                       type="number"
-                      className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-1.5 text-[10px] text-gray-300 focus:outline-none focus:border-[#0097A7]"
                       value={seed ?? ''}
-                      onChange={(e) => { 
-                        const v = e.target.value ? parseInt(e.target.value) : undefined;
-                        setSeed(v); 
-                        updateConfig('seed', v); 
-                      }}
+                      onChange={(e) => { const v = e.target.value ? parseInt(e.target.value) : undefined; setSeed(v); updateConfig('seed', v); }}
                       placeholder="Random"
                     />
-                  </div>
-
-                  <ReferenceStrip 
-                    nodeId={id} 
-                    references={referenceImages.map(r => ({ edgeId: r.edgeId, url: r.url, role: 'style' as const, strength: 0.5 }))} 
-                    onUpdateRole={() => {}} 
+                  </NodeField>
+                  <ReferenceStrip
+                    nodeId={id}
+                    references={referenceImages.map((r) => ({ edgeId: r.edgeId, url: r.url, role: 'style' as const, strength: 0.5 }))}
+                    onUpdateRole={() => {}}
                   />
                 </motion.div>
               )}
             </AnimatePresence>
           </>
         ) : (
-          <div className="space-y-1">
-            <label className="text-[10px] text-gray-500 uppercase font-bold">Voice</label>
-            <select 
-              className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-1.5 text-[10px] text-gray-400 focus:outline-none"
-              value={data.config?.voice || 'Kore'}
-              onChange={(e) => updateConfig('voice', e.target.value)}
-            >
-              <option value="Kore">Kore</option>
-              <option value="Puck">Puck</option>
-              <option value="Charon">Charon</option>
-              <option value="Fenrir">Fenrir</option>
-              <option value="Zephyr">Zephyr</option>
-              <option value="Aoede">Aoede</option>
-              <option value="Leda">Leda</option>
-              <option value="Orus">Orus</option>
-            </select>
-          </div>
+          <NodeField label="Voice">
+            <NodeSelect value={data.config?.voice || 'Kore'} onChange={(e) => updateConfig('voice', e.target.value)}>
+              {['Kore', 'Puck', 'Charon', 'Fenrir', 'Zephyr', 'Aoede', 'Leda', 'Orus'].map((v) => <option key={v} value={v}>{v}</option>)}
+            </NodeSelect>
+          </NodeField>
         )}
 
         <div className="flex gap-2">
           <button
             onClick={handleRun}
             disabled={data.isRunning}
-            className="flex-1 py-2 bg-[#0097A7] hover:bg-[#00838F] text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-lg bg-[#0097A7] text-[12px] font-medium text-white transition-[transform,background-color] duration-150 hover:bg-[#00a9bb] active:scale-[0.98] disabled:opacity-50"
           >
-            {data.isRunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Music className="w-3 h-3" />}
-            {data.isRunning ? "GENERATING..." : `GENERATE ${isLyria ? 'MUSIC' : 'AUDIO'}`}
+            {data.isRunning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Music className="h-3.5 w-3.5" />}
+            {data.isRunning ? 'Generating…' : `Generate ${isLyria ? 'music' : 'audio'}`}
           </button>
-          
+
           {data.isRunning && (
             <button
               onClick={handleCancel}
-              className="px-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 rounded-lg transition-all flex items-center justify-center"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-red-500/10 text-red-400 ring-1 ring-red-500/25 transition-[transform,background-color] duration-150 hover:bg-red-500/15 active:scale-[0.96]"
               title="Cancel"
             >
-              <XCircle className="w-4 h-4" />
+              <XCircle className="h-4 w-4" />
             </button>
           )}
         </div>
@@ -461,18 +333,15 @@ const LyriaNode = ({ id, data }: NodeProps<LyriaNodeData>) => {
         {data.output && (
           <div className="mt-2 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Result Audio</span>
-              <button 
+              <NodeLabel>Result audio</NodeLabel>
+              <button
                 onClick={() => downloadFile(data.output, `generated-audio-${Date.now()}.wav`)}
-                className="p-1.5 bg-[#1a1a1a] hover:bg-[#0097A7] text-gray-400 hover:text-white rounded-lg transition-all border border-[#2a2a2a]"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-white/[0.04] text-gray-400 ring-1 ring-white/10 transition-[transform,color,background-color] duration-150 hover:bg-[#0097A7] hover:text-white active:scale-[0.96]"
               >
-                <Download className="w-3 h-3" />
+                <Download className="h-3.5 w-3.5" />
               </button>
             </div>
-            <ExpandableAssetWrapper
-              onClick={() => setExpandedAsset(data.output, 'audio')}
-              type="audio"
-            >
+            <ExpandableAssetWrapper onClick={() => setExpandedAsset(data.output, 'audio')} type="audio">
               <AudioPreview url={data.output} />
             </ExpandableAssetWrapper>
           </div>

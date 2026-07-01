@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
 import { useProjectStore } from '../store/useProjectStore';
+import { buildProjectContext } from '../lib/projectContext';
 import ParameterSlider from '../components/ParameterSlider';
 import ReferenceStrip from '../components/ReferenceStrip';
 import { ImageIcon, Loader2, Download, XCircle, ChevronDown, ChevronRight } from 'lucide-react';
@@ -15,6 +16,7 @@ import { AnimatePresence } from 'motion/react';
 import { NodeProps } from '../types/nodeProps';
 import { IMAGE_MODELS } from './imagenModels';
 import ImagenAdvancedPanel from './ImagenAdvancedPanel';
+import { NodeField, NodeSelect, NodeLabel } from './ui';
 
 interface ImagenNodeData {
   type: 'imagen';
@@ -146,14 +148,7 @@ const ImagenNode = ({ id, data }: NodeProps<ImagenNodeData>) => {
     startTimeRef.current = Date.now();
     updateNodeData(id, { isRunning: true, error: undefined, progress: '0:00' });
 
-    const projectContext = currentProject ? `
-      Project: ${currentProject.name}
-      Type: ${currentProject.type}
-      Description: ${currentProject.description}
-      Brand: ${currentProject.clientName}
-      AI Instructions: ${currentProject.aiInstructions}
-      Style Keywords: ${currentProject.styleKeywords}
-    `.trim() : undefined;
+    const projectContext = buildProjectContext(currentProject) || undefined;
 
     const updateTimer = () => {
       if (!startTimeRef.current) return;
@@ -249,96 +244,65 @@ const ImagenNode = ({ id, data }: NodeProps<ImagenNodeData>) => {
     : [];
 
   return (
-    <BaseNode
-      id={id}
-      data={{ ...data, label: 'Image Generator' }}
-      inputs={true}
-      onRun={handleRun}
-      className="border-[#0097A7]"
-    >
+    <BaseNode id={id} data={{ ...data, label: 'Image Generator' }} inputs={true} onRun={handleRun}>
       <div className="space-y-3">
         {/* Model */}
-        <div className="space-y-1">
-          <label className="text-[10px] text-gray-500 uppercase font-bold">Model</label>
-          <select
-            className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-1.5 text-[10px] text-gray-400 focus:outline-none focus:border-[#0097A7]"
-            value={model}
-            onChange={(e) => { setModel(e.target.value); updateConfig('model', e.target.value); }}
-          >
+        <NodeField label="Model">
+          <NodeSelect value={model} onChange={(e) => { setModel(e.target.value); updateConfig('model', e.target.value); }}>
             <optgroup label="Imagen 4 (Text-to-Image)">
-              {IMAGE_MODELS.filter(m => m.family === 'imagen4').map(m => (
+              {IMAGE_MODELS.filter((m) => m.family === 'imagen4').map((m) => (
                 <option key={m.id} value={m.id}>{m.label} (${m.price}/img)</option>
               ))}
             </optgroup>
             <optgroup label="Nano Banana (Multimodal)">
-              {IMAGE_MODELS.filter(m => m.family.startsWith('nanoBanana')).map(m => (
+              {IMAGE_MODELS.filter((m) => m.family.startsWith('nanoBanana')).map((m) => (
                 <option key={m.id} value={m.id}>{m.label}</option>
               ))}
             </optgroup>
-          </select>
-        </div>
+          </NodeSelect>
+        </NodeField>
 
-        {/* Aspect Ratio / Resolution / Output Count */}
+        {/* Aspect ratio / resolution / output count */}
         <div className="grid grid-cols-2 gap-2">
-          <div className="space-y-1">
-            <label className="text-[10px] text-gray-500 uppercase font-bold">Aspect Ratio</label>
-            <select
-              className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-1.5 text-[10px] text-gray-400 focus:outline-none"
-              value={aspectRatio}
-              onChange={(e) => { setAspectRatio(e.target.value); updateConfig('aspectRatio', e.target.value); }}
-            >
-              {aspectRatioOptions.map(ar => <option key={ar} value={ar}>{ar}</option>)}
-            </select>
-          </div>
+          <NodeField label="Aspect ratio">
+            <NodeSelect value={aspectRatio} onChange={(e) => { setAspectRatio(e.target.value); updateConfig('aspectRatio', e.target.value); }}>
+              {aspectRatioOptions.map((ar) => <option key={ar} value={ar}>{ar}</option>)}
+            </NodeSelect>
+          </NodeField>
 
           {isNanoBanana && resolutionOptions.length > 0 && (
-            <div className="space-y-1">
-              <label className="text-[10px] text-gray-500 uppercase font-bold">Resolution</label>
-              <select
-                className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-1.5 text-[10px] text-gray-400 focus:outline-none"
-                value={resolution}
-                onChange={(e) => { setResolution(e.target.value); updateConfig('resolution', e.target.value); }}
-              >
-                {resolutionOptions.map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
-            </div>
+            <NodeField label="Resolution">
+              <NodeSelect value={resolution} onChange={(e) => { setResolution(e.target.value); updateConfig('resolution', e.target.value); }}>
+                {resolutionOptions.map((r) => <option key={r} value={r}>{r}</option>)}
+              </NodeSelect>
+            </NodeField>
           )}
 
           {isImagen4 && (
-            <div className="space-y-1">
-              <label className="text-[10px] text-gray-500 uppercase font-bold">Output Count</label>
-              <select
-                className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-1.5 text-[10px] text-gray-400 focus:outline-none"
-                value={sampleCount}
-                onChange={(e) => { setSampleCount(Number(e.target.value)); updateConfig('sampleCount', Number(e.target.value)); }}
-              >
-                {[1, 2, 3, 4].map(n => <option key={n} value={n}>{n} image{n > 1 ? 's' : ''}</option>)}
-              </select>
-            </div>
+            <NodeField label="Output count">
+              <NodeSelect value={sampleCount} onChange={(e) => { setSampleCount(Number(e.target.value)); updateConfig('sampleCount', Number(e.target.value)); }}>
+                {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n} image{n > 1 ? 's' : ''}</option>)}
+              </NodeSelect>
+            </NodeField>
           )}
 
           {isNanoBanana && (
-            <div className="space-y-1">
-              <label className="text-[10px] text-gray-500 uppercase font-bold">Output Count</label>
-              <select
-                className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-1.5 text-[10px] text-gray-400 focus:outline-none"
-                value={sampleCount}
-                onChange={(e) => { setSampleCount(Number(e.target.value)); updateConfig('sampleCount', Number(e.target.value)); }}
-              >
+            <NodeField label="Output count">
+              <NodeSelect value={sampleCount} onChange={(e) => { setSampleCount(Number(e.target.value)); updateConfig('sampleCount', Number(e.target.value)); }}>
                 <option value={1}>1 image</option>
                 <option value={2}>2 images</option>
-              </select>
-            </div>
+              </NodeSelect>
+            </NodeField>
           )}
         </div>
 
-        {/* Advanced Toggle */}
+        {/* Advanced toggle */}
         <button
           onClick={() => setShowAdvanced(!showAdvanced)}
-          className="w-full flex items-center justify-between py-1.5 px-2 bg-[#111] rounded-lg border border-[#2a2a2a] text-[10px] text-gray-400 hover:text-white hover:border-[#0097A7]/50 transition-colors"
+          className="flex w-full items-center justify-between rounded-lg bg-white/[0.03] px-2.5 py-2 text-[11px] font-medium text-gray-400 ring-1 ring-white/10 transition-[color,box-shadow] duration-150 hover:text-white hover:ring-white/20"
         >
-          <span className="font-bold uppercase">Advanced</span>
-          {showAdvanced ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+          <span>Advanced</span>
+          {showAdvanced ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
         </button>
 
         <AnimatePresence>
@@ -394,24 +358,24 @@ const ImagenNode = ({ id, data }: NodeProps<ImagenNodeData>) => {
           </>
         )}
 
-        {/* Generate Button */}
+        {/* Generate */}
         <div className="flex gap-2">
           <button
             onClick={handleRun}
             disabled={data.isRunning}
-            className="flex-1 py-2 bg-[#0097A7] hover:bg-[#00838F] text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-lg bg-[#0097A7] text-[12px] font-medium text-white transition-[transform,background-color] duration-150 hover:bg-[#00a9bb] active:scale-[0.98] disabled:opacity-50"
           >
-            {data.isRunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <ImageIcon className="w-3 h-3" />}
-            {data.isRunning ? "GENERATING..." : "GENERATE IMAGE"}
+            {data.isRunning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImageIcon className="h-3.5 w-3.5" />}
+            {data.isRunning ? 'Generating…' : 'Generate image'}
           </button>
 
           {data.isRunning && (
             <button
               onClick={handleCancel}
-              className="px-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 rounded-lg transition-all flex items-center justify-center"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-red-500/10 text-red-400 ring-1 ring-red-500/25 transition-[transform,background-color] duration-150 hover:bg-red-500/15 active:scale-[0.96]"
               title="Cancel"
             >
-              <XCircle className="w-4 h-4" />
+              <XCircle className="h-4 w-4" />
             </button>
           )}
         </div>
@@ -419,46 +383,24 @@ const ImagenNode = ({ id, data }: NodeProps<ImagenNodeData>) => {
         {/* Outputs */}
         {outputs.length > 0 && (
           <div className="mt-2 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">
-                {outputs.length > 1 ? `${outputs.length} Results` : 'Result'}
-              </span>
-            </div>
+            <NodeLabel>{outputs.length > 1 ? `${outputs.length} results` : 'Result'}</NodeLabel>
 
             {outputs.length === 1 ? (
-              <ExpandableAssetWrapper
-                onClick={() => setExpandedAsset(outputs[0], 'image')}
-                type="image"
-                className="h-[200px]"
-              >
-                <img
-                  src={outputs[0]}
-                  alt="Generated"
-                  className="w-full h-full object-cover transition-transform duration-500"
-                  referrerPolicy="no-referrer"
-                />
+              <ExpandableAssetWrapper onClick={() => setExpandedAsset(outputs[0], 'image')} type="image" className="h-[200px]">
+                <img src={outputs[0]} alt="Generated" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
               </ExpandableAssetWrapper>
             ) : (
-              <div className="grid grid-cols-2 gap-1">
+              <div className="grid grid-cols-2 gap-1.5">
                 {outputs.map((url, i) => (
-                  <div key={url + i} className="relative group">
-                    <ExpandableAssetWrapper
-                      onClick={() => setExpandedAsset(url, 'image')}
-                      type="image"
-                      className="aspect-square"
-                    >
-                      <img
-                        src={url}
-                        alt={`Generated ${i + 1}`}
-                        className="w-full h-full object-cover"
-                        referrerPolicy="no-referrer"
-                      />
+                  <div key={url + i} className="group relative">
+                    <ExpandableAssetWrapper onClick={() => setExpandedAsset(url, 'image')} type="image" className="aspect-square">
+                      <img src={url} alt={`Generated ${i + 1}`} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
                     </ExpandableAssetWrapper>
                     <button
                       onClick={() => handleDownload(url)}
-                      className="absolute top-1 right-1 p-1 bg-black/60 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute right-1 top-1 z-10 inline-flex h-6 w-6 items-center justify-center rounded-md bg-black/60 text-white opacity-0 transition-opacity duration-150 group-hover:opacity-100"
                     >
-                      <Download className="w-3 h-3 text-white" />
+                      <Download className="h-3 w-3" />
                     </button>
                   </div>
                 ))}

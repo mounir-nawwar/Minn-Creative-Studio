@@ -3,6 +3,8 @@ import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
 import { useAssetExpand } from '../hooks/useAssetExpand';
 import { ExpandableAssetWrapper } from '../components/ExpandableAssetWrapper';
+import ParameterSlider from '../components/ParameterSlider';
+import { RunButton } from './ui';
 
 const CompositorNode = ({ id, data }: any) => {
   const [opacity, setOpacity] = useState(data.config?.opacity || 100);
@@ -76,53 +78,23 @@ const CompositorNode = ({ id, data }: any) => {
   };
 
   return (
-    <BaseNode id={id} data={data} inputs={true} onRun={handleRun} className="border-indigo-500">
+    <BaseNode id={id} data={data} inputs={true} onRun={handleRun}>
       <div className="space-y-3">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-[#444]" />
-            <span className="text-[10px] text-gray-500 font-bold uppercase">Background</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-[#0097A7]" />
-            <span className="text-[10px] text-gray-500 font-bold uppercase">Foreground</span>
-          </div>
+        <div className="flex flex-col gap-1.5 text-[11px] text-gray-500">
+          <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-gray-500" /> Background</div>
+          <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-[#0097A7]" /> Foreground</div>
         </div>
 
-        <div className="space-y-1">
-          <div className="flex justify-between">
-            <label className="text-[10px] text-gray-500 uppercase font-bold">FG Opacity</label>
-            <span className="text-[10px] text-[#0097A7]">{opacity}%</span>
-          </div>
-          <input 
-            type="range" min="0" max="100" value={opacity}
-            onChange={(e) => {
-              setOpacity(Number(e.target.value));
-              updateNodeData(id, { config: { ...data.config, opacity: Number(e.target.value) } });
-            }}
-            className="w-full h-1 bg-[#1a1a1a] rounded-lg appearance-none cursor-pointer accent-[#0097A7]"
-          />
-        </div>
+        <ParameterSlider label="FG opacity" value={opacity} min={0} max={100} onChange={(v) => { setOpacity(v); updateNodeData(id, { config: { ...data.config, opacity: v } }); }} />
 
-        <button
-          onClick={handleRun}
-          disabled={data.isRunning}
-          className="w-full py-2 bg-[#0097A7] hover:bg-[#00838F] text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50"
-        >
-          {data.isRunning ? "COMPOSITING..." : "COMPOSITE"}
-        </button>
+        <RunButton onClick={handleRun} running={data.isRunning}>{data.isRunning ? 'Compositing…' : 'Composite'}</RunButton>
 
         <canvas ref={canvasRef} className="hidden" />
 
         {data.output && (
-          <div className="mt-2 rounded-lg overflow-hidden border border-[#2a2a2a] bg-black">
-            <ExpandableAssetWrapper
-              onClick={() => setExpandedAsset(data.output, 'image')}
-              type="image"
-            >
-              <img src={data.output} alt="Processed" className="w-full h-auto" />
-            </ExpandableAssetWrapper>
-          </div>
+          <ExpandableAssetWrapper onClick={() => setExpandedAsset(data.output, 'image')} type="image">
+            <img src={data.output} alt="Processed" className="h-auto w-full" />
+          </ExpandableAssetWrapper>
         )}
       </div>
     </BaseNode>

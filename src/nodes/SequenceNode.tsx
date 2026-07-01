@@ -43,67 +43,52 @@ const SequenceNode = ({ id, data }: any) => {
   const togglePlay = () => setIsPlaying(!isPlaying);
 
   return (
-    <BaseNode id={id} data={data} color="#E91E63" icon={Film}>
+    <BaseNode id={id} data={data} color="#0097A7" icon={Film}>
       <div className="space-y-3">
         {incomingVideos.length === 0 ? (
-          <div className="py-8 flex flex-col items-center justify-center text-gray-600 border-2 border-dashed border-[#2a2a2a] rounded-xl">
-            <Film className="w-8 h-8 mb-2 opacity-20" />
-            <p className="text-[10px] uppercase font-bold tracking-widest">Connect Videos</p>
+          <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-white/10 py-8 text-gray-600">
+            <Film className="h-7 w-7 opacity-30" />
+            <p className="text-[11px] text-gray-500">Connect videos</p>
           </div>
         ) : (
           <div className="space-y-2">
-            <div className="relative aspect-video rounded-lg overflow-hidden border border-[#2a2a2a] bg-black">
-              <video
-                id={`seq-video-${id}`}
-                src={incomingVideos[currentIndex]}
-                className="w-full h-full object-contain"
-                autoPlay={isPlaying}
-                controls={false}
-              />
-              <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 rounded text-[8px] text-white font-bold uppercase">
+            <div className="relative aspect-video overflow-hidden rounded-lg bg-black ring-1 ring-inset ring-white/10">
+              <video id={`seq-video-${id}`} src={incomingVideos[currentIndex]} className="h-full w-full object-contain" autoPlay={isPlaying} controls={false} />
+              <div className="absolute bottom-2 left-2 rounded bg-black/60 px-2 py-1 text-[10px] font-medium text-white">
                 Clip {currentIndex + 1} / {incomingVideos.length}
               </div>
             </div>
 
-            <div className="flex items-center justify-center gap-4 py-2">
-              <button 
-                onClick={() => setCurrentIndex(Math.max(0, currentIndex - 1))}
-                className="p-2 hover:bg-[#1a1a1a] rounded-full text-gray-400 hover:text-white transition-colors"
-              >
-                <SkipBack className="w-4 h-4" />
+            <div className="flex items-center justify-center gap-4 py-1">
+              <button onClick={() => setCurrentIndex(Math.max(0, currentIndex - 1))} className="inline-flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-white/5 hover:text-white">
+                <SkipBack className="h-4 w-4" />
               </button>
-              <button 
-                onClick={togglePlay}
-                className="p-3 bg-[#E91E63] hover:bg-[#D81B60] rounded-full text-white transition-all transform hover:scale-110"
-              >
-                {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
+              <button onClick={togglePlay} className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#0097A7] text-white transition-[transform,background-color] duration-150 hover:bg-[#00a9bb] active:scale-[0.96]">
+                {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="ml-0.5 h-5 w-5" />}
               </button>
-              <button 
-                onClick={() => setCurrentIndex(Math.min(incomingVideos.length - 1, currentIndex + 1))}
-                className="p-2 hover:bg-[#1a1a1a] rounded-full text-gray-400 hover:text-white transition-colors"
-              >
-                <SkipForward className="w-4 h-4" />
+              <button onClick={() => setCurrentIndex(Math.min(incomingVideos.length - 1, currentIndex + 1))} className="inline-flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-white/5 hover:text-white">
+                <SkipForward className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="space-y-1">
-              <p className="text-[9px] text-gray-500 uppercase font-bold">Sequence Order (Top to Bottom)</p>
-              <div className="flex gap-1 overflow-x-auto pb-2 scrollbar-hide">
+            <div className="space-y-1.5">
+              <p className="text-[10px] uppercase tracking-wide text-gray-500">Sequence order (top to bottom)</p>
+              <div className="scrollbar-hide flex gap-1.5 overflow-x-auto pb-1">
                 {incomingVideos.map((v, idx) => (
-                  <div 
+                  <button
                     key={idx}
                     onClick={() => setCurrentIndex(idx)}
-                    className={`flex-shrink-0 w-16 aspect-video rounded border transition-all cursor-pointer ${currentIndex === idx ? 'border-[#E91E63] scale-105' : 'border-[#2a2a2a] opacity-50'}`}
+                    className={`aspect-video w-16 shrink-0 overflow-hidden rounded-md ring-1 transition-[opacity,box-shadow] duration-150 ${currentIndex === idx ? 'opacity-100 ring-[#0097A7]' : 'opacity-50 ring-white/10 hover:opacity-80'}`}
                   >
-                    <video src={v} className="w-full h-full object-cover" muted />
-                  </div>
+                    <video src={v} className="h-full w-full object-cover" muted />
+                  </button>
                 ))}
               </div>
             </div>
           </div>
         )}
-        
-        <p className="text-[8px] text-gray-600 italic text-center">Arrange nodes vertically to change clip order.</p>
+
+        <p className="text-center text-[10px] text-gray-600">Arrange nodes vertically to change clip order.</p>
       </div>
     </BaseNode>
   );

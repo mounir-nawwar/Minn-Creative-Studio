@@ -1,7 +1,7 @@
-import React from 'react';
 import { motion } from 'motion/react';
 import ParameterSlider from '../components/ParameterSlider';
 import type { ImageModel } from './imagenModels';
+import { NodeField, NodeSelect, NodeInput } from './ui';
 
 interface ImagenAdvancedPanelProps {
   currentModelConfig: ImageModel;
@@ -31,6 +31,15 @@ interface ImagenAdvancedPanelProps {
   onThinkingBudgetChange: (v: number) => void;
 }
 
+function CheckboxCard({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+  return (
+    <label className="flex cursor-pointer items-center gap-2 rounded-lg bg-white/[0.03] px-2.5 py-2 ring-1 ring-white/10 transition-shadow duration-150 hover:ring-white/20">
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="accent-[#0097A7]" />
+      <span className="text-[11px] text-gray-300">{label}</span>
+    </label>
+  );
+}
+
 export default function ImagenAdvancedPanel({
   currentModelConfig, isImagen4, isNanoBanana,
   seed, personGeneration, enhancePrompt, addWatermark, safetySetting,
@@ -45,143 +54,75 @@ export default function ImagenAdvancedPanel({
       initial={{ height: 0, opacity: 0 }}
       animate={{ height: 'auto', opacity: 1 }}
       exit={{ height: 0, opacity: 0 }}
-      transition={{ duration: 0.2 }}
-      className="overflow-hidden space-y-3"
+      transition={{ duration: 0.2, ease: [0.2, 0, 0, 1] }}
+      className="space-y-3 overflow-hidden"
     >
       {currentModelConfig.supports.seed && (
-        <div className="space-y-1">
-          <label className="text-[10px] text-gray-500 uppercase font-bold">Seed</label>
-          <input
+        <NodeField label="Seed">
+          <NodeInput
             type="number"
-            className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-1.5 text-[10px] text-gray-300 focus:outline-none focus:border-[#0097A7]"
             placeholder="Random"
             value={seed ?? ''}
             onChange={(e) => onSeedChange(e.target.value ? parseInt(e.target.value) : undefined)}
           />
-        </div>
+        </NodeField>
       )}
 
       {isImagen4 && (
         <>
-          <div className="space-y-1">
-            <label className="text-[10px] text-gray-500 uppercase font-bold">Person Generation</label>
-            <select
-              className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-1.5 text-[10px] text-gray-400 focus:outline-none"
-              value={personGeneration}
-              onChange={(e) => onPersonGenerationChange(e.target.value)}
-            >
-              <option value="allow_all">Allow All</option>
-              <option value="allow_adult">Allow Adults</option>
-              <option value="dont_allow">Disallow All</option>
-            </select>
-          </div>
+          <NodeField label="Person generation">
+            <NodeSelect value={personGeneration} onChange={(e) => onPersonGenerationChange(e.target.value)}>
+              <option value="allow_all">Allow all</option>
+              <option value="allow_adult">Allow adults</option>
+              <option value="dont_allow">Disallow all</option>
+            </NodeSelect>
+          </NodeField>
 
-          <div className="space-y-1">
-            <label className="text-[10px] text-gray-500 uppercase font-bold">Safety Setting</label>
-            <select
-              className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-1.5 text-[10px] text-gray-400 focus:outline-none"
-              value={safetySetting}
-              onChange={(e) => onSafetySettingChange(e.target.value)}
-            >
-              <option value="block_low_and_above">Block Low & Above</option>
-              <option value="block_medium_and_above">Block Medium & Above</option>
-              <option value="block_only_high">Block Only High</option>
-            </select>
-          </div>
+          <NodeField label="Safety setting">
+            <NodeSelect value={safetySetting} onChange={(e) => onSafetySettingChange(e.target.value)}>
+              <option value="block_low_and_above">Block low &amp; above</option>
+              <option value="block_medium_and_above">Block medium &amp; above</option>
+              <option value="block_only_high">Block only high</option>
+            </NodeSelect>
+          </NodeField>
 
           <div className="grid grid-cols-2 gap-2">
-            <label className="flex items-center gap-2 py-1.5 px-2 bg-[#111] rounded-lg border border-[#2a2a2a] cursor-pointer hover:border-[#0097A7]/50">
-              <input
-                type="checkbox"
-                checked={enhancePrompt}
-                onChange={(e) => onEnhancePromptChange(e.target.checked)}
-                className="accent-[#0097A7]"
-              />
-              <span className="text-[10px] text-gray-400">Enhance Prompt</span>
-            </label>
-            <label className="flex items-center gap-2 py-1.5 px-2 bg-[#111] rounded-lg border border-[#2a2a2a] cursor-pointer hover:border-[#0097A7]/50">
-              <input
-                type="checkbox"
-                checked={addWatermark}
-                onChange={(e) => onAddWatermarkChange(e.target.checked)}
-                className="accent-[#0097A7]"
-              />
-              <span className="text-[10px] text-gray-400">Watermark</span>
-            </label>
+            <CheckboxCard checked={enhancePrompt} onChange={onEnhancePromptChange} label="Enhance prompt" />
+            <CheckboxCard checked={addWatermark} onChange={onAddWatermarkChange} label="Watermark" />
           </div>
         </>
       )}
 
       {isNanoBanana && (
         <>
-          <ParameterSlider
-            label="Temperature"
-            value={temperature}
-            min={0}
-            max={2}
-            step={0.1}
-            onChange={onTemperatureChange}
-            color="#0097A7"
-          />
-          <ParameterSlider
-            label="Top P"
-            value={topP}
-            min={0}
-            max={1}
-            step={0.05}
-            onChange={onTopPChange}
-            color="#0097A7"
-          />
-          <ParameterSlider
-            label="Top K"
-            value={topK}
-            min={1}
-            max={64}
-            step={1}
-            onChange={onTopKChange}
-            color="#0097A7"
-          />
+          <ParameterSlider label="Temperature" value={temperature} min={0} max={2} step={0.1} onChange={onTemperatureChange} />
+          <ParameterSlider label="Top P" value={topP} min={0} max={1} step={0.05} onChange={onTopPChange} />
+          <ParameterSlider label="Top K" value={topK} min={1} max={64} step={1} onChange={onTopKChange} />
 
           <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1">
-              <label className="text-[10px] text-gray-500 uppercase font-bold">Format</label>
-              <select
-                className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-1.5 text-[10px] text-gray-400 focus:outline-none"
-                value={mimeType}
-                onChange={(e) => onMimeTypeChange(e.target.value)}
-              >
+            <NodeField label="Format">
+              <NodeSelect value={mimeType} onChange={(e) => onMimeTypeChange(e.target.value)}>
                 <option value="image/png">PNG</option>
                 <option value="image/jpeg">JPEG</option>
                 <option value="image/webp">WebP</option>
-              </select>
-            </div>
+              </NodeSelect>
+            </NodeField>
 
             {currentModelConfig.supports.grounding && (
-              <label className="flex items-center gap-2 py-1.5 px-2 bg-[#111] rounded-lg border border-[#2a2a2a] cursor-pointer hover:border-[#0097A7]/50">
-                <input
-                  type="checkbox"
-                  checked={grounding}
-                  onChange={(e) => onGroundingChange(e.target.checked)}
-                  className="accent-[#0097A7]"
-                />
-                <span className="text-[10px] text-gray-400">Grounding</span>
-              </label>
+              <div className="flex items-end">
+                <CheckboxCard checked={grounding} onChange={onGroundingChange} label="Grounding" />
+              </div>
             )}
           </div>
 
           {currentModelConfig.supports.thinkingLevel && (
-            <div className="space-y-1">
-              <label className="text-[10px] text-gray-500 uppercase font-bold">Thinking Budget</label>
-              <select
-                className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-1.5 text-[10px] text-gray-400 focus:outline-none"
-                value={thinkingBudget}
-                onChange={(e) => onThinkingBudgetChange(parseInt(e.target.value))}
-              >
+            <NodeField label="Thinking budget">
+              <NodeSelect value={thinkingBudget} onChange={(e) => onThinkingBudgetChange(parseInt(e.target.value))}>
                 <option value={1024}>Low (1K tokens)</option>
                 <option value={4096}>Medium (4K tokens)</option>
                 <option value={8192}>High (8K tokens)</option>
-              </select>
-            </div>
+              </NodeSelect>
+            </NodeField>
           )}
         </>
       )}

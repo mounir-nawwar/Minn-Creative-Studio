@@ -53,54 +53,38 @@ const ImageIteratorNode = ({ id, data }: any) => {
   }, [isAutoPlaying, currentIndex]);
 
   return (
-    <BaseNode id={id} data={data} onRun={handleRun} color="#FF9800">
+    <BaseNode id={id} data={data} onRun={handleRun} color="#0097A7">
       <div className="space-y-3">
-        <div className="flex items-center justify-between bg-[#0a0a0a] p-2 rounded-lg border border-[#2a2a2a]">
-          <button 
-            onClick={() => {
-              const nextIndex = Math.max(0, currentIndex - 1);
-              setCurrentIndex(nextIndex);
-              updateNodeData(id, { config: { ...data.config, currentIndex: nextIndex } });
-              handleRun();
-            }}
-            className="p-1 hover:bg-[#1a1a1a] rounded text-gray-400 hover:text-white transition-colors"
+        <div className="flex items-center justify-between rounded-lg bg-black/30 p-2 ring-1 ring-white/10">
+          <button
+            onClick={() => { const n = Math.max(0, currentIndex - 1); setCurrentIndex(n); updateNodeData(id, { config: { ...data.config, currentIndex: n } }); handleRun(); }}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-white/5 hover:text-white"
           >
-            <ChevronLeft className="w-4 h-4" />
+            <ChevronLeft className="h-4 w-4" />
           </button>
-          
           <div className="text-center">
-            <p className="text-[10px] text-gray-500 uppercase font-bold">Index</p>
-            <p className="text-xs font-black text-[#FF9800]">{currentIndex}</p>
+            <p className="text-[10px] uppercase tracking-wide text-gray-500">Index</p>
+            <p className="text-xs font-medium tabular-nums text-[#0097A7]">{currentIndex}</p>
           </div>
-
-          <button 
-            onClick={() => {
-              setCurrentIndex(currentIndex + 1);
-              updateNodeData(id, { config: { ...data.config, currentIndex: currentIndex + 1 } });
-              handleRun();
-            }}
-            className="p-1 hover:bg-[#1a1a1a] rounded text-gray-400 hover:text-white transition-colors"
+          <button
+            onClick={() => { setCurrentIndex(currentIndex + 1); updateNodeData(id, { config: { ...data.config, currentIndex: currentIndex + 1 } }); handleRun(); }}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-white/5 hover:text-white"
           >
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight className="h-4 w-4" />
           </button>
         </div>
 
         <button
           onClick={() => setIsAutoPlaying(!isAutoPlaying)}
-          className={`w-full py-2 flex items-center justify-center gap-2 rounded-lg text-xs font-bold transition-all ${isAutoPlaying ? 'bg-red-500/20 border border-red-500/50 text-red-500' : 'bg-[#1a1a1a] border border-[#2a2a2a] text-gray-400 hover:bg-[#222222]'}`}
+          className={`inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg text-[12px] font-medium ring-1 transition-[transform,color,background-color] duration-150 active:scale-[0.98] ${isAutoPlaying ? 'bg-red-500/15 text-red-400 ring-red-500/30' : 'bg-white/[0.04] text-gray-300 ring-white/10 hover:text-white'}`}
         >
-          {isAutoPlaying ? <Square className="w-3 h-3 fill-current" /> : <Play className="w-3 h-3 fill-current" />}
-          {isAutoPlaying ? 'STOP AUTO' : 'AUTO PLAY'}
+          {isAutoPlaying ? <Square className="h-3 w-3 fill-current" /> : <Play className="h-3 w-3 fill-current" />}
+          {isAutoPlaying ? 'Stop auto' : 'Auto play'}
         </button>
 
         {data.output && (
-          <div className="mt-2 rounded-lg overflow-hidden border border-[#2a2a2a] bg-[#0a0a0a]">
-            <img 
-              src={data.output} 
-              alt="Current" 
-              className="w-full h-auto object-contain max-h-48"
-              referrerPolicy="no-referrer"
-            />
+          <div className="overflow-hidden rounded-lg bg-black ring-1 ring-inset ring-white/10">
+            <img src={data.output} alt="Current" className="h-auto max-h-48 w-full object-contain" referrerPolicy="no-referrer" />
           </div>
         )}
       </div>

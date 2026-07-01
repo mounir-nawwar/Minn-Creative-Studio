@@ -3,6 +3,7 @@ import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
 import { useAssetExpand } from '../hooks/useAssetExpand';
 import { ExpandableAssetWrapper } from '../components/ExpandableAssetWrapper';
+import { RunButton } from './ui';
 
 const MergeAlphaNode = ({ id, data }: any) => {
   const updateNodeData = useStore((state) => state.updateNodeData);
@@ -89,38 +90,21 @@ const MergeAlphaNode = ({ id, data }: any) => {
   };
 
   return (
-    <BaseNode id={id} data={data} inputs={true} onRun={handleRun} className="border-pink-500">
+    <BaseNode id={id} data={data} inputs={true} onRun={handleRun}>
       <div className="space-y-3">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-[#0097A7]" />
-            <span className="text-[10px] text-gray-500 font-bold uppercase">Image (RGB)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-gray-500" />
-            <span className="text-[10px] text-gray-500 font-bold uppercase">Mask (Alpha)</span>
-          </div>
+        <div className="flex flex-col gap-1.5 text-[11px] text-gray-500">
+          <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-[#0097A7]" /> Image (RGB)</div>
+          <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-gray-500" /> Mask (Alpha)</div>
         </div>
 
-        <button
-          onClick={handleRun}
-          disabled={data.isRunning}
-          className="w-full py-2 bg-[#0097A7] hover:bg-[#00838F] text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50"
-        >
-          {data.isRunning ? "MERGING..." : "MERGE ALPHA"}
-        </button>
+        <RunButton onClick={handleRun} running={data.isRunning}>{data.isRunning ? 'Merging…' : 'Merge alpha'}</RunButton>
 
         <canvas ref={canvasRef} className="hidden" />
 
         {data.output && (
-          <div className="mt-2 rounded-lg overflow-hidden border border-[#2a2a2a] bg-black">
-            <ExpandableAssetWrapper
-              onClick={() => setExpandedAsset(data.output, 'image')}
-              type="image"
-            >
-              <img src={data.output} alt="Processed" className="w-full h-auto" />
-            </ExpandableAssetWrapper>
-          </div>
+          <ExpandableAssetWrapper onClick={() => setExpandedAsset(data.output, 'image')} type="image">
+            <img src={data.output} alt="Processed" className="h-auto w-full" />
+          </ExpandableAssetWrapper>
         )}
       </div>
     </BaseNode>

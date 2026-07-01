@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
 import { RefreshCw, Lock, Unlock } from 'lucide-react';
+import { NodeField, NodeLabel, NodeInput, NodeToggle, RunButton } from './ui';
 
 interface SeedNodeProps {
   id: string;
@@ -95,52 +96,46 @@ const SeedNode: React.FC<SeedNodeProps> = ({ id, data }) => {
     <BaseNode id={id} data={data} inputs={true} onRun={handleRun}>
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <label className="text-[10px] text-gray-500 uppercase font-bold">Random Toggle</label>
-          <button 
-            onClick={handleRandomToggle}
-            className={`w-8 h-4 rounded-full transition-all relative ${isRandom ? 'bg-[#2196F3]' : 'bg-[#1a1a1a]'}`}
-          >
-            <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${isRandom ? 'left-4.5' : 'left-0.5'}`} />
-          </button>
+          <NodeLabel>Random</NodeLabel>
+          <NodeToggle on={isRandom} onClick={handleRandomToggle} />
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="flex-1 space-y-1">
-            <label className="text-[10px] text-gray-500 uppercase font-bold">Seed Value</label>
-            <input 
-              type="number" value={seed}
-              disabled={isLocked || isRandom}
-              onChange={(e) => handleSeedChange(Number(e.target.value))}
-              className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-1.5 text-xs text-gray-300 focus:outline-none disabled:opacity-50"
-            />
+        <div className="flex items-end gap-2">
+          <div className="flex-1">
+            <NodeField label="Seed value">
+              <NodeInput
+                type="number"
+                value={seed}
+                disabled={isLocked || isRandom}
+                onChange={(e) => handleSeedChange(Number(e.target.value))}
+                className="disabled:opacity-50"
+              />
+            </NodeField>
           </div>
-          <div className="flex flex-col gap-1 mt-4">
-            <button 
+          <div className="flex flex-col gap-1">
+            <button
               onClick={randomize}
               disabled={isLocked || isRandom}
-              className="p-1.5 bg-[#1a1a1a] hover:bg-[#222222] border border-[#2a2a2a] rounded-lg text-gray-500 hover:text-[#2196F3] transition-all disabled:opacity-50"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-white/[0.04] text-gray-500 ring-1 ring-white/10 transition-[transform,color,background-color] duration-150 hover:text-[#0097A7] active:scale-[0.96] disabled:opacity-50"
+              title="Randomize"
             >
-              <RefreshCw className="w-3 h-3" />
+              <RefreshCw className="h-3.5 w-3.5" />
             </button>
-            <button 
+            <button
               onClick={handleLockToggle}
-              className={`p-1.5 border rounded-lg transition-all ${isLocked ? 'bg-red-500/10 border-red-500/50 text-red-500' : 'bg-[#1a1a1a] border-[#2a2a2a] text-gray-500'}`}
+              className={`inline-flex h-7 w-7 items-center justify-center rounded-lg ring-1 transition-[transform,color,background-color] duration-150 active:scale-[0.96] ${isLocked ? 'bg-red-500/10 text-red-400 ring-red-500/40' : 'bg-white/[0.04] text-gray-500 ring-white/10'}`}
+              title={isLocked ? 'Locked' : 'Unlocked'}
             >
-              {isLocked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+              {isLocked ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
             </button>
           </div>
         </div>
 
-        <button
-          onClick={handleRun}
-          className="w-full py-2 bg-[#2196F3] hover:bg-[#1976D2] text-white rounded-lg text-xs font-bold transition-colors"
-        >
-          SET SEED
-        </button>
+        <RunButton onClick={handleRun}>Set seed</RunButton>
 
-        <div className="mt-2 text-center">
-          <p className="text-[10px] text-gray-500 uppercase font-bold">Output: <span className="text-[#2196F3]">{isRandom ? "RANDOM" : seed}</span></p>
-        </div>
+        <p className="text-center text-[11px] text-gray-500">
+          Output: <span className="font-medium tabular-nums text-[#0097A7]">{isRandom ? 'Random' : seed}</span>
+        </p>
       </div>
     </BaseNode>
   );

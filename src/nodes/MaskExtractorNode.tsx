@@ -3,6 +3,7 @@ import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
 import { useAssetExpand } from '../hooks/useAssetExpand';
 import { ExpandableAssetWrapper } from '../components/ExpandableAssetWrapper';
+import { RunButton } from './ui';
 
 const MaskExtractorNode = ({ id, data }: any) => {
   const updateNodeData = useStore((state) => state.updateNodeData);
@@ -68,26 +69,15 @@ const MaskExtractorNode = ({ id, data }: any) => {
   return (
     <BaseNode id={id} data={data} onRun={handleRun}>
       <div className="space-y-3">
-        <p className="text-[10px] text-gray-500 italic">Extracts the alpha channel of the input image as a grayscale mask.</p>
-        <button
-          onClick={handleRun}
-          disabled={data.isRunning}
-          className="w-full py-2 bg-[#0097A7] hover:bg-[#00838F] text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50"
-        >
-          {data.isRunning ? "EXTRACTING..." : "EXTRACT MASK"}
-        </button>
+        <p className="text-[11px] leading-relaxed text-gray-500">Extracts the alpha channel of the input image as a grayscale mask.</p>
+        <RunButton onClick={handleRun} running={data.isRunning}>{data.isRunning ? 'Extracting…' : 'Extract mask'}</RunButton>
 
         <canvas ref={canvasRef} className="hidden" />
 
         {data.output && (
-          <div className="mt-2 rounded-lg overflow-hidden border border-[#2a2a2a] bg-black">
-            <ExpandableAssetWrapper
-              onClick={() => setExpandedAsset(data.output, 'image')}
-              type="image"
-            >
-              <img src={data.output} alt="Processed" className="w-full h-auto" />
-            </ExpandableAssetWrapper>
-          </div>
+          <ExpandableAssetWrapper onClick={() => setExpandedAsset(data.output, 'image')} type="image">
+            <img src={data.output} alt="Processed" className="h-auto w-full" />
+          </ExpandableAssetWrapper>
         )}
       </div>
     </BaseNode>

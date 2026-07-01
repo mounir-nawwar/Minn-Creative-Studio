@@ -18,17 +18,18 @@ const StickyNoteNode = ({ id, data }: any) => {
   ];
 
   return (
-    <motion.div 
-      initial={{ scale: 0.9, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.15 }}
       style={{ backgroundColor: color }}
-      className="min-w-[200px] min-h-[200px] p-4 rounded-lg shadow-2xl relative group"
+      className="group relative min-h-[200px] min-w-[200px] rounded-xl p-4 shadow-2xl"
     >
-      <button 
+      <button
         onClick={() => deleteNode(id)}
-        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 hover:bg-black/10 rounded transition-all"
+        className="absolute right-2 top-2 inline-flex h-6 w-6 items-center justify-center rounded-md opacity-0 transition-[transform,background-color] duration-150 hover:bg-black/10 active:scale-[0.96] group-hover:opacity-100"
       >
-        <X className="w-3.5 h-3.5 text-black/50 hover:text-black" />
+        <X className="h-3.5 w-3.5 text-black/50" />
       </button>
 
       <textarea
