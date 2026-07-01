@@ -33,6 +33,12 @@ pm2 logs minn-studio --lines 50
 
 `npm start` runs `tsx server.ts`. With `NODE_ENV=production` the server serves the prebuilt `dist/` and falls back unknown routes to `index.html`; otherwise it boots a Vite dev server in middleware mode.
 
+> **Local dev caveat:** `.env` sets `NODE_ENV=production` (for the VPS), so a bare
+> `tsx server.ts` would serve the stale `dist/`. `npm run dev` therefore uses
+> **`cross-env NODE_ENV=development`** to serve live source with HMR. Rule of thumb:
+> `npm run dev` = development/live, `npm start` = production/`dist`. After a code
+> change on the VPS you must `npm run build` (prod serves `dist/`, not source).
+
 ## 🔐 Environment (`.env`)
 
 Copy `.env.example` → `.env` and set at minimum:

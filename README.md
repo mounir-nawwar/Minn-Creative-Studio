@@ -15,6 +15,7 @@ It is built for a private two-person agency workspace ("Mission Control" dark ae
 | Frontend | React 19, TypeScript, Vite 6, Tailwind CSS 4 |
 | Canvas | React Flow (`reactflow`) |
 | State | Zustand |
+| UI primitives | Radix UI (dialog, dropdown-menu, avatar, …) |
 | Animation | Motion (`motion/react`) + UnicornStudio background |
 | Backend | Express 4 (single combined Vite + API server, `tsx`) |
 | Database | SQLite via `better-sqlite3` |

@@ -10,22 +10,37 @@ src/
 ├── hooks/        useProject.ts · useChat.ts · useAssets.ts · useAssetExpand.tsx
 ├── services/     geminiService.ts · performance.ts · gemini/*
 ├── contexts/     ConnectionContext.tsx
-├── lib/          api.ts · utils.ts · env.ts
+├── lib/          api.ts · utils.ts · env.ts · projectContext.ts
 ├── types/        project.types.ts · nodeHandles.ts · handleTypes.ts · validationRules.ts · …
-├── nodes/        BaseNode.tsx + ~49 node components
-├── components/   UI components (see Design System)
+├── nodes/        BaseNode.tsx · ui.tsx (shared primitives) + ~49 node components
+├── components/   UI components (see Design System) · ProfileMenu · ProjectPickerHeader
+│                 └── ProjectCreation/  StepBasicInfo · StepVisualIdentity · StepReview · ui.tsx
 ├── pages/        ProjectPicker.tsx
 ├── styles/       design.tokens.css
 └── index.css
 ```
 
+> **UI foundation (redesigned):** interactive surfaces are built on **Radix UI**
+> primitives (`@radix-ui/react-dialog`, `alert-dialog`, `dropdown-menu`, `avatar`,
+> `tooltip`) with a calm-motion language — no scale-pop entrances, `active:scale-[0.96]`
+> press feedback, and a single teal accent. Two small primitive sets keep it DRY:
+> `nodes/ui.tsx` (node inputs/labels/buttons) and `components/ProjectCreation/ui.tsx`
+> (wizard form fields). See [06 — Design System](./06-DESIGN-SYSTEM.md).
+
 ---
 
 ## 🏗️ Entry & build
 
-- **`index.html`** — single `#root`, loads `/src/main.tsx` as a module. Preconnects to fonts/jsdelivr and **also still has Firebase preconnects** (`firestore.googleapis.com`, `identitytoolkit.googleapis.com`, `index.html:9-10`) — **dead leftovers** from the Firebase era; harmless but safe to remove. Preloads `/scene.json`.
+- **`index.html`** — single `#root`, loads `/src/main.tsx` as a module. Preconnects to fonts/jsdelivr. Preloads `/scene.json`. (The old dead Firebase preconnects were removed.)
 - **`src/main.tsx`** — `createRoot(...).render(<StrictMode><App/></StrictMode>)`; imports `styles/design.tokens.css` and `index.css`.
 - **`vite.config.ts`** — React + Tailwind plugins, alias `@ → repo root`, `base:'/'`. `manualChunks` split vendors into `vendor-react` (react/react-dom/scheduler/react-is kept together to avoid circular-chunk crashes), `vendor-flow` (reactflow), `vendor-motion`, `vendor-misc`. `server.hmr` is disabled when `DISABLE_HMR=true` (AI Studio). `allowedHosts` includes `studio.minnagency.com`, the old Cloud Run URL, and `localhost`. Vitest config (`jsdom`, `src/test/setup.ts`).
+
+> **Dev vs prod serving (important):** `server.ts` serves the **live Vite source**
+> (HMR) only when `NODE_ENV !== 'production'`; otherwise it serves the prebuilt
+> `dist/`. Because `.env` sets `NODE_ENV=production` (for the VPS), `npm run dev`
+> uses **`cross-env NODE_ENV=development`** so local edits hot-reload. `npm start`
+> stays production. If local changes don't show up, you're being served a stale
+> `dist/` — you're not in dev mode.
 - **`tsconfig.json`** — ES2022/ESNext, `@/*` path mapping, `react-jsx`.
 - **`src/constants.ts`** — `API_BASE = '/api'` (relative → same origin), `RETENTION_DAYS = 30`, `AUTHORIZED_EMAILS` (the two agency emails), `isAuthorized(email)`.
 - **`src/lib/env.ts`** — startup env validation with a single cached result; in production enforces a 32+ char `SESSION_SECRET` and a non-default `ADMIN_PASSWORD`.
@@ -116,6 +131,15 @@ The React Flow host.
 - `stripUndefined(obj)` — recursively drops `undefined`/functions/non-finite numbers/non-plain objects so node data is safely serializable before save.
 - `downloadFile(url, filename)` — robust download: decodes `data:` URLs, **proxies `storage.googleapis.com` through `/api/proxy-image`** (CORS), else fetches directly; falls back to `window.open` on error.
 - `calcHandlePosition(index, total)` — handle vertical distribution (1→`50%`, 2→`33/66%`, 3→`25/50/75%`, 4→`20/40/60/80%`, 5+ linear 20–80%).
+
+## 🧾 `src/lib/projectContext.ts`
+`buildProjectContext(project)` builds the one **project brief** string injected into
+every AI generation. It includes only the non-empty fields — name, type/subtype,
+client + industry, description, target audience, brand tone, visual mood, brand
+colors, style keywords, "avoid" (negative) keywords, and the AI master instructions.
+Centralizing it here means the whole creative brief reaches the model (not just a
+couple of fields). Consumed by `ImagenNode`, `VeoNode`, `LLMNode`,
+`PromptEnhancerNode`, and `useChat` — see [04](./04-FRONTEND-BACKEND-CONNECTION.md).
 
 ## 📓 Notes for AI agents
 `src/AGENTS.md` documents the connection-validation system; `src/AGENTS-REVIEW.md` is a candid self-review flagging known issues (some `any` types, O(n²) validation, unmemoized context value, silent save failures, missing ARIA). Treat the latter as a backlog, not current behavior guarantees.

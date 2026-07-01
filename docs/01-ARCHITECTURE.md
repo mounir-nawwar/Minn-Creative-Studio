@@ -14,6 +14,7 @@ It is a **single-tenant, two-user private tool** for an agency, not a public pro
 | Styling | Tailwind CSS 4 (`@tailwindcss/vite`) + CSS custom-property design tokens |
 | Canvas | `reactflow` 11 |
 | Client state | Zustand 5 (`useStore`, `useProjectStore`, `useToastStore`) |
+| UI primitives | **Radix UI** (`dialog`, `alert-dialog`, `dropdown-menu`, `avatar`, `tooltip`) |
 | Animation | `motion` (Motion / ex-Framer Motion) + `unicornstudio-react` animated background |
 | Server | Express 4, run with `tsx` (TypeScript, no build step for the server) |
 | DB | SQLite via `better-sqlite3` (`data/minn-studio.db`, WAL mode) |

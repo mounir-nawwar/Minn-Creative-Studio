@@ -37,8 +37,8 @@ Full, code-verified docs live in [`docs/`](./docs). Consult them before large ch
 ## Commands
 
 ```bash
-npm run dev      # run server.ts (Vite SPA + Express API) via tsx — default port 3000
-npm start        # same entry, used in production (serves dist/)
+npm run dev      # cross-env NODE_ENV=development tsx server.ts — LIVE source + HMR (port 3000)
+npm start        # tsx server.ts in production mode — serves prebuilt dist/
 npm run build    # Vite production build → dist/
 npm run lint     # tsc --noEmit (type-check; there is no ESLint)
 npm test         # vitest run
@@ -46,10 +46,15 @@ npm test         # vitest run
 
 There is **no build step for the server** — it runs TypeScript directly through `tsx`.
 
+> **Dev vs prod:** `.env` sets `NODE_ENV=production`, and `server.ts` serves `dist/` in
+> production but live Vite source in development. So `npm run dev` forces development via
+> `cross-env` (HMR); a bare `tsx server.ts` would serve a stale `dist/`. If local edits
+> don't show, you're not in dev mode.
+
 ## Tech stack
 
-React 19 · TypeScript · Vite 6 · Tailwind 4 · React Flow · Zustand · Motion · Express 4 · better-sqlite3 ·
-jsonwebtoken · `@google/genai` (Vertex) · ffmpeg-static / fluent-ffmpeg · sharp.
+React 19 · TypeScript · Vite 6 · Tailwind 4 · React Flow · Zustand · Motion · **Radix UI** · Express 4 ·
+better-sqlite3 · jsonwebtoken · zod · `@google/genai` + `google-auth-library` (Vertex) · ffmpeg-static / fluent-ffmpeg · sharp.
 
 ## Layout
 
@@ -76,13 +81,17 @@ data/  storage/        # runtime SQLite + media (gitignored)
   Never mutate `node.data` directly. New node data must stay JSON-serializable (the canvas auto-saves it).
 - **All AI calls go through `src/services/gemini/*`** → `callBackend(method, params)` → `POST /api/gemini/proxy`.
   Don't call Vertex from the frontend or add new ad-hoc AI endpoints; extend the proxy's `method` switch in `backend/routes/gemini.ts`.
-- **New nodes:** create the component in `src/nodes/` (wrap it in `<BaseNode>`), add handle defs to
-  `src/types/nodeHandles.ts`, and **register it in `src/utils/nodeTypes.ts`** (unregistered files won't appear on the canvas).
+- **New nodes:** create the component in `src/nodes/` (wrap it in `<BaseNode>`), build its body from the shared
+  `src/nodes/ui.tsx` primitives (`NodeField`, `NodeInput`, `NodeSelect`, `RunButton`, `NodeToggle`, `NodeOutput`),
+  add handle defs to `src/types/nodeHandles.ts`, and **register it in `src/utils/nodeTypes.ts`** (unregistered files won't appear on the canvas).
 - **Auth:** protected backend routes use `authMiddleware`; the frontend attaches `Authorization: Bearer` via
   `authHeader()` and auto-refreshes on 401 in `lib/api.ts`. Keep that flow intact.
 - **Shared workspace is intentional:** `projects.findAll()` returns every user's projects. Don't "fix" it to filter by `user_id`.
-- **Styling:** dark theme, single teal accent `#0097A7`. Reuse the tokens in `src/styles/design.tokens.css`
-  and the palette in `docs/06-DESIGN-SYSTEM.md`; don't introduce new accent colors.
+- **Styling:** dark theme, single teal accent `#0097A7` (hover `#00a9bb`); don't introduce new accent colors.
+  Build interactive surfaces on **Radix UI** (Dialog/AlertDialog/DropdownMenu/Avatar) and the shared primitives
+  (`src/nodes/ui.tsx`, `src/components/ProjectCreation/ui.tsx`, `ProfileMenu`). **Calm motion:** no hover/tap
+  scale-jumps or scale-pop entrances — use `active:scale-[0.96]` for press, ring/shadow for hover. Full rules in
+  `docs/06-DESIGN-SYSTEM.md`.
 - **Cost tracking:** anything that calls a paid model should flow through `trackProjectCost` /
   `backend/config/pricing.ts`. Update `MODEL_PRICING` when adding a model.
 - **Secrets:** never hardcode credentials. Config comes from `.env` (see `.env.example` and `docs/02-BACKEND.md`).

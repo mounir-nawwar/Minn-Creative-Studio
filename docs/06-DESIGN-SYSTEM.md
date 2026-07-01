@@ -1,6 +1,13 @@
 # 06 — Design System
 
-A "Mission Control" dark theme: near-black surfaces, a single **teal** accent (`#0097A7`), Inter + Apple system typography, and Motion-driven micro-interactions. Tokens live in `src/styles/design.tokens.css`; global rules in `src/index.css`; auth-screen styling is inline in `src/components/AuthLayout.tsx`.
+A "Mission Control" dark theme: near-black surfaces, a single **teal** accent (`#0097A7`), Inter + Apple system typography, **Radix UI** primitives, and a **calm** motion language. Tokens live in `src/styles/design.tokens.css`; global rules + animation keyframes in `src/index.css`; auth-screen styling is inline in `src/components/AuthLayout.tsx`.
+
+> **Interaction principles (post-redesign).** The UI was rebuilt on these rules — follow them for any new surface:
+> - **Single teal accent.** Every interactive/active state uses `#0097A7` (hover `#00a9bb`). Off-palette per-node colors (orange/blue/purple/pink/cyan/amber) were all unified to teal.
+> - **Calm motion.** No hover/tap scale-jumps and no scale-pop entrances. Use `active:scale-[0.96]` on buttons for press feedback; hover changes ring/shadow/background only. Menu/dialog entrances are short fades (`[0.2,0,0,1]` ease).
+> - **Rings over hard borders**, concentric radii, `tabular-nums` for changing numbers, image outlines on media.
+> - **Disciplined type.** Normal-case labels/buttons; caps reserved for small field labels used sparingly (no blanket `font-black uppercase`).
+> - **Radix** provides the accessible primitives (Dialog, AlertDialog, DropdownMenu, Avatar, Tooltip) — focus-trap, Esc, scroll-lock. Shared primitive sets: `src/nodes/ui.tsx` and `src/components/ProjectCreation/ui.tsx`.
 
 ---
 
@@ -39,7 +46,7 @@ A "Mission Control" dark theme: near-black surfaces, a single **teal** accent (`
 | `#22c55e` | valid handle / success text (`--color-handle-valid`, `--color-text-success`) |
 | `#ef4444` | error border/text/handle (`--color-node-error`, `--color-handle-invalid`, `--color-text-error`) |
 | `#3b82f6` | focused handle (`--color-handle-focus`) |
-| `#2196f3` | toggle active (`--color-toggle-active`); also the param-node accent (Seed/Number/Motion) |
+| `#2196f3` | **legacy token only** (`--color-toggle-active` in `design.tokens.css`). No longer used at runtime — the toggle and the param nodes (Seed/Number/Motion) are **teal** now. |
 | `#34C759` | Apple-green: toast success, online indicator |
 | `#FF453A` | Apple-red: toast error, offline indicator |
 | `#FF9F0A` | amber: toast warning |
@@ -57,7 +64,8 @@ Each variant uses `bg rgba(.,.12)`, `border rgba(.,.25)`, solid icon color, `glo
 - **Apple system stacks** (auth, exported from `AuthLayout.tsx`):
   - `SF` (text) = `-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif`
   - `SFDisplay` = `… 'SF Pro Display' …` (light display headings, `font-weight: 200`).
-- **Responsive sizing** via `clamp()` throughout, e.g. heading `clamp(24px, 2vw, 32px)`, subtext `clamp(11px, 0.85vw, 13px)`, button `clamp(13px, 1vw, 15px)`. Node labels are small uppercase (`text-xs`/`text-[10px]`, `tracking-wider`).
+- **Responsive sizing** via `clamp()` throughout, e.g. heading `clamp(24px, 2vw, 32px)`, subtext `clamp(11px, 0.85vw, 13px)`, button `clamp(13px, 1vw, 15px)`.
+- **Disciplined hierarchy (post-redesign):** buttons and most labels are **normal-case** (`Generate image`, not `GENERATE IMAGE`). Small uppercase (`text-[10px]/[11px]`, `tracking-wide`, `font-medium`) is reserved for compact field labels (`NodeLabel`, `FieldLabel`) — not blanket `font-black uppercase`.
 
 ---
 
@@ -84,7 +92,7 @@ Each variant uses `bg rgba(.,.12)`, `border rgba(.,.25)`, solid icon color, `glo
 - `body`: `#000` background, white text, no margin.
 - **Scrollbars** (webkit): 6px, track `#0a0a0a`, thumb `#1a1a1a` → `#2a2a2a` on hover, radius 10px.
 - **React Flow overrides:** nodes `cursor: default`; handles forced to `8px` circles; edges use `stroke-dasharray: 5` with the `dash` animation; attribution hidden.
-- **Keyframes:** `dash` (animated edge flow, 1s linear infinite), `shimmer` (running-node progress bar). `authFadeUp` lives in `AuthLayout`.
+- **Keyframes:** `dash` (animated edge flow, 1s linear infinite), `shimmer` (running-node progress bar), and the Radix popover/dialog set — `menuIn`/`menuOut` (calm dropdown fade + 4px rise, no scale), `overlayIn` (backdrop/content opacity fade), `dialogIn` (modal opacity fade; **opacity-only** so the `-translate` centering never flashes). `authFadeUp` lives in `AuthLayout`.
 
 ---
 
@@ -98,7 +106,9 @@ Each variant uses `bg rgba(.,.12)`, `border rgba(.,.25)`, solid icon color, `glo
 
 ## 🎞️ Motion & background
 
-- **Library:** `motion/react`. Common patterns: opacity fades, `y`/`scale` slides, spring configs (e.g. `stiffness 300–500, damping 30` for toasts), `AnimatePresence` for mount/unmount (node error footer, modals, screen cross-fades in `App.tsx`).
+- **Two motion systems:**
+  - **Radix** components animate via `data-[state=open/closed]` + the `menuIn`/`overlayIn`/`dialogIn` keyframes (dropdowns, dialogs, alert-dialogs). Calm, opacity-led, no scale-pop.
+  - **`motion/react`** for the rest: opacity fades and short `y` shifts (`ease [0.2,0,0,1]`), collapsible disclosures (`height:auto`), spring toasts, and the `App.tsx` screen cross-fades. Sidebar width uses a spring. Deliberately **no** `whileHover`/`whileTap` scale — press feedback is `active:scale-[0.96]` in CSS.
 - **Animated background:** `public/scene.json` rendered by `unicornstudio-react`'s `<UnicornScene>` behind auth screens only (teal `#0097A7` is baked into the scene's shaders); it fades out and unmounts when entering the main app.
 
 ---
@@ -108,40 +118,45 @@ Each variant uses `bg rgba(.,.12)`, `border rgba(.,.25)`, solid icon color, `glo
 ### Layout / shell
 | Component | Purpose |
 |---|---|
-| `ProjectSidebar.tsx` | Left nav; animates 320px↔0; hosts the Nodes/Workflows/Chats/Assets tabs |
-| `Sidebar.tsx` + `Sidebar/` (`NodesTab`, `WorkflowsTab`, `ChatsTab`) | Tabbed sidebar content (drag nodes, list/save workflows, list chats); footer "Project Active" teal-dot indicator |
-| `Toolbar.tsx` | Top bar: run/play, undo-redo, save status (Cmd+S), user menu + logout |
-| `ProjectContextBar.tsx` | Project name/type/context strip (`#1a1a1a`) |
+| `ProfileMenu.tsx` | **Shared** Radix Avatar (initials fallback) + DropdownMenu (name/email + Sign out). `variant`: `chip` (picker) or `avatar` (toolbar). Used by both. |
+| `ProjectPickerHeader.tsx` | Project-picker top bar: logo, search, New Project, `ProfileMenu` |
+| `ProjectSidebar.tsx` | Left nav; animates 320px↔0 (spring); hosts Nodes/Workflows/Chats/Assets tabs; opacity-only tab transitions |
+| `Sidebar/` (`NodesTab`, `WorkflowsTab`, `ChatsTab`) | Tabbed sidebar content (drag nodes, list/save workflows, list chats) |
+| `Toolbar.tsx` | Top bar: run, **Radix DropdownMenu** workflows list, **Radix Dialog** save modal, save status (Cmd+S), `ProfileMenu` |
+| `ProjectContextBar.tsx` | Project chip, status pill, `type → subtype`, client + industry, colors, tabular-nums cost popover, Settings / Switch |
 
 ### Auth / project entry
 | Component | Purpose |
 |---|---|
 | `AuthLayout.tsx` | Auth screen wrapper + exported `SF`/`SFDisplay` fonts and shared auth CSS |
-| `CustomLoginPage.tsx` | Username/password login form (`auth.login`) |
-| `ProjectCard.tsx` | Project tile (grid/list); hover border → `#0097A7/50`; status menu |
-| `ProjectCreationOverlay.tsx` + `ProjectCreation/` | Multi-step new/edit-project wizard: `StepBasicInfo`, `StepProjectType`, `StepTargetAudience`, `StepVisualIdentity`, `StepCollaborators`, `StepAIInstructions`, `StepReview` (+ `types.ts`) |
-| `StepIndicator.tsx` | Wizard progress dots (active scales 1.2, teal; completed = check) |
+| `CustomLoginPage.tsx` | Username/password login form (`auth.login`) — user-customized |
+| `ProjectCard.tsx` | Project tile (grid/list); calm hover on **ring + shadow** (no scale); `StatusControl` dropdown |
+| `ProjectCreationOverlay.tsx` + `ProjectCreation/` | **Radix Dialog** 3-step new/edit wizard: `StepBasicInfo` (Project) · `StepVisualIdentity` (Creative brief) · `StepReview`, on the shared `ui.tsx` form primitives. (`StepIndicator` and the old `StepProjectType`/`StepTargetAudience`/`StepAIInstructions`/`StepCollaborators` were removed.) |
 
 ### Assets / chat
 | Component | Purpose |
 |---|---|
-| `ChatDrawer.tsx` | Creative-assistant chat; markdown + code blocks w/ copy; inline asset attach |
-| `AssetGrid.tsx` | 2-col asset browser; drag-drop upload; search/filter; favorite/download/delete/add-to-canvas |
-| `AssetExpandModal.tsx` | Global full-screen asset preview (driven by `useStore.expandedAsset`) |
-| `AssetPreviewModal.tsx` | Lightbox preview with navigation |
-| `ExpandableAssetWrapper.tsx` | Wraps node outputs to open the expand modal |
+| `ChatDrawer.tsx` | Creative-assistant chat as a **Radix Dialog** (drawer + asset picker); markdown + code-copy; inline asset attach |
+| `AssetGrid.tsx` | 2-col asset browser; ring cards + image outlines; drag-drop upload; search/filter; favorite/add-to-canvas/delete |
+| `AssetPreviewModal.tsx` | **Radix Dialog** lightbox (media + metadata sidebar); shared by the sidebar and the global expand modal |
+| `AssetExpandModal.tsx` | Global full-screen preview (renders `AssetPreviewModal`, driven by `useStore.expandedAsset`) |
+| `ExpandableAssetWrapper.tsx` | Calm expand affordance (ring hover + corner icon, no scale) for node outputs |
 | `ReferenceStrip.tsx` | Horizontal reference-image strip with per-item role dropdown + delete (Imagen/Veo/Lyria) |
-| `VideoPreview.tsx` / `AudioPreview.tsx` | Inline video (autoplay/loop) and audio (play/pause + waveform) players |
-| `DeleteAssetModal.tsx` / `DeleteProjectModal.tsx` | Red-accented confirm dialogs |
+| `VideoPreview.tsx` / `AudioPreview.tsx` | Inline video (autoplay/loop) and audio (play/pause + **deterministic** waveform) |
+| `DeleteAssetModal.tsx` / `DeleteProjectModal.tsx` | **Radix AlertDialog** confirm dialogs |
 
 ### Inputs / feedback
 | Component | Purpose |
 |---|---|
-| `AskAIButton.tsx` | "Ask AI to Fill" helper (Sparkles icon, teal `#0097A7/10` bg, `/30` border) |
-| `ParameterSlider.tsx` | Labeled range slider (accent color configurable, default `#0097A7`) |
-| `ToggleSwitch.tsx` | Styled toggle (styled-components); OFF gray+red, ON green+glow; size presets navbar/node |
+| `AskAIButton.tsx` | "Ask AI to fill" helper (Sparkles, teal `#0097A7/10` bg + `/25` ring) |
+| `ParameterSlider.tsx` | Labeled range slider (tabular-nums value, accent configurable, default teal) |
+| `ToggleSwitch.tsx` | **Flat teal pill** switch (rewritten from the old skeuomorphic styled-components toggle); `size` presets `navbar`/`node` |
 | `ToastContainer.tsx` | Top-center toasts (spring), color-coded by type, auto-dismiss + close |
 | `OfflineIndicator.tsx` | Bottom-center online/offline badge (green `#34C759` / red `#FF453A`) |
-| `ErrorBoundary.tsx` | Catches render errors; red panel + Try-Again / Reload |
+| `ErrorBoundary.tsx` | Catches render errors; on-palette Try-again / Reload buttons |
 | `Skeleton.tsx` | Loading placeholders (`#2a2a2a` pulse): workflow/project/asset/node variants |
 | `PerfHUD.tsx` | Dev performance overlay (validation time, cache hits, render count; green/yellow/red budget) |
+
+> Two shared **primitive** files back the redesign, both exporting flat inputs, teal focus rings, calm press, and normal-case labels:
+> `src/components/ProjectCreation/ui.tsx` (`StepShell`, `StepHeader`, `Field`, `TextField`, `TextArea`, `Chip`, `SelectTile`) and
+> `src/nodes/ui.tsx` (`NodeField`, `NodeLabel`, `NodeInput`, `NodeTextArea`, `NodeSelect`, `NodeToggle`, `RunButton`, `NodeOutput`).

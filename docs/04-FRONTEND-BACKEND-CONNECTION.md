@@ -52,6 +52,15 @@ Both attach the JWT and both target `API_BASE = '/api'` (same origin — see [03
 | `generateVideo` | `veo-3.1-*` | `generateVideos` → `getOperation` → `fetchVideoFile` |
 | `generateAudio` | `lyria-3-*` | `generateContent`/`getOperation` (Pro is an LRO) |
 
+### Project brief injection (`projectContext`)
+Every generation carries a `projectContext` string so the model knows the project's
+brief. It's built by the shared **`buildProjectContext(currentProject)`**
+(`src/lib/projectContext.ts`) — name, type/subtype, client + industry, description,
+target audience, brand tone, visual mood, brand colors, style keywords, "avoid"
+(negative) keywords, and the AI master instructions (non-empty fields only). The
+same helper feeds `ImagenNode`, `VeoNode`, `LLMNode`, `PromptEnhancerNode`, and the
+chat (`useChat`), so the **whole** brief reaches every call — not just a few fields.
+
 ---
 
 ## 🔁 Traced lifecycles
