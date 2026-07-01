@@ -17,7 +17,7 @@ interface ReferenceStripProps {
   onUpdateRole: (edgeId: string, role: string) => void;
 }
 
-const ReferenceStrip: React.FC<ReferenceStripProps> = ({ nodeId, references, onUpdateRole }) => {
+const ReferenceStrip: React.FC<ReferenceStripProps> = ({ references, onUpdateRole }) => {
   const deleteEdge = useStore((state) => state.deleteEdge);
   const { setExpandedAsset } = useAssetExpand();
 
@@ -25,37 +25,25 @@ const ReferenceStrip: React.FC<ReferenceStripProps> = ({ nodeId, references, onU
 
   return (
     <div className="space-y-2">
-      <label className="text-[10px] text-gray-500 uppercase font-bold">References ({references.length})</label>
-      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+      <span className="text-[11px] font-medium uppercase tracking-wide text-gray-400">References ({references.length})</span>
+      <div className="scrollbar-hide flex gap-2 overflow-x-auto pb-2">
         {references.map((ref) => (
-          <div key={ref.edgeId} className="flex-shrink-0 w-24 space-y-1">
-            <ExpandableGridWrapper
-              onClick={() => setExpandedAsset(ref.url, 'image')}
-              type="image"
-              className="w-24 h-24"
-            >
-              <div className="relative aspect-square rounded-lg overflow-hidden">
-                <img 
-                  src={ref.url} 
-                  className="w-full h-full object-cover" 
-                  alt="Ref" 
-                  referrerPolicy="no-referrer"
-                />
+          <div key={ref.edgeId} className="w-24 shrink-0 space-y-1.5">
+            <ExpandableGridWrapper onClick={() => setExpandedAsset(ref.url, 'image')} type="image" className="h-24 w-24">
+              <div className="relative aspect-square">
+                <img src={ref.url} className="h-full w-full object-cover" alt="Reference" referrerPolicy="no-referrer" />
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteEdge(ref.edgeId);
-                  }}
-                  className="absolute top-1 right-1 p-0.5 bg-black/50 hover:bg-red-500 rounded-full text-white transition-colors"
+                  onClick={(e) => { e.stopPropagation(); deleteEdge(ref.edgeId); }}
+                  className="absolute right-1 top-1 z-10 inline-flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white transition-[transform,background-color] duration-150 hover:bg-red-500 active:scale-[0.96]"
                 >
-                  <X className="w-3 h-3" />
+                  <X className="h-3 w-3" />
                 </button>
               </div>
             </ExpandableGridWrapper>
             <select
               value={ref.role}
               onChange={(e) => onUpdateRole(ref.edgeId, e.target.value)}
-              className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded p-0.5 text-[8px] text-gray-400 focus:outline-none focus:border-[#0097A7]"
+              className="w-full rounded-md bg-[#0a0a0a] px-1 py-1 text-[10px] text-gray-300 ring-1 ring-white/10 focus:outline-none focus:ring-[#0097A7]/50"
             >
               <option value="style">Style</option>
               <option value="composition">Composition</option>

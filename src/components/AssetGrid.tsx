@@ -1,26 +1,12 @@
-import React, { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useAssets } from '../hooks/useAssets';
-import { 
-  Image as ImageIcon, 
-  Video as VideoIcon, 
-  Music as AudioIcon, 
-  FileText as DocIcon, 
-  Search, 
-  Filter, 
-  Heart, 
-  Download, 
-  ExternalLink,
-  Trash2,
-  Maximize2,
-  Upload,
-  Plus,
-  Play
+import {
+  Image as ImageIcon, Video as VideoIcon, Music as AudioIcon, FileText as DocIcon,
+  Search, Filter, Heart, ExternalLink, Trash2, Plus, Upload, Play,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Asset, AssetType } from '../types/project.types';
 import { useStore } from '../store/useStore';
-import { useReactFlow } from 'reactflow';
-import { useRef } from 'react';
 import DeleteAssetModal from './DeleteAssetModal';
 import { RETENTION_DAYS } from '../constants';
 
@@ -29,10 +15,11 @@ interface AssetGridProps {
   isPicker?: boolean;
 }
 
+const FILTERS: (AssetType | 'all')[] = ['all', 'image', 'video', 'audio', 'reference'];
+
 export default function AssetGrid({ onAssetClick, isPicker = false }: AssetGridProps) {
   const { assets, loading, deleteAsset, toggleFavorite, uploadAsset, uploadProgress } = useAssets();
   const setPendingNodeType = useStore((state) => state.setPendingNodeType);
-  const { project, getViewport } = useReactFlow();
   const [filter, setFilter] = useState<AssetType | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [assetToDelete, setAssetToDelete] = useState<Asset | null>(null);
@@ -41,29 +28,14 @@ export default function AssetGrid({ onAssetClick, isPicker = false }: AssetGridP
 
   const handleFiles = async (files: FileList | null) => {
     if (!files) return;
-    const fileArray = Array.from(files);
-    
-    for (const file of fileArray) {
+    for (const file of Array.from(files)) {
       try {
         await uploadAsset(file);
       } catch (err) {
         console.error(`Failed to upload ${file.name}:`, err);
       }
     }
-
-    // Reset input value to allow re-uploading same file
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
-  const onDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const onDragLeave = () => {
-    setIsDragging(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const onDrop = async (e: React.DragEvent) => {
@@ -72,10 +44,10 @@ export default function AssetGrid({ onAssetClick, isPicker = false }: AssetGridP
     await handleFiles(e.dataTransfer.files);
   };
 
-  const filteredAssets = assets.filter(a => {
+  const filteredAssets = assets.filter((a) => {
     const matchesFilter = filter === 'all' || a.type === filter;
-    const matchesSearch = a.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         a.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()));
+    const q = searchQuery.toLowerCase();
+    const matchesSearch = a.name.toLowerCase().includes(q) || a.tags.some((t) => t.toLowerCase().includes(q));
     return matchesFilter && matchesSearch;
   });
 
@@ -91,100 +63,78 @@ export default function AssetGrid({ onAssetClick, isPicker = false }: AssetGridP
 
   const handleAddToCanvas = (asset: Asset) => {
     const type = asset.type === 'video' ? 'videoUpload' : 'imageUpload';
-    
-    setPendingNodeType(type, { 
-      type,
-      label: asset.name,
-      output: asset.url,
-      config: {
-        ...asset.metadata,
-        url: asset.url
-      }
-    });
+    setPendingNodeType(type, { type, label: asset.name, output: asset.url, config: { ...asset.metadata, url: asset.url } });
   };
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-[#0097A7] border-t-transparent rounded-full animate-spin" />
+      <div className="flex flex-1 items-center justify-center">
+        <div className="h-7 w-7 animate-spin rounded-full border-2 border-[#0097A7]/20 border-t-[#0097A7]" />
       </div>
     );
   }
 
   return (
-    <div 
-      className={`flex-1 flex flex-col overflow-hidden transition-all ${isDragging ? 'bg-[#0097A7]/10' : ''}`}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
+    <div
+      className={`flex flex-1 flex-col overflow-hidden transition-colors duration-150 ${isDragging ? 'bg-[#0097A7]/10' : ''}`}
+      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+      onDragLeave={() => setIsDragging(false)}
       onDrop={onDrop}
     >
-      {/* Filters & Search */}
-      <div className={`border-b border-white/5 space-y-2 ${isPicker ? 'p-2' : 'p-4 space-y-4'}`}>
+      {/* Controls */}
+      <div className={`space-y-2 border-b border-white/5 ${isPicker ? 'p-2' : 'p-3'}`}>
         {!isPicker && (
-          <div className="flex flex-col gap-3">
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={(e) => handleFiles(e.target.files)}
-              className="hidden"
-              multiple
-              accept="image/*,video/*,audio/*"
-            />
+          <>
+            <input type="file" ref={fileInputRef} onChange={(e) => handleFiles(e.target.files)} className="hidden" multiple accept="image/*,video/*,audio/*" />
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="w-full py-3 bg-[#0097A7] hover:bg-[#00838F] text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(0,151,167,0.2)]"
+              className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#0097A7] text-[13px] font-medium text-white transition-[transform,background-color] duration-150 hover:bg-[#00a9bb] active:scale-[0.98]"
             >
-              <Upload className="w-4 h-4" />
-              Upload Asset
+              <Upload className="h-4 w-4" />
+              Upload asset
             </button>
 
-            {/* Upload Progress */}
-            <AnimatePresence>
+            <AnimatePresence initial={false}>
               {Object.entries(uploadProgress).map(([fileId, progress]) => (
                 <motion.div
                   key={fileId}
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="bg-black/40 border border-white/5 rounded-lg p-2 space-y-1.5"
+                  transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}
+                  className="space-y-1.5 rounded-lg bg-black/40 p-2 ring-1 ring-white/10"
                 >
-                  <div className="flex justify-between text-[8px] font-bold uppercase tracking-widest">
-                    <span className="text-gray-400 truncate max-w-[150px]">{fileId.split('-').slice(1).join('-')}</span>
-                    <span className="text-[#0097A7]">{Math.round(progress as number)}%</span>
+                  <div className="flex justify-between text-[11px]">
+                    <span className="max-w-[150px] truncate text-gray-400">{fileId.split('-').slice(1).join('-')}</span>
+                    <span className="tabular-nums text-[#0097A7]">{Math.round(progress as number)}%</span>
                   </div>
-                  <div className="h-1 bg-white/5 rounded-full overflow-hidden">
-                    <motion.div
-                      className="h-full bg-[#0097A7]"
-                      initial={{ width: 0 }}
-                      animate={{ width: `${progress as number}%` }}
-                    />
+                  <div className="h-1 overflow-hidden rounded-full bg-white/5">
+                    <motion.div className="h-full bg-[#0097A7]" initial={{ width: 0 }} animate={{ width: `${progress as number}%` }} />
                   </div>
                 </motion.div>
               ))}
             </AnimatePresence>
-          </div>
+          </>
         )}
 
-        <div className="relative group">
-          <Search className={`absolute top-1/2 -translate-y-1/2 text-gray-600 group-focus-within:text-[#0097A7] transition-colors ${isPicker ? 'left-2 w-3 h-3' : 'left-3 w-3.5 h-3.5'}`} />
+        <div className="relative">
+          <Search className={`pointer-events-none absolute top-1/2 -translate-y-1/2 text-gray-500 ${isPicker ? 'left-2.5 h-3 w-3' : 'left-3 h-3.5 w-3.5'}`} />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search assets..."
-            className={`w-full bg-black/60 border border-white/5 rounded-lg text-white focus:outline-none focus:border-[#0097A7]/50 transition-all ${isPicker ? 'py-1.5 pl-7 pr-3 text-[10px]' : 'py-2.5 pl-10 pr-4 text-[11px] font-bold rounded-xl border'}`}
+            placeholder="Search assets"
+            className={`w-full rounded-lg bg-white/[0.04] text-white placeholder:text-gray-600 ring-1 ring-white/10 transition-shadow duration-150 focus:outline-none focus:ring-[1.5px] focus:ring-[#0097A7]/60 ${isPicker ? 'py-1.5 pl-7 pr-3 text-[12px]' : 'py-2 pl-9 pr-3 text-[13px]'}`}
           />
         </div>
 
-        <div className={`flex gap-1.5 ${isPicker ? 'overflow-x-auto pb-0.5 scrollbar-none' : 'flex-wrap gap-2'}`}>
-          {['all', 'image', 'video', 'audio', 'reference'].map((f) => (
+        <div className={`flex gap-1.5 ${isPicker ? 'scrollbar-none overflow-x-auto pb-0.5' : 'flex-wrap'}`}>
+          {FILTERS.map((f) => (
             <button
               key={f}
-              onClick={() => setFilter(f as any)}
-              className={`shrink-0 uppercase tracking-widest font-black transition-all border ${
-                isPicker
-                  ? `px-2 py-1 rounded-md text-[8px] ${filter === f ? 'bg-[#0097A7] text-white border-[#0097A7]' : 'bg-white/5 text-gray-500 border-white/5 hover:border-white/10'}`
-                  : `px-3 py-1.5 rounded-lg text-[9px] ${filter === f ? 'bg-[#0097A7] text-white border-[#0097A7]' : 'bg-white/5 text-gray-500 border-white/5 hover:border-white/10'}`
+              onClick={() => setFilter(f)}
+              className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium capitalize ring-1 transition-[transform,color,background-color,box-shadow] duration-150 active:scale-[0.96] ${
+                filter === f ? 'bg-[#0097A7] text-white ring-[#0097A7]' : 'bg-white/[0.03] text-gray-400 ring-white/10 hover:bg-white/[0.06] hover:text-white'
               }`}
             >
               {f}
@@ -194,104 +144,82 @@ export default function AssetGrid({ onAssetClick, isPicker = false }: AssetGridP
       </div>
 
       {/* Grid */}
-      <div className={`flex-1 overflow-y-auto custom-scrollbar ${isPicker ? 'p-2' : 'p-4'}`}>
+      <div className={`custom-scrollbar flex-1 overflow-y-auto ${isPicker ? 'p-2' : 'p-3'}`}>
         {filteredAssets.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-4">
-            <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center">
-              <Filter className="w-6 h-6 text-gray-700" />
+          <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/[0.04] ring-1 ring-white/10">
+              <Filter className="h-5 w-5 text-gray-600" />
             </div>
-            <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">No assets found</p>
+            <p className="text-xs text-gray-500">No assets found</p>
           </div>
         ) : (
-          <div className={`grid grid-cols-2 ${isPicker ? 'gap-2' : 'gap-4'}`}>
+          <div className={`grid grid-cols-2 ${isPicker ? 'gap-2' : 'gap-3'}`}>
             {filteredAssets.map((asset) => {
               const Icon = getIcon(asset.type);
               return (
-                <motion.div
-                  layout
+                <div
                   key={asset.id}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className={`group relative aspect-square bg-[#111111] border border-white/5 overflow-hidden cursor-pointer hover:border-[#0097A7]/50 transition-all ${isPicker ? 'rounded-xl' : 'rounded-2xl'}`}
                   onClick={() => onAssetClick?.(asset)}
+                  className="group relative aspect-square cursor-pointer overflow-hidden rounded-xl bg-[#111111] ring-1 ring-white/10 transition-[transform,box-shadow] duration-150 hover:ring-[#0097A7]/40 active:scale-[0.98]"
                 >
                   {asset.type === 'video' ? (
-                    <div className="w-full h-full relative">
-                      <video 
-                        src={asset.url + "#t=0.1"} 
-                        className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity" 
-                        preload="metadata"
-                      />
+                    <div className="relative h-full w-full">
+                      <video src={asset.url + '#t=0.1'} className="h-full w-full object-cover opacity-70 transition-opacity duration-150 group-hover:opacity-100" preload="metadata" />
                       <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="w-8 h-8 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30 group-hover:scale-110 group-hover:bg-[#0097A7]/40 transition-all">
-                          <Play className="w-3 h-3 text-white fill-white" />
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 ring-1 ring-white/20 backdrop-blur-md transition-colors duration-150 group-hover:bg-[#0097A7]/50">
+                          <Play className="h-3 w-3 fill-white text-white" />
                         </div>
                       </div>
                     </div>
                   ) : asset.type === 'image' ? (
-                    <img 
-                      src={asset.thumbnailUrl || asset.url} 
-                      alt={asset.name} 
-                      className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity"
-                    />
+                    <img src={asset.thumbnailUrl || asset.url} alt={asset.name} className="h-full w-full object-cover opacity-80 transition-opacity duration-150 group-hover:opacity-100" />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Icon className="w-8 h-8 text-gray-700 group-hover:text-[#0097A7] transition-colors" />
+                    <div className="flex h-full w-full items-center justify-center">
+                      <Icon className="h-8 w-8 text-gray-700 transition-colors group-hover:text-[#0097A7]" />
                     </div>
                   )}
 
-                  {/* Overlay Controls */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-3 flex flex-col justify-between">
-                    <div className="flex justify-end gap-2">
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleFavorite(asset.id, asset.isFavorited);
-                        }}
-                        className={`p-1.5 rounded-lg backdrop-blur-md border border-white/10 transition-all ${asset.isFavorited ? 'bg-red-500 text-white' : 'bg-black/40 text-gray-400 hover:text-white'}`}
+                  <span className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/[0.06]" />
+
+                  <div className="absolute inset-0 flex flex-col justify-between bg-gradient-to-t from-black/80 via-transparent to-transparent p-2.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                    <div className="flex justify-end gap-1.5">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); toggleFavorite(asset.id, asset.isFavorited); }}
+                        className={`inline-flex h-7 w-7 items-center justify-center rounded-lg ring-1 ring-white/10 backdrop-blur-md transition-[transform,color,background-color] duration-150 active:scale-[0.96] ${asset.isFavorited ? 'bg-red-500 text-white' : 'bg-black/40 text-gray-300 hover:text-white'}`}
                       >
-                        <Heart className={`w-3.5 h-3.5 ${asset.isFavorited ? 'fill-current' : ''}`} />
+                        <Heart className={`h-3.5 w-3.5 ${asset.isFavorited ? 'fill-current' : ''}`} />
                       </button>
                       {!isPicker && (
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleAddToCanvas(asset);
-                          }}
-                          className="p-1.5 bg-black/40 backdrop-blur-md border border-white/10 rounded-lg text-gray-400 hover:text-white transition-all"
-                          title="Add to Canvas"
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleAddToCanvas(asset); }}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-black/40 text-gray-300 ring-1 ring-white/10 backdrop-blur-md transition-[transform,color] duration-150 hover:text-white active:scale-[0.96]"
+                          title="Add to canvas"
                         >
-                          <Maximize2 className="w-3.5 h-3.5" />
+                          <Plus className="h-3.5 w-3.5" />
                         </button>
                       )}
                     </div>
-                    
+
                     <div className="space-y-1">
-                      <p className="text-[9px] font-black text-white uppercase tracking-tighter truncate">{asset.name}</p>
+                      <p className="truncate text-[12px] font-medium text-white">{asset.name}</p>
                       <div className="flex items-center justify-between">
-                        <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">{asset.type}</span>
-                        <div className="flex gap-2">
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setAssetToDelete(asset);
-                            }}
-                            className="p-1 text-gray-500 hover:text-red-500 transition-colors"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
+                        <span className="text-[11px] capitalize text-gray-400">{asset.type}</span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setAssetToDelete(asset); }}
+                          className="p-0.5 text-gray-400 transition-colors hover:text-red-400"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
                       </div>
                     </div>
                   </div>
-                </motion.div>
+                </div>
               );
             })}
           </div>
         )}
       </div>
-      
-      {/* Delete Confirmation Modal */}
+
       <DeleteAssetModal
         asset={assetToDelete}
         isOpen={!!assetToDelete}
