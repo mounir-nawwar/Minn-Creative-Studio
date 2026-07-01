@@ -1,11 +1,5 @@
-import React, { useState } from 'react';
-import {
-  Layout,
-  MessageSquare,
-  Image as ImageIcon,
-  Box,
-  PanelLeftClose
-} from 'lucide-react';
+import { useState } from 'react';
+import { Layout, MessageSquare, Image as ImageIcon, Box, PanelLeftClose } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useProjectStore } from '../store/useProjectStore';
 import AssetGrid from './AssetGrid';
@@ -16,6 +10,13 @@ import WorkflowsTab from './Sidebar/WorkflowsTab';
 import ChatsTab from './Sidebar/ChatsTab';
 
 type Tab = 'nodes' | 'workflows' | 'chats' | 'assets';
+
+const TABS: { id: Tab; icon: typeof Box }[] = [
+  { id: 'nodes', icon: Box },
+  { id: 'workflows', icon: Layout },
+  { id: 'chats', icon: MessageSquare },
+  { id: 'assets', icon: ImageIcon },
+];
 
 export default function ProjectSidebar() {
   const { currentProject, toggleSidebar, isSidebarOpen } = useProjectStore();
@@ -28,40 +29,36 @@ export default function ProjectSidebar() {
     <motion.div
       initial={false}
       animate={{ width: isSidebarOpen ? 320 : 0, opacity: isSidebarOpen ? 1 : 0 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-      className="h-full bg-[#0a0a0a] border-r border-white/5 flex flex-col relative z-50 overflow-hidden"
+      transition={{ type: 'spring', stiffness: 320, damping: 34 }}
+      className="relative z-50 flex h-full flex-col overflow-hidden border-r border-white/5 bg-[#0a0a0a]"
     >
-      {/* Tabs Header */}
-      <div className="flex p-2 bg-[#111111] border-b border-white/5 items-center">
-        <div className="flex-1 flex gap-1">
-          {(['nodes', 'workflows', 'chats', 'assets'] as Tab[]).map((tab) => (
+      {/* Tabs */}
+      <div className="flex items-center gap-1 border-b border-white/5 p-2">
+        <div className="flex flex-1 gap-1">
+          {TABS.map(({ id, icon: Icon }) => (
             <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl transition-all ${activeTab === tab
-                ? 'bg-black text-[#0097A7] shadow-xl border border-white/5'
-                : 'text-gray-600 hover:text-gray-400'
-                }`}
+              key={id}
+              onClick={() => setActiveTab(id)}
+              className={`flex flex-1 flex-col items-center gap-1.5 rounded-lg py-2.5 transition-[color,background-color] duration-150 ${
+                activeTab === id ? 'bg-white/[0.06] text-[#0097A7]' : 'text-gray-500 hover:bg-white/[0.03] hover:text-gray-300'
+              }`}
             >
-              {tab === 'nodes' && <Box className="w-4 h-4" />}
-              {tab === 'workflows' && <Layout className="w-4 h-4" />}
-              {tab === 'chats' && <MessageSquare className="w-4 h-4" />}
-              {tab === 'assets' && <ImageIcon className="w-4 h-4" />}
-              <span className="text-[8px] font-black uppercase tracking-widest">{tab}</span>
+              <Icon className="h-4 w-4" />
+              <span className="text-[10px] font-medium capitalize">{id}</span>
             </button>
           ))}
         </div>
         <button
           onClick={toggleSidebar}
-          className="p-2 ml-1 text-gray-600 hover:text-white transition-colors rounded-lg hover:bg-white/5"
-          title="Close Sidebar"
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-500 transition-[transform,color,background-color] duration-150 hover:bg-white/5 hover:text-white active:scale-[0.96]"
+          title="Close sidebar"
         >
-          <PanelLeftClose className="w-4 h-4" />
+          <PanelLeftClose className="h-4 w-4" />
         </button>
       </div>
 
-      {/* Tab Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      {/* Content */}
+      <div className="flex flex-1 flex-col overflow-hidden">
         <AnimatePresence mode="wait">
           {activeTab === 'nodes' && <NodesTab key="nodes" />}
           {activeTab === 'workflows' && <WorkflowsTab key="workflows" />}
@@ -69,10 +66,11 @@ export default function ProjectSidebar() {
           {activeTab === 'assets' && (
             <motion.div
               key="assets"
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -10 }}
-              className="flex-1 flex flex-col overflow-hidden"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="flex flex-1 flex-col overflow-hidden"
             >
               <AssetGrid onAssetClick={setSelectedAsset} />
             </motion.div>
@@ -80,25 +78,20 @@ export default function ProjectSidebar() {
         </AnimatePresence>
       </div>
 
-      {/* Asset Preview Modal */}
-      <AnimatePresence>
-        {selectedAsset && (
-          <AssetPreviewModal
-            asset={selectedAsset}
-            onClose={() => setSelectedAsset(null)}
-            onDelete={() => {}}
-            onToggleFavorite={() => {}}
-          />
-        )}
-      </AnimatePresence>
+      <AssetPreviewModal
+        asset={selectedAsset}
+        onClose={() => setSelectedAsset(null)}
+        onDelete={() => {}}
+        onToggleFavorite={() => {}}
+      />
 
       {/* Footer */}
-      <div className="p-4 border-t border-white/5 bg-[#0d0d0d] flex items-center justify-between">
+      <div className="flex items-center justify-between border-t border-white/5 bg-[#0d0d0d] px-4 py-3">
         <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-[#0097A7]" />
-          <span className="text-[8px] font-black text-white uppercase tracking-[0.3em]">Project Active</span>
+          <span className="h-2 w-2 rounded-full bg-[#0097A7]" />
+          <span className="text-[11px] font-medium text-gray-400">Project active</span>
         </div>
-        <span className="text-[8px] font-bold text-gray-700 uppercase tracking-widest">v1.0.4</span>
+        <span className="text-[11px] tabular-nums text-gray-600">v1.0.4</span>
       </div>
     </motion.div>
   );

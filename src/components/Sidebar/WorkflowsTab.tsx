@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'motion/react';
 import { Plus, Layout, Clock, Copy, Trash2 } from 'lucide-react';
 import { Node, Edge } from 'reactflow';
@@ -16,19 +16,9 @@ export default function WorkflowsTab() {
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchWorkflows = useCallback(async () => {
-    if (!currentProject) {
-      setWorkflows([]);
-      setIsLoading(false);
-      return;
-    }
-
+    if (!currentProject) { setWorkflows([]); setIsLoading(false); return; }
     const user = auth.getCurrentUser();
-    if (!user) {
-      setWorkflows([]);
-      setIsLoading(false);
-      return;
-    }
-
+    if (!user) { setWorkflows([]); setIsLoading(false); return; }
     try {
       const data = await workflowsApi.list(currentProject.id);
       setWorkflows(data);
@@ -40,33 +30,15 @@ export default function WorkflowsTab() {
   }, [currentProject?.id]);
 
   useEffect(() => {
-    // Initial fetch
     fetchWorkflows();
-
-    // Set up polling every 5 seconds
     pollingRef.current = setInterval(fetchWorkflows, 5000);
-
-    return () => {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-      }
-    };
+    return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
   }, [fetchWorkflows]);
 
   const createNewWorkflow = async () => {
-    if (!currentProject) return;
-
-    const user = auth.getCurrentUser();
-    if (!user) return;
-
+    if (!currentProject || !auth.getCurrentUser()) return;
     try {
-      await workflowsApi.create({
-        projectId: currentProject.id,
-        name: `Workflow ${new Date().toLocaleTimeString()}`,
-        nodes: [],
-        edges: []
-      });
-      // Immediately refresh after creation
+      await workflowsApi.create({ projectId: currentProject.id, name: `Workflow ${new Date().toLocaleTimeString()}`, nodes: [], edges: [] });
       fetchWorkflows();
     } catch (err) {
       console.error('Error creating workflow:', err);
@@ -75,19 +47,9 @@ export default function WorkflowsTab() {
 
   const duplicateWorkflow = async (e: React.MouseEvent, workflow: any) => {
     e.stopPropagation();
-    if (!currentProject) return;
-
-    const user = auth.getCurrentUser();
-    if (!user) return;
-
+    if (!currentProject || !auth.getCurrentUser()) return;
     try {
-      await workflowsApi.create({
-        projectId: currentProject.id,
-        name: `${workflow.name} (Copy)`,
-        nodes: workflow.nodes || [],
-        edges: workflow.edges || []
-      });
-      // Immediately refresh after duplication
+      await workflowsApi.create({ projectId: currentProject.id, name: `${workflow.name} (Copy)`, nodes: workflow.nodes || [], edges: workflow.edges || [] });
       fetchWorkflows();
     } catch (err) {
       console.error('Error duplicating workflow:', err);
@@ -99,12 +61,7 @@ export default function WorkflowsTab() {
     if (!window.confirm('Delete this workflow?')) return;
     try {
       await workflowsApi.delete(id);
-      if (currentWfId === id) {
-        setActiveWorkflowId(null);
-        setNodes([]);
-        setEdges([]);
-      }
-      // Immediately refresh after deletion
+      if (currentWfId === id) { setActiveWorkflowId(null); setNodes([]); setEdges([]); }
       fetchWorkflows();
     } catch (err) {
       console.error('Error deleting workflow:', err);
@@ -113,16 +70,12 @@ export default function WorkflowsTab() {
 
   const loadWorkflow = (wf: any) => {
     const validated = validateWorkflow(wf);
-    if (!validated) {
-      console.error('[WorkflowsTab] Cannot load invalid workflow');
-      return;
-    }
+    if (!validated) return;
     setNodes(validated.nodes as unknown as Node[]);
     setEdges(validated.edges as unknown as Edge[]);
     setActiveWorkflowId(validated.id || null);
   };
 
-  // Helper to format date from ISO string or Date
   const formatDate = (dateValue: string | Date | undefined): string => {
     if (!dateValue) return 'Just now';
     try {
@@ -136,80 +89,77 @@ export default function WorkflowsTab() {
   return (
     <motion.div
       key="workflows"
-      initial={{ opacity: 0, x: -10 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -10 }}
-      className="flex-1 flex flex-col overflow-hidden"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
+      className="flex flex-1 flex-col overflow-hidden"
     >
-      <div className="p-4">
+      <div className="p-3">
         <button
           onClick={createNewWorkflow}
-          className="w-full py-4 bg-[#0097A7]/10 hover:bg-[#0097A7]/20 text-[#0097A7] rounded-2xl flex items-center justify-center gap-3 transition-all border border-[#0097A7]/20 group"
+          className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#0097A7]/10 text-[13px] font-medium text-[#0097A7] ring-1 ring-[#0097A7]/20 transition-[transform,background-color] duration-150 hover:bg-[#0097A7]/15 active:scale-[0.98]"
         >
-          <Plus className="w-4 h-4 group-hover:rotate-90 transition-transform" />
-          <span className="text-[10px] font-black uppercase tracking-widest">New Workflow</span>
+          <Plus className="h-4 w-4" />
+          New workflow
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-3 custom-scrollbar">
+      <div className="custom-scrollbar flex-1 space-y-2 overflow-y-auto px-3 pb-4">
         {isLoading ? (
           Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="bg-[#111111] border border-white/5 rounded-2xl p-4">
-              <div className="flex items-center gap-4">
-                <Skeleton className="w-12 h-12 rounded-xl" />
+            <div key={i} className="rounded-xl bg-white/[0.03] p-3 ring-1 ring-white/10">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-11 w-11 rounded-lg" />
                 <div className="flex-1 space-y-2">
-                  <Skeleton className="h-4 w-2/3" />
+                  <Skeleton className="h-3.5 w-2/3" />
                   <Skeleton className="h-3 w-1/2" />
                 </div>
               </div>
             </div>
           ))
         ) : workflows.length === 0 ? (
-          <div className="py-20 text-center space-y-4">
-            <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center mx-auto">
-              <Layout className="w-6 h-6 text-gray-700" />
+          <div className="space-y-3 py-16 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-white/[0.04] ring-1 ring-white/10">
+              <Layout className="h-5 w-5 text-gray-600" />
             </div>
-            <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">No workflows yet</p>
+            <p className="text-xs text-gray-500">No workflows yet</p>
           </div>
         ) : (
-          workflows.map(wf => (
+          workflows.map((wf) => (
             <div
               key={wf.id}
               onClick={() => loadWorkflow(wf)}
-              className={`group relative bg-[#111111] border border-white/5 hover:border-[#0097A7]/30 rounded-2xl p-4 cursor-pointer transition-all ${currentWfId === wf.id ? 'border-[#0097A7]/50 bg-[#0097A7]/5' : ''}`}
+              className={`group relative cursor-pointer rounded-xl bg-white/[0.03] p-3 ring-1 transition-[background-color,box-shadow] duration-150 ${
+                currentWfId === wf.id ? 'bg-[#0097A7]/[0.06] ring-[#0097A7]/50' : 'ring-white/10 hover:ring-[#0097A7]/30'
+              }`}
             >
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-black rounded-xl border border-white/5 flex items-center justify-center overflow-hidden">
-                  {wf.thumbnailUrl ? (
-                    <img src={wf.thumbnailUrl} className="w-full h-full object-cover" />
-                  ) : (
-                    <Layout className="w-5 h-5 text-gray-800" />
-                  )}
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-lg bg-black/40 ring-1 ring-inset ring-white/10">
+                  {wf.thumbnailUrl ? <img src={wf.thumbnailUrl} className="h-full w-full object-cover" /> : <Layout className="h-5 w-5 text-gray-700" />}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <h4 className="text-[11px] font-black text-white uppercase truncate group-hover:text-[#0097A7] transition-colors">{wf.name}</h4>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Clock className="w-3 h-3 text-gray-600" />
-                    <span className="text-[9px] font-bold text-gray-600 uppercase tracking-tighter">
-                      {formatDate(wf.created_at || wf.createdAt)}
-                    </span>
+                <div className="min-w-0 flex-1">
+                  <h4 className="truncate text-[13px] font-medium text-white transition-colors group-hover:text-[#0097A7]">{wf.name}</h4>
+                  <div className="mt-0.5 flex items-center gap-1.5 text-gray-500">
+                    <Clock className="h-3 w-3" />
+                    <span className="text-[11px] tabular-nums">{formatDate(wf.created_at || wf.createdAt)}</span>
                   </div>
                 </div>
               </div>
-              <div className="absolute top-2 right-2 flex gap-1">
+              <div className="absolute right-2 top-2 flex gap-0.5">
                 <button
                   onClick={(e) => duplicateWorkflow(e, wf)}
-                  className="p-1.5 opacity-0 group-hover:opacity-100 text-gray-600 hover:text-[#0097A7] transition-all"
-                  title="Duplicate Workflow"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-600 opacity-0 transition-[opacity,color] duration-150 hover:text-[#0097A7] group-hover:opacity-100"
+                  title="Duplicate"
                 >
-                  <Copy className="w-3.5 h-3.5" />
+                  <Copy className="h-3.5 w-3.5" />
                 </button>
                 <button
                   onClick={(e) => deleteWorkflow(e, wf.id)}
-                  className="p-1.5 opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-500 transition-all"
-                  title="Delete Workflow"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-600 opacity-0 transition-[opacity,color] duration-150 hover:text-red-400 group-hover:opacity-100"
+                  title="Delete"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>
             </div>

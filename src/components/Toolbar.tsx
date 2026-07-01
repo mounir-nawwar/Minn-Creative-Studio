@@ -1,28 +1,19 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import * as Dialog from '@radix-ui/react-dialog';
 import { User, workflowsApi } from '../lib/api';
-import {
-  Play,
-  Save,
-  Trash2,
-  X,
-  Clock,
-  Loader2,
-  ChevronDown,
-  Zap,
-  User as UserIcon,
-  LogOut,
-  Pencil
-} from 'lucide-react';
+import { Play, Save, Trash2, X, Clock, Loader2, ChevronDown, Zap, Pencil } from 'lucide-react';
 import ToggleSwitch from './ToggleSwitch';
+import ProfileMenu from './ProfileMenu';
 import { useStore } from '../store/useStore';
 import { useProjectStore } from '../store/useProjectStore';
-import { motion, AnimatePresence } from 'motion/react';
 import { API_BASE } from '../constants';
 import { authHeader } from '../lib/api';
 import { stripUndefined } from '../lib/utils';
 import { validateWorkflow } from '../lib/workflowValidation';
 
 interface ToolbarProps { user: User | null; onLogout: () => void; }
+
 const Toolbar = ({ user, onLogout }: ToolbarProps) => {
   const nodes = useStore((state) => state.nodes);
   const edges = useStore((state) => state.edges);
@@ -30,7 +21,7 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
   const setEdges = useStore((state) => state.setEdges);
   const updateNodeData = useStore((state) => state.updateNodeData);
   const { currentProject, activeWorkflowId, setActiveWorkflowId, uploadEnabled, setUploadEnabled } = useProjectStore();
-  
+
   const [isSaving, setIsSaving] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [workflowName, setWorkflowName] = useState('');
@@ -39,9 +30,7 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
   const [tempName, setTempName] = useState('');
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const profileRef = useRef<HTMLDivElement>(null);
-  
+
   const nodesRef = useRef(nodes);
   const edgesRef = useRef(edges);
   const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
@@ -53,17 +42,6 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
   useEffect(() => { hasUnsavedChangesRef.current = hasUnsavedChanges; }, [hasUnsavedChanges]);
   useEffect(() => { activeWorkflowIdRef.current = activeWorkflowId; }, [activeWorkflowId]);
 
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
-        setShowProfileMenu(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, []);
-
-  // Fetch Workflows with polling
   const fetchWorkflows = useCallback(async () => {
     if (!currentProject || !user) return;
     try {
@@ -76,14 +54,11 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
 
   useEffect(() => {
     fetchWorkflows();
-    const interval = setInterval(fetchWorkflows, 5000); // Poll every 5 seconds
+    const interval = setInterval(fetchWorkflows, 5000);
     return () => clearInterval(interval);
   }, [fetchWorkflows]);
 
-  // Track unsaved changes
-  useEffect(() => {
-    setHasUnsavedChanges(true);
-  }, [nodes, edges]);
+  useEffect(() => { setHasUnsavedChanges(true); }, [nodes, edges]);
 
   // Auto-save every 2 minutes
   useEffect(() => {
@@ -91,20 +66,17 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
       if (hasUnsavedChangesRef.current && activeWorkflowIdRef.current) {
         confirmSaveRef.current?.(true);
       }
-    }, 120000); // 2 minutes
+    }, 120000);
     return () => clearInterval(timer);
   }, []);
 
-  // Keyboard shortcut Cmd+S
+  // Cmd/Ctrl+S
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
         e.preventDefault();
-        if (activeWorkflowIdRef.current) {
-          confirmSaveRef.current?.();
-        } else {
-          setShowSaveModal(true);
-        }
+        if (activeWorkflowIdRef.current) confirmSaveRef.current?.();
+        else setShowSaveModal(true);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -114,7 +86,7 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
   const handleSave = () => {
     if (!user || !currentProject) return;
     if (activeWorkflowId) {
-      const currentWf = workflows.find(w => w.id === activeWorkflowId);
+      const currentWf = workflows.find((w) => w.id === activeWorkflowId);
       setWorkflowName(currentWf?.name || '');
       confirmSave();
     } else {
@@ -126,23 +98,18 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
   const confirmSave = async (isAuto = false) => {
     if (!currentProject || !user) return;
     setIsSaving(true);
-
     try {
       const sanitizedNodes = await Promise.all(nodes.map(async (node) => {
         const data = { ...node.data };
-
-        // Upload base64 outputs to backend at save time
         if (data.output && typeof data.output === 'string' && data.output.startsWith('data:')) {
           try {
             const fetchRes = await fetch(data.output);
             const blob = await fetchRes.blob();
             const ext = blob.type.includes('video') ? 'mp4' : blob.type.includes('audio') ? 'mp3' : 'png';
             const file = new File([blob], `output-${node.id}.${ext}`, { type: blob.type });
-
             const formData = new FormData();
             formData.append('file', file);
             formData.append('projectId', currentProject.id);
-
             const response = await fetch(`${API_BASE}/upload`, { method: 'POST', headers: { ...authHeader() }, body: formData });
             if (response.ok) {
               const { url } = await response.json();
@@ -154,23 +121,13 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
             data.output = null;
           }
         }
-
-        // Reset runtime state only — preserve all user inputs and config
         data.isRunning = false;
         data.error = null;
         data.progress = 0;
-
-        // Only save plain safe fields — spreading { ...node } includes React Flow internal
-        // properties (positionAbsolute, selected, dragging, __rf, etc.) that API may reject
-        return {
-          id: node.id,
-          type: node.type,
-          position: node.position,
-          data: stripUndefined(data),
-        };
+        return { id: node.id, type: node.type, position: node.position, data: stripUndefined(data) };
       }));
 
-      const sanitizedEdges = edges.map(e => ({
+      const sanitizedEdges = edges.map((e) => ({
         id: e.id,
         source: e.source,
         target: e.target,
@@ -183,7 +140,7 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
 
       if (activeWorkflowId) {
         await workflowsApi.update(activeWorkflowId, {
-          name: workflows.find(w => w.id === activeWorkflowId)?.name || `Workflow ${new Date().toLocaleDateString()}`,
+          name: workflows.find((w) => w.id === activeWorkflowId)?.name || `Workflow ${new Date().toLocaleDateString()}`,
           nodes: sanitizedNodes,
           edges: sanitizedEdges,
         });
@@ -207,23 +164,17 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
     }
   };
 
-  // Keep ref in sync so the stale Ctrl+S closure always calls the latest confirmSave
   useEffect(() => { confirmSaveRef.current = confirmSave; });
 
-  const deleteWorkflow = async (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
+  const deleteWorkflow = async (id: string) => {
     if (activeWorkflowId === id) setActiveWorkflowId(null);
     await workflowsApi.delete(id);
+    fetchWorkflows();
   };
 
   const loadWorkflow = (workflow: unknown) => {
-    console.log('[Toolbar] Loading workflow:', workflow);
     const validated = validateWorkflow(workflow);
-    if (!validated) {
-      console.error('[Toolbar] Cannot load invalid workflow');
-      return;
-    }
-    console.log('[Toolbar] Validated workflow:', validated);
+    if (!validated) return;
     setNodes(validated.nodes as unknown as typeof nodes);
     setEdges(validated.edges as unknown as typeof edges);
     setActiveWorkflowId(validated.id || null);
@@ -231,38 +182,19 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
     setHasUnsavedChanges(false);
   };
 
-  const handleUploadToggle = (checked: boolean) => {
-    setUploadEnabled(checked);
-  };
-
   const handleRunAll = () => {
-    const nodesToRun = nodes.filter(n => 
-      ['prompt', 'vision', 'imagen', 'nanoBanana', 'veo', 'imageToVideo', 'lyria'].includes(n.data.type)
+    const nodesToRun = nodes.filter((n) =>
+      ['prompt', 'vision', 'imagen', 'nanoBanana', 'veo', 'imageToVideo', 'lyria'].includes(n.data.type),
     );
-    
-    for (const node of nodesToRun) {
-      updateNodeData(node.id, { triggerRun: Date.now() });
-    }
+    for (const node of nodesToRun) updateNodeData(node.id, { triggerRun: Date.now() });
   };
 
   const handleRename = async () => {
-    if (!activeWorkflowId || !tempName.trim()) {
-      setIsEditingName(false);
-      return;
-    }
-
-    const currentWf = workflows.find(w => w.id === activeWorkflowId);
-    if (currentWf && currentWf.name === tempName.trim()) {
-      setIsEditingName(false);
-      return;
-    }
-
+    if (!activeWorkflowId || !tempName.trim()) { setIsEditingName(false); return; }
+    const currentWf = workflows.find((w) => w.id === activeWorkflowId);
+    if (currentWf && currentWf.name === tempName.trim()) { setIsEditingName(false); return; }
     try {
-      await workflowsApi.update(activeWorkflowId, {
-        name: tempName.trim(),
-        nodes: currentWf?.nodes || [],
-        edges: currentWf?.edges || [],
-      });
+      await workflowsApi.update(activeWorkflowId, { name: tempName.trim(), nodes: currentWf?.nodes || [], edges: currentWf?.edges || [] });
       setIsEditingName(false);
     } catch (err) {
       console.error('Rename failed:', err);
@@ -270,14 +202,17 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
     }
   };
 
+  const activeName = activeWorkflowId ? workflows.find((w) => w.id === activeWorkflowId)?.name : 'Untitled workflow';
+
   return (
-    <div className="h-16 bg-[#0a0a0a] border-b border-[#1a1a1a] flex items-center justify-between px-6 z-10">
-      <div className="flex items-center gap-6">
+    <div className="z-10 flex h-16 items-center justify-between border-b border-white/5 bg-[#0a0a0a] px-6">
+      {/* Left */}
+      <div className="flex items-center gap-5">
         <div className="flex items-center gap-3">
-          <div className="w-5 h-5 bg-[#0097A7] rounded-md flex items-center justify-center shadow-[0_0_15px_rgba(0,151,167,0.4)]">
-            <Zap className="w-3 h-3 text-white" />
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#0097A7]">
+            <Zap className="h-3.5 w-3.5 text-white" />
           </div>
-          <div>
+          <div className="min-w-0">
             {isEditingName && activeWorkflowId ? (
               <input
                 value={tempName}
@@ -287,213 +222,163 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
                   if (e.key === 'Enter') handleRename();
                   if (e.key === 'Escape') setIsEditingName(false);
                 }}
-                className="bg-transparent border-b border-[#0097A7] text-xs font-black text-white uppercase tracking-widest focus:outline-none mb-1"
+                className="mb-0.5 border-b border-[#0097A7] bg-transparent text-sm font-medium text-white focus:outline-none"
                 autoFocus
               />
             ) : (
-              <h2 
-                className={`text-xs font-black text-white uppercase tracking-widest flex items-center gap-2 group ${activeWorkflowId ? 'cursor-pointer hover:text-[#0097A7] transition-colors' : ''}`}
+              <button
+                type="button"
+                className={`group flex items-center gap-1.5 text-sm font-medium text-white ${activeWorkflowId ? 'transition-colors hover:text-[#0097A7]' : 'cursor-default'}`}
                 onClick={() => {
                   if (activeWorkflowId) {
-                    const currentWf = workflows.find(w => w.id === activeWorkflowId);
-                    setTempName(currentWf?.name || '');
+                    setTempName(workflows.find((w) => w.id === activeWorkflowId)?.name || '');
                     setIsEditingName(true);
                   }
                 }}
               >
-                {activeWorkflowId ? workflows.find(w => w.id === activeWorkflowId)?.name : 'Untitled Workflow'}
-                {activeWorkflowId && <Pencil className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100 transition-opacity text-[#0097A7]" />}
-              </h2>
+                <span className="truncate">{activeName}</span>
+                {activeWorkflowId && <Pencil className="h-3 w-3 text-[#0097A7] opacity-0 transition-opacity group-hover:opacity-100" />}
+              </button>
             )}
-            <div className="flex items-center gap-2">
-              <span className="text-[8px] text-gray-500 font-bold uppercase tracking-tighter">
-                {currentProject?.name}
-              </span>
+            <div className="flex items-center gap-2 text-xs text-gray-500">
+              <span className="truncate">{currentProject?.name}</span>
               {lastSaved && (
-                <span className="text-[8px] text-[#0097A7] font-bold uppercase tracking-tighter flex items-center gap-1">
-                  <Clock className="w-2 h-2" />
-                  Saved {lastSaved.toLocaleTimeString()}
+                <span className="flex items-center gap-1 text-[#0097A7]">
+                  <Clock className="h-2.5 w-2.5" />
+                  <span className="tabular-nums">Saved {lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                 </span>
               )}
             </div>
           </div>
         </div>
 
-        <div className="h-8 w-px bg-white/5" />
+        <div className="h-7 w-px bg-white/10" />
 
         <div className="flex items-center gap-2">
-          <div className="relative group">
-            <button className="flex items-center gap-2 px-3 py-2 bg-[#111111] border border-[#1a1a1a] rounded-xl text-[10px] font-black text-gray-400 hover:text-white hover:border-[#0097A7]/50 transition-all">
-              Workflows
-              <ChevronDown className="w-3 h-3" />
-            </button>
-            <div className="absolute top-full left-0 pt-2 w-64 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-              <div className="bg-[#111111] border border-[#1a1a1a] rounded-2xl shadow-2xl p-2">
-                <div className="max-h-64 overflow-y-auto custom-scrollbar space-y-1">
-                  {workflows.map(w => (
-                    <div 
+          {/* Workflows dropdown */}
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger asChild>
+              <button className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-white/[0.04] px-3 text-[13px] font-medium text-gray-300 ring-1 ring-white/10 transition-[transform,color,box-shadow] duration-150 hover:text-white hover:ring-white/20 active:scale-[0.96] data-[state=open]:ring-[#0097A7]/40 focus:outline-none">
+                Workflows
+                <ChevronDown className="h-3.5 w-3.5 transition-transform duration-200 data-[state=open]:rotate-180" />
+              </button>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content
+                align="start"
+                sideOffset={8}
+                className="z-[200] max-h-72 w-64 overflow-y-auto rounded-xl bg-[#0d0d0d] p-1.5 ring-1 ring-white/10 shadow-[0_16px_40px_rgba(0,0,0,0.7)] focus:outline-none data-[state=open]:[animation:menuIn_140ms_cubic-bezier(0.2,0,0,1)]"
+              >
+                {workflows.length === 0 ? (
+                  <p className="px-3 py-6 text-center text-xs text-gray-600">No saved workflows</p>
+                ) : (
+                  workflows.map((w) => (
+                    <DropdownMenu.Item
                       key={w.id}
-                      onClick={() => loadWorkflow(w)}
-                      className={`flex items-center justify-between p-2 rounded-xl cursor-pointer transition-all ${activeWorkflowId === w.id ? 'bg-[#0097A7]/20 text-[#0097A7]' : 'hover:bg-white/5 text-gray-500 hover:text-gray-300'}`}
+                      onSelect={() => loadWorkflow(w)}
+                      className={`group flex h-9 cursor-pointer select-none items-center justify-between gap-2 rounded-lg px-2.5 text-[13px] outline-none transition-colors duration-100 data-[highlighted]:bg-white/5 ${
+                        activeWorkflowId === w.id ? 'text-[#0097A7]' : 'text-gray-300 data-[highlighted]:text-white'
+                      }`}
                     >
-                      <div className="flex items-center gap-2 truncate">
-                        <Save className="w-3 h-3 flex-shrink-0" />
-                        <span className="text-[10px] font-bold truncate">{w.name}</span>
-                      </div>
-                      <button 
-                        onClick={(e) => deleteWorkflow(e, w.id)}
-                        className="p-1 hover:text-red-500 transition-colors"
+                      <span className="flex min-w-0 items-center gap-2">
+                        <Save className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{w.name}</span>
+                      </span>
+                      <button
+                        aria-label="Delete workflow"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteWorkflow(w.id); }}
+                        className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-600 opacity-0 transition-[opacity,color] duration-150 hover:text-red-400 group-data-[highlighted]:opacity-100"
                       >
-                        <Trash2 className="w-3 h-3" />
+                        <Trash2 className="h-3.5 w-3.5" />
                       </button>
-                    </div>
-                  ))}
-                  {workflows.length === 0 && (
-                    <p className="text-[9px] text-gray-600 text-center py-4 uppercase font-bold tracking-widest">No saved workflows</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+                    </DropdownMenu.Item>
+                  ))
+                )}
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
 
-          <button 
+          <button
             onClick={handleSave}
             disabled={isSaving}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${hasUnsavedChanges ? 'bg-[#0097A7] text-white shadow-[0_0_15px_rgba(0,151,167,0.3)]' : 'bg-[#111111] border border-[#1a1a1a] text-gray-500'}`}
+            className={`inline-flex h-9 items-center gap-2 rounded-lg px-3.5 text-[13px] font-medium transition-[transform,background-color,box-shadow] duration-150 active:scale-[0.96] ${
+              hasUnsavedChanges
+                ? 'bg-[#0097A7] text-white hover:bg-[#00a9bb]'
+                : 'bg-white/[0.04] text-gray-400 ring-1 ring-white/10'
+            }`}
           >
-            {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
-            {activeWorkflowId ? 'Save' : 'Save Workflow'}
+            {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+            {activeWorkflowId ? 'Save' : 'Save workflow'}
           </button>
         </div>
       </div>
 
+      {/* Right */}
       <div className="flex items-center gap-3">
-        {/* Global Upload Toggle */}
         <div className="flex items-center gap-2">
-          <span className="text-[9px] font-black uppercase tracking-widest text-gray-500">Upload</span>
-          <ToggleSwitch checked={uploadEnabled} onChange={handleUploadToggle} size="navbar" />
+          <span className="text-xs font-medium text-gray-500">Upload</span>
+          <ToggleSwitch checked={uploadEnabled} onChange={setUploadEnabled} size="navbar" />
         </div>
 
         <button
           onClick={handleRunAll}
-          className="flex items-center gap-2 px-6 py-2 bg-[#0097A7] hover:bg-[#00838F] text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-[0_0_20px_rgba(0,151,167,0.3)] hover:scale-105"
+          className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#0097A7] px-4 text-[13px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_6px_16px_-6px_rgba(0,151,167,0.7)] transition-[transform,background-color] duration-150 hover:bg-[#00a9bb] active:scale-[0.96]"
         >
-          <Play className="w-3.5 h-3.5 fill-current" />
-          Run Project
+          <Play className="h-3.5 w-3.5 fill-current" />
+          Run project
         </button>
 
-        <div ref={profileRef} className="relative">
-          <button
-            onClick={() => setShowProfileMenu((prev) => !prev)}
-            className="w-9 h-9 rounded-full overflow-hidden border-2 border-[#0097A7]/40 hover:border-[#0097A7] transition-all focus:outline-none flex-shrink-0"
-          >
-            {user?.photoUrl ? (
-              <img src={user.photoUrl} alt={user.displayName || ''} className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full bg-[#111111] flex items-center justify-center">
-                <UserIcon className="w-4 h-4 text-gray-400" />
-              </div>
-            )}
-          </button>
-
-          <AnimatePresence>
-            {showProfileMenu && (
-              <motion.div
-                initial={{ opacity: 0, y: -8, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -8, scale: 0.96 }}
-                transition={{ duration: 0.15 }}
-                className="absolute top-full right-0 mt-2 w-56 bg-[#111111] border border-white/10 rounded-2xl shadow-2xl z-[200] overflow-hidden"
-              >
-                <div className="px-4 py-3 border-b border-white/5 flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full overflow-hidden border border-[#0097A7]/30 flex-shrink-0">
-                    {user?.photoUrl ? (
-                      <img src={user.photoUrl} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full bg-[#1a1a1a] flex items-center justify-center">
-                        <UserIcon className="w-3.5 h-3.5 text-gray-500" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-black text-white truncate">{user?.displayName}</p>
-                    <p className="text-[9px] text-gray-500 truncate">{user?.email}</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => { setShowProfileMenu(false); onLogout(); }}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-[10px] font-black text-gray-400 hover:text-red-400 hover:bg-red-500/5 transition-all uppercase tracking-widest"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                  Sign Out
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+        <ProfileMenu user={user} onLogout={onLogout} variant="avatar" />
       </div>
 
-      {/* Save Workflow Modal */}
-      <AnimatePresence>
-        {showSaveModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-8">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowSaveModal(false)}
-              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-md bg-[#111111] border border-white/10 rounded-3xl shadow-2xl overflow-hidden"
-            >
-              <div className="p-6 border-b border-white/5 flex items-center justify-between bg-[#1a1a1a]">
-                <div className="flex items-center gap-3">
-                  <Save className="w-5 h-5 text-[#0097A7]" />
-                  <h3 className="text-sm font-black text-white uppercase tracking-widest">Save Workflow</h3>
-                </div>
-                <button 
-                  onClick={() => setShowSaveModal(false)}
-                  className="p-2 hover:bg-white/5 rounded-full text-gray-500 hover:text-white transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+      {/* Save workflow modal */}
+      <Dialog.Root open={showSaveModal} onOpenChange={setShowSaveModal}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm data-[state=open]:[animation:overlayIn_160ms_ease-out]" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-[100] w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-[#0b0b0b] ring-1 ring-white/10 shadow-[0_24px_80px_rgba(0,0,0,0.7)] focus:outline-none data-[state=open]:[animation:dialogIn_180ms_ease-out]">
+            <div className="flex items-center justify-between border-b border-white/5 px-5 py-4">
+              <div className="flex items-center gap-2.5">
+                <Save className="h-4 w-4 text-[#0097A7]" />
+                <Dialog.Title className="text-base font-semibold text-white">Save workflow</Dialog.Title>
               </div>
-              <div className="p-6 space-y-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] text-gray-500 uppercase font-bold">Workflow Name</label>
-                  <input 
-                    type="text"
-                    value={workflowName}
-                    onChange={(e) => setWorkflowName(e.target.value)}
-                    placeholder="Enter workflow name..."
-                    className="w-full bg-black border border-white/10 rounded-xl py-3 px-4 text-sm text-white focus:outline-none focus:border-[#0097A7] transition-all"
-                    autoFocus
-                  />
-                </div>
-                <div className="flex gap-3 pt-4">
-                  <button 
-                    onClick={() => setShowSaveModal(false)}
-                    className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-                  >
+              <Dialog.Close asChild>
+                <button aria-label="Close" className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition-[transform,color,background-color] duration-150 hover:bg-white/5 hover:text-white active:scale-[0.96]">
+                  <X className="h-5 w-5" />
+                </button>
+              </Dialog.Close>
+            </div>
+            <div className="space-y-4 p-5">
+              <label className="block space-y-2">
+                <span className="text-[11px] font-medium uppercase tracking-wide text-gray-400">Workflow name</span>
+                <input
+                  type="text"
+                  value={workflowName}
+                  onChange={(e) => setWorkflowName(e.target.value)}
+                  placeholder="Enter a name…"
+                  className="w-full rounded-xl bg-white/[0.04] px-3.5 py-2.5 text-sm text-white placeholder:text-gray-600 ring-1 ring-white/10 transition-shadow duration-150 focus:outline-none focus:ring-[1.5px] focus:ring-[#0097A7]/60"
+                  autoFocus
+                  onKeyDown={(e) => { if (e.key === 'Enter' && workflowName.trim()) confirmSave(); }}
+                />
+              </label>
+              <div className="flex justify-end gap-2">
+                <Dialog.Close asChild>
+                  <button className="inline-flex h-9 items-center rounded-lg px-3.5 text-sm font-medium text-gray-300 ring-1 ring-white/10 transition-[transform,color,background-color] duration-150 hover:bg-white/5 hover:text-white active:scale-[0.96]">
                     Cancel
                   </button>
-                  <button 
-                    onClick={() => confirmSave()}
-                    disabled={!workflowName.trim() || isSaving}
-                    className="flex-1 py-3 bg-[#0097A7] hover:bg-[#00838F] text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-[0_0_15px_rgba(0,151,167,0.2)] disabled:opacity-50"
-                  >
-                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Save Workflow'}
-                  </button>
-                </div>
+                </Dialog.Close>
+                <button
+                  onClick={() => confirmSave()}
+                  disabled={!workflowName.trim() || isSaving}
+                  className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#0097A7] px-4 text-sm font-medium text-white transition-[transform,background-color] duration-150 hover:bg-[#00a9bb] active:scale-[0.96] disabled:opacity-50"
+                >
+                  {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save workflow'}
+                </button>
               </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
   );
 };

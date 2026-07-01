@@ -1,181 +1,135 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useProjectStore } from '../store/useProjectStore';
 import { PROJECT_TYPES } from '../types/project.types';
-import { Settings, ArrowLeftRight, Briefcase, Calendar, ChevronRight, PanelLeftOpen, DollarSign, Coins } from 'lucide-react';
+import { Settings, ArrowLeftRight, Briefcase, ChevronRight, PanelLeftOpen, DollarSign, Coins } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function ProjectContextBar() {
   const { currentProject, clearProject, openSettings, isSidebarOpen, toggleSidebar } = useProjectStore();
   const [showCostBreakdown, setShowCostBreakdown] = useState(false);
-  
+
   if (!currentProject) return null;
 
   const projectType = PROJECT_TYPES[currentProject.type as keyof typeof PROJECT_TYPES] || PROJECT_TYPES.personal;
-  const usage = currentProject.usage || { 
-    totalCost: 0, 
-    textCost: 0, 
-    imageCost: 0, 
-    videoCost: 0, 
-    audioCost: 0,
-    totalTokens: 0,
-    totalImages: 0,
-    totalVideos: 0,
-    totalAudio: 0
+  const usage = currentProject.usage || {
+    totalCost: 0, textCost: 0, imageCost: 0, videoCost: 0, audioCost: 0,
+    totalTokens: 0, totalImages: 0, totalVideos: 0, totalAudio: 0,
   };
 
+  const costRow = (label: string, value: number) => (
+    <div className="flex items-center justify-between">
+      <span className="text-xs text-gray-400">{label}</span>
+      <span className="text-xs tabular-nums text-white">${(value || 0).toFixed(4)}</span>
+    </div>
+  );
+
   return (
-    <div className="h-12 bg-black border-b border-white/5 flex items-center justify-between px-6 relative z-50">
-      <div className="flex items-center gap-6">
-        <AnimatePresence>
+    <div className="relative z-50 flex h-12 items-center justify-between border-b border-white/5 bg-black px-5">
+      <div className="flex items-center gap-4">
+        <AnimatePresence initial={false}>
           {!isSidebarOpen && (
             <motion.button
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
+              initial={{ opacity: 0, width: 0 }}
+              animate={{ opacity: 1, width: 'auto' }}
+              exit={{ opacity: 0, width: 0 }}
+              transition={{ duration: 0.15 }}
               onClick={toggleSidebar}
-              className="p-2 -ml-2 text-gray-400 hover:text-[#0097A7] transition-colors rounded-lg hover:bg-white/5"
-              title="Open Sidebar"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-[transform,color,background-color] duration-150 hover:bg-white/5 hover:text-[#0097A7] active:scale-[0.96]"
+              title="Open sidebar"
             >
-              <PanelLeftOpen className="w-4 h-4" />
+              <PanelLeftOpen className="h-4 w-4" />
             </motion.button>
           )}
         </AnimatePresence>
 
-        {/* Project Info */}
+        {/* Project */}
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-[#111111] border border-white/5 rounded-lg flex items-center justify-center text-lg grayscale group-hover:grayscale-0 transition-all">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.04] text-base ring-1 ring-white/10">
             {projectType.icon}
           </div>
           <div className="flex flex-col">
             <div className="flex items-center gap-2">
-              <h2 className="text-[11px] font-black text-white uppercase tracking-tight">{currentProject.name}</h2>
-              <span className="px-2 py-0.5 bg-[#0097A7]/20 text-[#0097A7] rounded-full text-[8px] font-black uppercase tracking-widest">
+              <h2 className="text-sm font-medium text-white">{currentProject.name}</h2>
+              <span className="rounded-full bg-[#0097A7]/15 px-2 py-0.5 text-[10px] font-medium capitalize text-[#0097A7]">
                 {currentProject.status}
               </span>
             </div>
-            <div className="flex items-center gap-2 text-[9px] font-bold text-gray-500 uppercase tracking-widest">
+            <div className="flex items-center gap-1.5 text-xs text-gray-500">
               <span>{projectType.label}</span>
-              <ChevronRight className="w-2.5 h-2.5" />
+              <ChevronRight className="h-3 w-3" />
               <span>{currentProject.subtype}</span>
             </div>
           </div>
         </div>
 
-        <div className="h-6 w-px bg-white/5" />
+        <div className="h-6 w-px bg-white/10" />
 
-        {/* Client & Metadata */}
-        <div className="flex items-center gap-6">
-          {currentProject.clientName && (
-            <div className="flex items-center gap-2">
-              <Briefcase className="w-3 h-3 text-gray-600" />
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{currentProject.clientName}</span>
-            </div>
-          )}
-          {currentProject.deadline && (
-            <div className="flex items-center gap-2">
-              <Calendar className="w-3 h-3 text-gray-600" />
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                {typeof (currentProject.deadline as any).toDate === 'function' 
-                  ? (currentProject.deadline as any).toDate().toLocaleDateString() 
-                  : new Date(currentProject.deadline as any).toLocaleDateString()}
-              </span>
-            </div>
-          )}
-        </div>
+        {currentProject.clientName && (
+          <div className="flex items-center gap-2 text-xs text-gray-400">
+            <Briefcase className="h-3.5 w-3.5 text-gray-600" />
+            <span>{currentProject.clientName}</span>
+            {currentProject.clientIndustry && <span className="text-gray-600">· {currentProject.clientIndustry}</span>}
+          </div>
+        )}
 
-        <div className="h-6 w-px bg-white/5" />
-
-        {/* Color Palette */}
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full border border-white/10" style={{ backgroundColor: currentProject.primaryColor }} />
-          <div className="w-3 h-3 rounded-full border border-white/10" style={{ backgroundColor: currentProject.secondaryColor }} />
-          <div className="w-3 h-3 rounded-full border border-white/10" style={{ backgroundColor: currentProject.accentColor }} />
+        <div className="flex items-center gap-1.5">
+          {[currentProject.primaryColor, currentProject.secondaryColor, currentProject.accentColor].map((c, i) => (
+            <span key={i} className="h-3.5 w-3.5 rounded-full ring-1 ring-inset ring-white/10" style={{ backgroundColor: c }} />
+          ))}
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        {/* Cost Display */}
-        <div 
-          className="relative"
-          onMouseEnter={() => setShowCostBreakdown(true)}
-          onMouseLeave={() => setShowCostBreakdown(false)}
-        >
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#111111] border border-white/5 rounded-lg cursor-pointer hover:border-[#0097A7]/30 transition-colors">
-            <DollarSign className="w-3 h-3 text-[#0097A7]" />
-            <span className="text-[11px] font-mono font-bold text-[#0097A7]">
-              {usage.totalCost.toFixed(4)}
-            </span>
+      <div className="flex items-center gap-2">
+        {/* Cost */}
+        <div className="relative" onMouseEnter={() => setShowCostBreakdown(true)} onMouseLeave={() => setShowCostBreakdown(false)}>
+          <div className="flex cursor-default items-center gap-1.5 rounded-lg bg-white/[0.04] px-3 py-1.5 ring-1 ring-white/10 transition-shadow duration-150 hover:ring-[#0097A7]/30">
+            <DollarSign className="h-3.5 w-3.5 text-[#0097A7]" />
+            <span className="text-[13px] font-medium tabular-nums text-[#0097A7]">{usage.totalCost.toFixed(4)}</span>
           </div>
 
-          {/* Hover Breakdown */}
           <AnimatePresence>
             {showCostBreakdown && (
               <motion.div
-                initial={{ opacity: 0, y: 5 }}
+                initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 5 }}
-                transition={{ duration: 0.15 }}
-                className="absolute top-full right-0 mt-2 w-56 p-3 bg-[#111111] border border-white/10 rounded-xl shadow-2xl"
+                exit={{ opacity: 0, y: 4 }}
+                transition={{ duration: 0.15, ease: [0.2, 0, 0, 1] }}
+                className="absolute right-0 top-full z-50 mt-2 w-60 rounded-xl bg-[#0d0d0d] p-3 ring-1 ring-white/10 shadow-[0_16px_40px_rgba(0,0,0,0.7)]"
               >
-                <div className="text-[9px] text-gray-500 uppercase font-bold tracking-widest mb-3">Cost Breakdown</div>
-                
+                <p className="mb-3 text-[10px] font-medium uppercase tracking-wide text-gray-500">Cost breakdown</p>
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-gray-400">Text / Chat</span>
-                    <span className="text-[11px] font-mono text-white">${(usage.textCost || 0).toFixed(4)}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-gray-400">Images ({usage.totalImages || 0})</span>
-                    <span className="text-[11px] font-mono text-white">${(usage.imageCost || 0).toFixed(4)}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-gray-400">Videos ({usage.totalVideos || 0})</span>
-                    <span className="text-[11px] font-mono text-white">${(usage.videoCost || 0).toFixed(4)}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-gray-400">Audio ({usage.totalAudio || 0})</span>
-                    <span className="text-[11px] font-mono text-white">${(usage.audioCost || 0).toFixed(4)}</span>
-                  </div>
+                  {costRow('Text / chat', usage.textCost)}
+                  {costRow(`Images (${usage.totalImages || 0})`, usage.imageCost)}
+                  {costRow(`Videos (${usage.totalVideos || 0})`, usage.videoCost)}
+                  {costRow(`Audio (${usage.totalAudio || 0})`, usage.audioCost)}
                 </div>
-
-                <div className="border-t border-white/10 mt-3 pt-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-[#0097A7]">Total</span>
-                    <span className="text-[12px] font-mono font-bold text-[#0097A7]">${usage.totalCost.toFixed(4)}</span>
-                  </div>
-                  {usage.totalTokens > 0 && (
-                    <div className="flex items-center justify-between mt-1">
-                      <span className="text-[9px] text-gray-500">Tokens Processed</span>
-                      <span className="text-[9px] font-mono text-gray-500">{(usage.totalTokens || 0).toLocaleString()}</span>
-                    </div>
-                  )}
+                <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-3">
+                  <span className="text-xs font-medium text-[#0097A7]">Total</span>
+                  <span className="text-sm font-semibold tabular-nums text-[#0097A7]">${usage.totalCost.toFixed(4)}</span>
                 </div>
-
-                <div className="mt-3 pt-2 border-t border-white/5">
-                  <div className="flex items-center gap-1.5 text-[9px] text-gray-600">
-                    <Coins className="w-2.5 h-2.5" />
-                    <span>Costs are cumulative and never decrease</span>
-                  </div>
+                <div className="mt-2 flex items-center gap-1.5 border-t border-white/5 pt-2 text-[10px] text-gray-600">
+                  <Coins className="h-2.5 w-2.5" />
+                  <span>Cumulative — never decreases</span>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
 
-        <button 
+        <button
           onClick={() => openSettings('edit')}
-          className="flex items-center gap-2 px-4 py-1.5 bg-[#111111] hover:bg-white/5 border border-white/5 rounded-full text-[9px] font-black text-gray-400 hover:text-white uppercase tracking-widest transition-all"
+          className="inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-medium text-gray-400 ring-1 ring-white/10 transition-[transform,color,background-color,box-shadow] duration-150 hover:bg-white/5 hover:text-white hover:ring-white/20 active:scale-[0.96]"
         >
-          <Settings className="w-3 h-3" />
-          Project Settings
+          <Settings className="h-3.5 w-3.5" />
+          Settings
         </button>
-        
-        <button 
+
+        <button
           onClick={clearProject}
-          className="flex items-center gap-2 px-4 py-1.5 bg-[#0097A7]/10 hover:bg-[#0097A7]/20 border border-[#0097A7]/20 rounded-full text-[9px] font-black text-[#0097A7] uppercase tracking-widest transition-all"
+          className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#0097A7]/10 px-3 text-xs font-medium text-[#0097A7] ring-1 ring-[#0097A7]/20 transition-[transform,background-color] duration-150 hover:bg-[#0097A7]/15 active:scale-[0.96]"
         >
-          <ArrowLeftRight className="w-3 h-3" />
-          Switch Project
+          <ArrowLeftRight className="h-3.5 w-3.5" />
+          Switch project
         </button>
       </div>
     </div>
