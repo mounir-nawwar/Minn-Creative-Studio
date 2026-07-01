@@ -64,6 +64,30 @@ body {
   }
 }
 
+/* Radix popovers/menus — calm fade, no bounce, no scale */
+@keyframes menuIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes menuOut {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(-4px); }
+}
+
+/* Radix Dialog — calm fade, gentle rise, no scale pop */
+@keyframes overlayIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Opacity only — the centering transform stays static so the modal never
+   flashes at the top-left before settling. */
+@keyframes dialogIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
 .react-flow__attribution {
   display: none !important;
 }

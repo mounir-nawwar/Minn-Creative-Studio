@@ -1,6 +1,5 @@
-import React from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { AlertTriangle, Trash2, Archive } from 'lucide-react';
+import * as AlertDialog from '@radix-ui/react-alert-dialog';
+import { Archive, Trash2 } from 'lucide-react';
 import { Project } from '../types/project.types';
 
 interface DeleteProjectModalProps {
@@ -16,81 +15,49 @@ export default function DeleteProjectModal({
   isOpen,
   onClose,
   onConfirm,
-  retentionDays
+  retentionDays,
 }: DeleteProjectModalProps) {
-  if (!project) return null;
-
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 bg-black/70 backdrop-blur-2xl z-50"
-          />
-          
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-md mx-4"
-          >
-            <div className="bg-[#111111] border border-white/10 rounded-2xl p-8 shadow-2xl space-y-6">
-              <div className="flex justify-center">
-                <div className="w-16 h-16 rounded-full bg-[#0097A7]/10 border border-[#0097A7]/30 flex items-center justify-center">
-                  <Archive className="w-8 h-8 text-[#0097A7]" />
-                </div>
-              </div>
-              
-              <div className="text-center space-y-3">
-                <h2 className="text-xl font-black text-white uppercase tracking-wider">
-                  Move to Recycle Bin?
-                </h2>
-                
-                <div className="bg-black/40 border border-white/5 rounded-xl p-4">
-                  <h3 className="text-sm font-black text-white mb-1 truncate">
-                    {project.name}
-                  </h3>
-                  {project.clientName && (
-                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">
-                      {project.clientName}
-                    </p>
-                  )}
-                </div>
-                
-                <div className="bg-[#0097A7]/5 border border-[#0097A7]/20 rounded-lg p-3">
-                  <p className="text-[11px] font-bold text-gray-300 leading-relaxed">
-                    Projects in the Recycle Bin are kept for{' '}
-                    <span className="text-[#0097A7]">{retentionDays} days</span> and can be restored.
-                  </p>
-                </div>
-              </div>
-              
-              <div className="flex gap-3">
-                <button
-                  onClick={onClose}
-                  className="flex-1 py-3 bg-[#1a1a1a] border border-white/10 text-gray-400 hover:text-white rounded-xl text-[11px] font-black uppercase tracking-widest hover:border-white/20 transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    onConfirm();
-                    onClose();
-                  }}
-                  className="flex-1 py-3 bg-[#0097A7] hover:bg-[#00838F] text-white rounded-xl text-[11px] font-black uppercase tracking-widest shadow-[0_0_20px_rgba(0,151,167,0.2)] hover:shadow-[0_0_25px_rgba(0,151,167,0.4)] transition-all flex items-center justify-center gap-2"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Move to Bin
-                </button>
-              </div>
+    <AlertDialog.Root open={isOpen && !!project} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <AlertDialog.Portal>
+        <AlertDialog.Overlay className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm data-[state=open]:[animation:overlayIn_160ms_ease-out]" />
+        <AlertDialog.Content className="fixed left-1/2 top-1/2 z-[100] w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-[#0b0b0b] p-6 ring-1 ring-white/10 shadow-[0_24px_80px_rgba(0,0,0,0.7)] focus:outline-none data-[state=open]:[animation:dialogIn_180ms_ease-out]">
+          <div className="flex items-start gap-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#0097A7]/12 ring-1 ring-inset ring-[#0097A7]/25">
+              <Archive className="h-5 w-5 text-[#0097A7]" />
             </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+            <div className="min-w-0 flex-1">
+              <AlertDialog.Title className="text-base font-semibold text-white">Move to recycle bin?</AlertDialog.Title>
+              <AlertDialog.Description className="mt-1 text-sm leading-relaxed text-gray-400">
+                <span className="font-medium text-gray-200">{project?.name}</span>
+                {project?.clientName ? ` · ${project.clientName}` : ''} will be kept for{' '}
+                <span className="tabular-nums text-[#0097A7]">{retentionDays} days</span> and can be restored anytime.
+              </AlertDialog.Description>
+            </div>
+          </div>
+
+          <div className="mt-6 flex justify-end gap-2">
+            <AlertDialog.Cancel asChild>
+              <button
+                type="button"
+                className="inline-flex h-9 items-center rounded-lg px-3.5 text-sm font-medium text-gray-300 ring-1 ring-white/10 transition-[transform,color,background-color,box-shadow] duration-150 hover:bg-white/5 hover:text-white hover:ring-white/20 active:scale-[0.96]"
+              >
+                Cancel
+              </button>
+            </AlertDialog.Cancel>
+            <AlertDialog.Action asChild>
+              <button
+                type="button"
+                onClick={onConfirm}
+                className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#0097A7] px-4 text-sm font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_6px_16px_-6px_rgba(0,151,167,0.7)] transition-[transform,background-color] duration-150 hover:bg-[#00a9bb] active:scale-[0.96]"
+              >
+                <Trash2 className="h-4 w-4" />
+                Move to bin
+              </button>
+            </AlertDialog.Action>
+          </div>
+        </AlertDialog.Content>
+      </AlertDialog.Portal>
+    </AlertDialog.Root>
   );
 }

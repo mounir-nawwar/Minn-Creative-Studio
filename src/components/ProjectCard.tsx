@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Project, PROJECT_TYPES, ProjectStatus } from '../types/project.types';
-import { Calendar, User, Briefcase, Layout, Clock, Trash2, Settings, MoreVertical, Check } from 'lucide-react';
+import { Clock, Briefcase, Trash2, Settings, Check, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface ProjectCardProps {
@@ -11,275 +11,265 @@ interface ProjectCardProps {
   onEdit: () => void;
   onDelete: () => void;
   onStatusChange: (status: ProjectStatus) => void;
-  key?: string | number;
 }
 
-export default function ProjectCard({ project, layout = 'grid', isShared, onClick, onEdit, onDelete, onStatusChange }: ProjectCardProps) {
-  const [isStatusMenuOpen, setIsStatusMenuOpen] = useState(false);
+const STATUSES: ProjectStatus[] = ['active', 'archived', 'completed'];
+
+function formatDate(timestamp: unknown): string {
+  if (!timestamp) return 'Just now';
+  const date = new Date(timestamp as string | number | Date);
+  if (Number.isNaN(date.getTime())) return 'Just now';
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+/** Shared, tactile icon button: 36px hit area, presses on click, no layout jump. */
+function IconButton({
+  label,
+  onClick,
+  children,
+  danger,
+}: {
+  label: string;
+  onClick: (e: React.MouseEvent) => void;
+  children: React.ReactNode;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      className={`inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 ring-1 ring-white/10 bg-black/50 backdrop-blur-md
+        hover:text-white hover:ring-white/20 active:scale-[0.96]
+        transition-[transform,color,box-shadow] duration-150 ${danger ? 'hover:text-red-400 hover:ring-red-500/30' : 'hover:text-[#0097A7] hover:ring-[#0097A7]/30'}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** Status pill + dropdown. Calm fade, no bounce, no pulse. */
+function StatusControl({
+  status,
+  onChange,
+  placement,
+}: {
+  status: ProjectStatus;
+  onChange: (s: ProjectStatus) => void;
+  placement: 'bottom-left' | 'top-right';
+}) {
+  const [open, setOpen] = useState(false);
+  const menuPos =
+    placement === 'bottom-left' ? 'top-full left-0 mt-2' : 'bottom-full right-0 mb-2';
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+        className="inline-flex h-8 items-center gap-2 rounded-full bg-black/55 px-3 backdrop-blur-md ring-1 ring-white/10
+          hover:ring-[#0097A7]/40 active:scale-[0.96] transition-[transform,box-shadow] duration-150"
+      >
+        <span className={`h-1.5 w-1.5 rounded-full ${status === 'active' ? 'bg-[#0097A7]' : 'bg-gray-500'}`} />
+        <span className="text-[11px] font-medium capitalize text-white">{status}</span>
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 4 }}
+            transition={{ duration: 0.15, ease: [0.2, 0, 0, 1] }}
+            className={`absolute z-30 min-w-[150px] rounded-xl bg-[#0a0a0a] p-1 ring-1 ring-white/10 shadow-[0_12px_32px_rgba(0,0,0,0.6)] ${menuPos}`}
+          >
+            {STATUSES.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onChange(s);
+                  setOpen(false);
+                }}
+                className={`flex h-9 w-full items-center justify-between rounded-lg px-3 text-[12px] capitalize transition-colors duration-150 ${
+                  status === s ? 'bg-[#0097A7]/10 text-[#0097A7]' : 'text-gray-400 hover:bg-white/5 hover:text-white'
+                }`}
+              >
+                {s}
+                {status === s && <Check className="h-3.5 w-3.5" />}
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function Swatches({ colors }: { colors: string[] }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      {colors.map((c, i) => (
+        <span
+          key={i}
+          className="h-4 w-4 rounded-full ring-1 ring-inset ring-white/10"
+          style={{ backgroundColor: c }}
+        />
+      ))}
+    </div>
+  );
+}
+
+export default function ProjectCard({
+  project,
+  layout = 'grid',
+  isShared,
+  onClick,
+  onEdit,
+  onDelete,
+  onStatusChange,
+}: ProjectCardProps) {
   const projectType = PROJECT_TYPES[project.type as keyof typeof PROJECT_TYPES] || PROJECT_TYPES.personal;
-  
-  const formatDate = (timestamp: any) => {
-    if (!timestamp) return 'Just now';
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  };
+  const swatch = [project.primaryColor, project.secondaryColor, project.accentColor];
+
+  // Hover affordance lives entirely in ring + shadow — no transform, no scale.
+  const cardBase =
+    'group relative bg-[#111111] cursor-pointer ring-1 ring-white/5 hover:ring-[#0097A7]/40 ' +
+    'shadow-[0_1px_2px_rgba(0,0,0,0.4)] hover:shadow-[0_10px_30px_rgba(0,0,0,0.5)] transition-shadow duration-200';
 
   if (layout === 'list') {
     return (
-      <motion.div
-        whileHover={{ x: 4 }}
-        whileTap={{ scale: 0.995 }}
-        onClick={onClick}
-        className="group relative bg-[#111111] border border-white/5 hover:border-[#0097A7]/50 rounded-2xl p-4 cursor-pointer transition-all flex items-center gap-6"
-      >
+      <div onClick={onClick} className={`${cardBase} flex items-center gap-5 rounded-2xl p-3.5`}>
         {/* Thumbnail */}
-        <div className="w-16 h-16 bg-[#0a0a0a] rounded-xl overflow-hidden shrink-0">
+        <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-[#0a0a0a]">
           {project.coverImage ? (
-            <img src={project.coverImage} alt={project.name} className="w-full h-full object-cover opacity-60" />
+            <img src={project.coverImage} alt="" className="h-full w-full object-cover" />
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-[#0097A7]/5">
-              <span className="text-xl grayscale opacity-20">{projectType.icon}</span>
+            <div className="flex h-full w-full items-center justify-center bg-[#0097A7]/[0.06] text-lg opacity-40">
+              {projectType.icon}
             </div>
           )}
+          <span className="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-inset ring-white/10" />
         </div>
 
         {/* Info */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-0.5">
-            <span className="text-[8px] font-black text-[#0097A7] uppercase tracking-widest">{projectType.label}</span>
-            <span className="text-[8px] text-gray-700 font-bold uppercase tracking-widest">{project.subtype}</span>
+        <div className="min-w-0 flex-1">
+          <div className="mb-0.5 flex items-center gap-2 text-[10px] uppercase tracking-wide text-gray-500">
+            <span className="font-medium text-[#0097A7]/80">{projectType.label}</span>
+            {project.subtype && (
+              <>
+                <span className="text-gray-700">·</span>
+                <span>{project.subtype}</span>
+              </>
+            )}
           </div>
-          <h3 className="text-sm font-black text-white tracking-tight truncate group-hover:text-[#0097A7] transition-colors">
-            {project.name}
-          </h3>
+          <h3 className="truncate text-sm font-semibold text-white">{project.name}</h3>
           {project.clientName && (
-            <p className="text-[9px] font-bold text-gray-500 uppercase tracking-tighter mt-0.5">{project.clientName}</p>
+            <p className="mt-0.5 truncate text-xs text-gray-500">{project.clientName}</p>
           )}
         </div>
 
-        {/* Stats / Status */}
-        <div className="flex items-center gap-8 shrink-0">
-          <div className="flex flex-col items-end gap-1">
-            <span className="text-[8px] font-black text-gray-700 uppercase tracking-widest">Last Updated</span>
-            <span className="text-[10px] font-bold text-gray-500 tabular-nums">{formatDate(project.updatedAt)}</span>
+        {/* Meta + actions */}
+        <div className="flex shrink-0 items-center gap-6">
+          <div className="hidden flex-col items-end gap-0.5 sm:flex">
+            <span className="text-[10px] uppercase tracking-wide text-gray-600">Updated</span>
+            <span className="text-xs tabular-nums text-gray-400">{formatDate(project.updatedAt)}</span>
           </div>
 
-          <div className="relative">
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsStatusMenuOpen(!isStatusMenuOpen);
-              }}
-              className="px-3 py-1.5 bg-black/40 rounded-full border border-white/5 hover:border-[#0097A7]/30 transition-all"
-            >
-              <div className="flex items-center gap-2">
-                <div className={`w-1 h-1 rounded-full ${project.status === 'active' ? 'bg-[#0097A7]' : 'bg-gray-600'}`} />
-                <span className="text-[8px] font-black text-white uppercase tracking-widest">{project.status}</span>
-              </div>
-            </button>
-            <AnimatePresence>
-              {isStatusMenuOpen && (
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  className="absolute bottom-full right-0 mb-2 p-1 bg-black border border-white/10 rounded-xl z-30 min-w-[120px] shadow-2xl"
-                >
-                  {(['active', 'archived', 'completed'] as ProjectStatus[]).map((s) => (
-                    <button
-                      key={s}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onStatusChange(s);
-                        setIsStatusMenuOpen(false);
-                      }}
-                      className={`w-full flex items-center justify-between px-3 py-2 text-[8px] font-black uppercase tracking-widest rounded-lg ${
-                        project.status === s ? 'text-[#0097A7] bg-[#0097A7]/10' : 'text-gray-500 hover:text-white hover:bg-white/5'
-                      }`}
-                    >
-                      {s}
-                      {project.status === s && <Check className="w-2.5 h-2.5" />}
-                    </button>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+          <StatusControl status={project.status} onChange={onStatusChange} placement="top-right" />
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onEdit();
-              }}
-              className="p-2 text-gray-600 hover:text-[#0097A7] transition-colors"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete();
-              }}
-              className="p-2 text-gray-600 hover:text-red-500 transition-colors"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </div>
+          {!isShared && (
+            <div className="flex items-center gap-2">
+              <IconButton label="Edit project" onClick={(e) => { e.stopPropagation(); onEdit(); }}>
+                <Settings className="h-4 w-4" />
+              </IconButton>
+              <IconButton label="Delete project" danger onClick={(e) => { e.stopPropagation(); onDelete(); }}>
+                <Trash2 className="h-4 w-4" />
+              </IconButton>
+            </div>
+          )}
         </div>
-      </motion.div>
+      </div>
     );
   }
 
   return (
-    <motion.div
-      whileHover={{ scale: 1.02, y: -4 }}
-      whileTap={{ scale: 0.98 }}
-      onClick={onClick}
-      className="group relative bg-[#111111] border border-white/5 hover:border-[#0097A7]/50 rounded-3xl overflow-hidden cursor-pointer transition-all shadow-2xl"
-    >
-      {/* Cover Image or Icon Placeholder */}
-      <div className="h-40 bg-[#0a0a0a] relative overflow-hidden">
+    <div onClick={onClick} className={`${cardBase} flex flex-col overflow-hidden rounded-2xl`}>
+      {/* Thumbnail */}
+      <div className="relative h-36 bg-[#0a0a0a]">
         {project.coverImage ? (
-          <img 
-            src={project.coverImage} 
-            alt={project.name} 
-            className="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity"
+          <img
+            src={project.coverImage}
+            alt=""
+            className="h-full w-full object-cover opacity-80 transition-opacity duration-200 group-hover:opacity-100"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#0097A7]/10 to-black">
-            <span className="text-6xl grayscale opacity-20 group-hover:grayscale-0 group-hover:opacity-40 transition-all duration-500">
-              {projectType.icon}
-            </span>
+          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#0097A7]/10 to-transparent text-5xl opacity-25">
+            {projectType.icon}
           </div>
         )}
-        
-        {/* Status Badge */}
-        <div className="absolute top-4 left-4 flex flex-col gap-2 z-20">
-          <div className="relative">
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsStatusMenuOpen(!isStatusMenuOpen);
-              }}
-              className="px-3 py-1 bg-black/60 backdrop-blur-md rounded-full border border-white/10 hover:border-[#0097A7]/50 transition-all cursor-pointer group/status"
-            >
-              <div className="flex items-center gap-2">
-                <div className={`w-1.5 h-1.5 rounded-full ${project.status === 'active' ? 'bg-[#0097A7] animate-pulse' : 'bg-gray-500'}`} />
-                <span className="text-[9px] font-black text-white uppercase tracking-widest">{project.status}</span>
-              </div>
-            </button>
+        <span className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/[0.06]" />
 
-            <AnimatePresence>
-              {isStatusMenuOpen && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  className="absolute top-full left-0 mt-2 p-1 bg-black/90 backdrop-blur-xl border border-white/10 rounded-xl z-30 min-w-[120px] shadow-2xl"
-                >
-                  {(['active', 'archived', 'completed'] as ProjectStatus[]).map((s) => (
-                    <button
-                      key={s}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onStatusChange(s);
-                        setIsStatusMenuOpen(false);
-                      }}
-                      className={`w-full flex items-center justify-between px-3 py-2 text-left text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${
-                        project.status === s 
-                        ? 'text-[#0097A7] bg-[#0097A7]/10' 
-                        : 'text-gray-500 hover:text-white hover:bg-white/5'
-                      }`}
-                    >
-                      {s}
-                      {project.status === s && <Check className="w-3 h-3" />}
-                    </button>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+        {/* Status + shared */}
+        <div className="absolute left-3 top-3 z-20 flex flex-col gap-2">
+          <StatusControl status={project.status} onChange={onStatusChange} placement="bottom-left" />
           {isShared && (
-            <div className="px-3 py-1 bg-[#0097A7]/20 backdrop-blur-md rounded-full border border-[#0097A7]/30">
-              <div className="flex items-center gap-2">
-                <User className="w-2.5 h-2.5 text-[#0097A7]" />
-                <span className="text-[9px] font-black text-[#0097A7] uppercase tracking-widest">Shared</span>
-              </div>
-            </div>
+            <span className="inline-flex h-8 items-center gap-1.5 self-start rounded-full bg-[#0097A7]/15 px-3 ring-1 ring-[#0097A7]/25 backdrop-blur-md">
+              <Users className="h-3 w-3 text-[#0097A7]" />
+              <span className="text-[11px] font-medium text-[#0097A7]">Shared</span>
+            </span>
           )}
         </div>
 
-        {/* Actions */}
+        {/* Actions — fade in on hover, no movement */}
         {!isShared && (
-          <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onEdit();
-              }}
-              className="p-2 bg-black/60 backdrop-blur-md rounded-full border border-white/10 text-gray-500 hover:text-[#0097A7]"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete();
-              }}
-              className="p-2 bg-black/60 backdrop-blur-md rounded-full border border-white/10 text-gray-500 hover:text-red-500"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
+          <div className="absolute right-3 top-3 z-20 flex gap-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+            <IconButton label="Edit project" onClick={(e) => { e.stopPropagation(); onEdit(); }}>
+              <Settings className="h-4 w-4" />
+            </IconButton>
+            <IconButton label="Delete project" danger onClick={(e) => { e.stopPropagation(); onDelete(); }}>
+              <Trash2 className="h-4 w-4" />
+            </IconButton>
           </div>
         )}
       </div>
 
       {/* Content */}
-      <div className="p-6 space-y-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-black text-[#0097A7] uppercase tracking-[0.2em]">
-              {projectType.label}
-            </span>
-            <span className="text-[10px] text-gray-600">•</span>
-            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
-              {project.subtype}
-            </span>
-          </div>
-          <h3 className="text-lg font-black text-white tracking-tight group-hover:text-[#0097A7] transition-colors truncate">
-            {project.name}
-          </h3>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          {project.clientName && (
-            <div className="flex items-center gap-2 text-gray-500">
-              <Briefcase className="w-3.5 h-3.5" />
-              <span className="text-[10px] font-bold truncate uppercase tracking-tighter">{project.clientName}</span>
-            </div>
+      <div className="space-y-3 p-5">
+        <div className="flex items-center gap-2 text-[10px] uppercase tracking-wide text-gray-500">
+          <span className="font-medium text-[#0097A7]/80">{projectType.label}</span>
+          {project.subtype && (
+            <>
+              <span className="text-gray-700">·</span>
+              <span>{project.subtype}</span>
+            </>
           )}
-          <div className="flex items-center gap-2 text-gray-500">
-            <Clock className="w-3.5 h-3.5" />
-            <span className="text-[10px] font-bold uppercase tracking-tighter">{formatDate(project.updatedAt)}</span>
-          </div>
         </div>
 
-        {/* Visual Identity Preview */}
-        <div className="flex items-center gap-1.5 pt-2">
-          <div className="w-4 h-4 rounded-full border border-white/10" style={{ backgroundColor: project.primaryColor }} />
-          <div className="w-4 h-4 rounded-full border border-white/10" style={{ backgroundColor: project.secondaryColor }} />
-          <div className="w-4 h-4 rounded-full border border-white/10" style={{ backgroundColor: project.accentColor }} />
-          <div className="flex-1" />
-          <div className="flex -space-x-2">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="w-6 h-6 rounded-full border-2 border-[#111111] bg-[#1a1a1a] flex items-center justify-center">
-                <div className="w-1 h-1 bg-gray-600 rounded-full" />
-              </div>
-            ))}
-          </div>
+        <h3 className="truncate text-[15px] font-semibold leading-snug text-white">{project.name}</h3>
+
+        <div className="flex items-center gap-4 text-xs text-gray-500">
+          {project.clientName && (
+            <span className="inline-flex min-w-0 items-center gap-1.5">
+              <Briefcase className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">{project.clientName}</span>
+            </span>
+          )}
+          <span className="inline-flex items-center gap-1.5">
+            <Clock className="h-3.5 w-3.5 shrink-0" />
+            <span className="tabular-nums">{formatDate(project.updatedAt)}</span>
+          </span>
+        </div>
+
+        <div className="pt-1">
+          <Swatches colors={swatch} />
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }
