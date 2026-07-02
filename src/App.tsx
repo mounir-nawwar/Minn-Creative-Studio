@@ -11,6 +11,7 @@ const Canvas              = lazy(() => import('./canvas/Canvas'));
 const ChatDrawer          = lazy(() => import('./components/ChatDrawer'));
 const ProjectPicker       = lazy(() => import('./pages/ProjectPicker'));
 const ProjectCreationOverlay = lazy(() => import('./components/ProjectCreationOverlay'));
+const ChatStudio          = lazy(() => import('./components/ChatStudio/ChatStudio'));
 import { motion, AnimatePresence } from 'motion/react';
 import type { Easing } from 'motion/react';
 import { Key } from 'lucide-react';
@@ -49,7 +50,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
   const [signInError, setSignInError] = useState<string | null>(null);
-  const { currentProject, isSettingsOpen, closeSettings, settingsMode, clearProject } = useProjectStore();
+  const { currentProject, isSettingsOpen, closeSettings, settingsMode, clearProject, studioMode } = useProjectStore();
   const { updateCurrentProject } = useProject();
   const setNodes = useStore((state) => state.setNodes);
   const setEdges = useStore((state) => state.setEdges);
@@ -243,7 +244,7 @@ export default function App() {
 
       {/* ── MAIN APP — rendered independently so AnimatePresence doesn't ── */}
       {/* unmount it during any auth transition                             */}
-      {inMainApp && (
+      {inMainApp && studioMode === 'canvas' && (
         <Suspense fallback={null}>
           <ReactFlowProvider>
             <div className="h-screen w-screen bg-transparent flex overflow-hidden font-sans selection:bg-[#0097A7]/30" style={{ position: 'relative', zIndex: 2 }}>
@@ -273,6 +274,30 @@ export default function App() {
               </div>
             </div>
           </ReactFlowProvider>
+        </Suspense>
+      )}
+
+      {/* ── CHAT STUDIO — full-screen conversational workspace ───────────── */}
+      {inMainApp && studioMode === 'chat' && (
+        <Suspense fallback={null}>
+          <div className="h-screen w-screen bg-transparent overflow-hidden font-sans selection:bg-[#0097A7]/30" style={{ position: 'relative', zIndex: 2 }}>
+            <ErrorBoundary>
+              <ChatStudio user={user!} onLogout={handleLogout} />
+            </ErrorBoundary>
+            <AssetExpandModal />
+            <OfflineIndicator />
+            <AnimatePresence>
+              {isSettingsOpen && (
+                <ProjectCreationOverlay
+                  isOpen={isSettingsOpen}
+                  onClose={closeSettings}
+                  mode={settingsMode}
+                  existingProject={currentProject}
+                  onCreate={async (data) => { await updateCurrentProject(data); closeSettings(); }}
+                />
+              )}
+            </AnimatePresence>
+          </div>
         </Suspense>
       )}
     </>

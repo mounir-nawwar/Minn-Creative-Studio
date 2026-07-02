@@ -5,6 +5,7 @@ import { User, workflowsApi } from '../lib/api';
 import { Play, Save, Trash2, X, Clock, Loader2, ChevronDown, Zap, Pencil } from 'lucide-react';
 import ToggleSwitch from './ToggleSwitch';
 import ProfileMenu from './ProfileMenu';
+import StudioModeToggle from './StudioModeToggle';
 import { useStore } from '../store/useStore';
 import { useProjectStore } from '../store/useProjectStore';
 import { API_BASE } from '../constants';
@@ -316,6 +317,10 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
 
       {/* Right */}
       <div className="flex items-center gap-3">
+        <StudioModeToggle />
+
+        <div className="h-7 w-px bg-white/10" />
+
         <div className="flex items-center gap-2">
           <span className="text-xs font-medium text-gray-500">Upload</span>
           <ToggleSwitch checked={uploadEnabled} onChange={setUploadEnabled} size="navbar" />
