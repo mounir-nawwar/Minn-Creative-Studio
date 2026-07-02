@@ -93,12 +93,13 @@ router.post('/', (req: any, res: any) => {
   try {
     const userId = req.user.id;
     const { title, projectId } = req.body;
-    
-    // Validate projectId if provided
+
+    // Validate projectId if provided.
+    // Shared workspace: any authenticated user may attach chats to any project.
     if (projectId) {
       const project = projects.findById(projectId);
-      if (!project || project.user_id !== userId) {
-        return res.status(403).json({ error: 'Access denied to project' });
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
       }
     }
     
@@ -120,29 +121,51 @@ router.post('/:id/messages', (req: any, res: any) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
-    const { role, content } = req.body;
-    
+    const { role, content, attachments } = req.body;
+
     if (!role || !content) {
       return res.status(400).json({ error: 'Role and content are required' });
     }
-    
+
     if (role !== 'user' && role !== 'assistant') {
       return res.status(400).json({ error: 'Role must be "user" or "assistant"' });
     }
-    
+
+    const MAX_ATTACHMENTS = 10;
+    const VALID_ATTACHMENT_TYPES = ['image', 'video', 'audio'];
+    let validAttachments: any[] = [];
+    if (attachments !== undefined) {
+      if (!Array.isArray(attachments) || attachments.length > MAX_ATTACHMENTS) {
+        return res.status(400).json({ error: `Attachments must be an array of at most ${MAX_ATTACHMENTS}` });
+      }
+      const allValid = attachments.every(
+        (a: any) => a && typeof a.url === 'string' && a.url.length > 0 && VALID_ATTACHMENT_TYPES.includes(a.type)
+      );
+      if (!allValid) {
+        return res.status(400).json({ error: 'Each attachment needs a url and a type of image, video, or audio' });
+      }
+      validAttachments = attachments.map((a: any) => ({
+        assetId: typeof a.assetId === 'string' ? a.assetId : undefined,
+        url: a.url,
+        type: a.type,
+        name: typeof a.name === 'string' ? a.name : undefined,
+        model: typeof a.model === 'string' ? a.model : undefined,
+      }));
+    }
+
     const chat = chats.findById(id);
-    
+
     if (!chat) {
       return res.status(404).json({ error: 'Chat not found' });
     }
-    
+
     if (chat.user_id !== userId) {
       return res.status(403).json({ error: 'Access denied' });
     }
-    
+
     const messageId = generateId();
-    const message = messages.create(messageId, id, role, content);
-    
+    const message = messages.create(messageId, id, role, content, validAttachments);
+
     res.status(201).json(message);
   } catch (error: any) {
     console.error('Error adding message:', error);

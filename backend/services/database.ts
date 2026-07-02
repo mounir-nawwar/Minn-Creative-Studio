@@ -152,6 +152,18 @@ function initializeSchema(): void {
     )
   `);
 
+  // Chat presets table (reusable system-instruction templates for Chat Studio)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS chat_presets (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      system_instruction TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+
   // Create indexes for better query performance
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id);
@@ -166,6 +178,23 @@ function initializeSchema(): void {
   `);
 
   console.log('✅ SQLite database schema initialized');
+}
+
+/**
+ * Guarded ALTER TABLE migration: adds a column only if it doesn't exist yet.
+ * SQLite has no "ADD COLUMN IF NOT EXISTS", so check PRAGMA table_info first.
+ */
+function ensureColumn(table: string, column: string, ddl: string): void {
+  const columns = db.pragma(`table_info(${table})`) as Array<{ name: string }>;
+  if (!columns.some((c) => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+    console.log(`✅ Migration: added ${table}.${column}`);
+  }
+}
+
+function runMigrations(): void {
+  // Chat Studio: structured media attachments on messages (JSON array)
+  ensureColumn('messages', 'attachments', "attachments TEXT NOT NULL DEFAULT '[]'");
 }
 
 // Password hashing utilities
@@ -415,25 +444,45 @@ export const chats = {
   }
 };
 
+// Structured media reference carried by a chat message (Chat Studio inline generation)
+export interface MessageAttachment {
+  assetId?: string;
+  url: string;
+  type: 'image' | 'video' | 'audio';
+  name?: string;
+  model?: string;
+}
+
+function parseAttachments(raw: unknown): MessageAttachment[] {
+  if (typeof raw !== 'string' || raw === '') return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 // Message operations
 export const messages = {
-  create: (id: string, chatId: string, role: 'user' | 'assistant', content: string) => {
+  create: (id: string, chatId: string, role: 'user' | 'assistant', content: string, attachments: MessageAttachment[] = []) => {
     const stmt = db.prepare(`
-      INSERT INTO messages (id, chat_id, role, content)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO messages (id, chat_id, role, content, attachments)
+      VALUES (?, ?, ?, ?, ?)
     `);
-    stmt.run(id, chatId, role, content);
-    
+    stmt.run(id, chatId, role, content, JSON.stringify(attachments));
+
     // Update chat's last_message and updated_at
     const updateChat = db.prepare('UPDATE chats SET last_message = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
     updateChat.run(content.substring(0, 200), chatId);
-    
-    return { id, chatId, role, content };
+
+    return { id, chatId, role, content, attachments };
   },
 
   findByChatId: (chatId: string) => {
     const stmt = db.prepare('SELECT * FROM messages WHERE chat_id = ? ORDER BY created_at ASC');
-    return stmt.all(chatId) as any[];
+    const messageList = stmt.all(chatId) as any[];
+    return messageList.map((m) => ({ ...m, attachments: parseAttachments(m.attachments) }));
   },
 
   deleteByChatId: (chatId: string) => {
@@ -649,5 +698,6 @@ export const prompts = {
 
 // Initialize schema on import
 initializeSchema();
+runMigrations();
 
 export { db };

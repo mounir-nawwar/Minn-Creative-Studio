@@ -58,11 +58,20 @@ export interface Chat {
   messages?: ChatMessage[];
 }
 
+export interface MessageAttachment {
+  assetId?: string;
+  url: string;
+  type: 'image' | 'video' | 'audio';
+  name?: string;
+  model?: string;
+}
+
 export interface ChatMessage {
   id: string;
   chat_id: string;
   role: 'user' | 'assistant';
   content: string;
+  attachments?: MessageAttachment[];
   created_at: string;
 }
 
@@ -291,10 +300,15 @@ export const chatsApi = {
       body: JSON.stringify(data)
     }),
   
-  addMessage: (chatId: string, role: 'user' | 'assistant', content: string): Promise<ChatMessage> =>
+  addMessage: (
+    chatId: string,
+    role: 'user' | 'assistant',
+    content: string,
+    attachments?: MessageAttachment[]
+  ): Promise<ChatMessage> =>
     apiRequest(`/chats/${chatId}/messages`, {
       method: 'POST',
-      body: JSON.stringify({ role, content })
+      body: JSON.stringify({ role, content, ...(attachments?.length ? { attachments } : {}) })
     }),
   
   update: (id: string, data: { title?: string }): Promise<Chat> =>

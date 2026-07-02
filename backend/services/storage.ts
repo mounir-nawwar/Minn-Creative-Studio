@@ -590,17 +590,17 @@ export async function uploadFromUrl(
 
 /**
  * Delete file from storage
- * Requires userId for authorization check
+ * Shared workspace: any authenticated user may delete any asset.
+ * userId is kept for audit logging only.
  */
 export async function deleteFile(assetId: string, userId: string): Promise<boolean> {
   const asset = assets.findById(assetId);
   if (!asset) {
     return false;
   }
-  
-  // Authorization check - verify user owns this asset via project ownership
+
   if (asset.user_id !== userId) {
-    throw new Error('Access denied: You do not own this asset');
+    console.log(`[Storage] ${userId} deleting asset ${assetId} owned by ${asset.user_id} (shared workspace)`);
   }
 
   const fullPath = path.join(STORAGE_PATH, asset.storage_path);

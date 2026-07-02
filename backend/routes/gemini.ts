@@ -6,7 +6,7 @@ import { requireAuth } from '../middleware/auth.ts';
 import { aiLimiter } from '../config/cors.ts';
 import { calculateCost } from '../config/pricing.ts';
 import { uploadBase64, STORAGE_PATH, PUBLIC_URL_BASE } from '../services/storage.ts';
-import { trackProjectCost, projects } from '../services/database.ts';
+import { trackProjectCost, projects, assets, generateId } from '../services/database.ts';
 import { resolveImageUrls, processInlineData, getExtensionFromMimeType } from '../utils/media.ts';
 import {
   VERTEX_PROJECT,
@@ -310,6 +310,20 @@ router.post('/', requireAuth, aiLimiter, async (req, res) => {
           const relativePath = path.relative(STORAGE_PATH, storagePath);
           const publicUrl = `${PUBLIC_URL_BASE}/${relativePath.replace(/\\/g, '/')}`;
 
+          // Record the video in the assets table so asset queries (grid, Library) can see it
+          const recordVideoAsset = (mimeType: string, sizeBytes: number): string => {
+            const assetId = generateId();
+            assets.create(assetId, projectId, userId, {
+              type: 'video',
+              filename,
+              storagePath: relativePath.replace(/\\/g, '/'),
+              url: publicUrl,
+              mimeType,
+              sizeBytes,
+            });
+            return assetId;
+          };
+
           let contentType: string;
           let resStream: any;
 
@@ -318,8 +332,9 @@ router.post('/', requireAuth, aiLimiter, async (req, res) => {
             contentType = header.split(':')[1]?.split(';')[0] || 'video/mp4';
             const buf = Buffer.from(b64, 'base64');
             fs.writeFileSync(storagePath, buf);
+            const assetId = recordVideoAsset(contentType, buf.byteLength);
             console.log(`[Veo] Saved ${Math.round(buf.byteLength / 1024)}KB → ${publicUrl}`);
-            return res.json({ success: true, data: { storageUrl: publicUrl } });
+            return res.json({ success: true, data: { storageUrl: publicUrl, assetId } });
           }
 
           if (USE_VERTEX_AI && url?.startsWith('gs://')) {
@@ -347,8 +362,10 @@ router.post('/', requireAuth, aiLimiter, async (req, res) => {
           if (resStream) {
             const writeStream = fs.createWriteStream(storagePath);
             await pipeline(Readable.fromWeb(resStream), writeStream);
+            const sizeBytes = fs.statSync(storagePath).size;
+            const assetId = recordVideoAsset(contentType, sizeBytes);
             console.log(`[Veo] Streamed to Storage: ${publicUrl}`);
-            return res.json({ success: true, data: { storageUrl: publicUrl } });
+            return res.json({ success: true, data: { storageUrl: publicUrl, assetId } });
           }
         } catch (uploadErr: any) {
           console.error('[Veo] Streaming upload failed:', uploadErr.message);

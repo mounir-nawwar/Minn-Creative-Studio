@@ -37,17 +37,16 @@ router.use(authMiddleware);
  */
 router.get('/', async (req: any, res: any) => {
   try {
-    const userId = req.user.id;
     const { projectId, type } = req.query;
-    
+
     if (!projectId) {
       return res.status(400).json({ error: 'Project ID is required' });
     }
-    
-    // Verify project access
+
+    // Shared workspace: any authenticated user may view any project's assets
     const project = projects.findById(projectId as string);
-    if (!project || project.user_id !== userId) {
-      return res.status(403).json({ error: 'Access denied' });
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
     }
     
     const assetList = assets.findByProjectId(projectId as string, type as string);
@@ -65,20 +64,13 @@ router.get('/', async (req: any, res: any) => {
 router.get('/:id', async (req: any, res: any) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id;
-    
+
     const asset = assets.findById(id);
-    
+
     if (!asset) {
       return res.status(404).json({ error: 'Asset not found' });
     }
-    
-    // Verify ownership via project
-    const project = projects.findById(asset.project_id);
-    if (!project || project.user_id !== userId) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-    
+
     res.json(asset);
   } catch (error: any) {
     console.error('Error fetching asset:', error);
@@ -103,10 +95,10 @@ router.post('/upload', upload.single('file'), async (req: any, res: any) => {
       return res.status(400).json({ error: 'Project ID is required' });
     }
     
-    // Verify project access
+    // Shared workspace: any authenticated user may write to any project
     const project = projects.findById(projectId);
-    if (!project || project.user_id !== userId) {
-      return res.status(403).json({ error: 'Access denied' });
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
     }
     
     const result = await uploadFile(projectId, userId, {
@@ -144,10 +136,10 @@ router.post('/base64', async (req: any, res: any) => {
       return res.status(400).json({ error: 'Project ID is required' });
     }
     
-    // Verify project access
+    // Shared workspace: any authenticated user may write to any project
     const project = projects.findById(projectId);
-    if (!project || project.user_id !== userId) {
-      return res.status(403).json({ error: 'Access denied' });
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
     }
     
     const result = await uploadBase64(projectId, userId, {
@@ -184,10 +176,10 @@ router.post('/url', async (req: any, res: any) => {
       return res.status(400).json({ error: 'Project ID is required' });
     }
     
-    // Verify project access
+    // Shared workspace: any authenticated user may write to any project
     const project = projects.findById(projectId);
-    if (!project || project.user_id !== userId) {
-      return res.status(403).json({ error: 'Access denied' });
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
     }
     
     // storage.uploadFromUrl already includes comprehensive SSRF protection

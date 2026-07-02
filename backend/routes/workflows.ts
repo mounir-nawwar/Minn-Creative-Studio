@@ -43,19 +43,15 @@ router.get('/', (req: any, res: any) => {
 router.get('/:id', (req: any, res: any) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id;
-    
+
     const workflow = workflows.findById(id);
-    
+
     if (!workflow) {
       return res.status(404).json({ error: 'Workflow not found' });
     }
-    
-    // Ensure user owns this workflow
-    if (workflow.user_id !== userId) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-    
+
+    // Shared workspace: any authenticated user may open any workflow
+
     res.json(workflow);
   } catch (error: any) {
     console.error('Error fetching workflow:', error);
@@ -76,13 +72,10 @@ router.post('/', (req: any, res: any) => {
       return res.status(400).json({ error: 'Project ID is required' });
     }
     
-    // Verify project exists and user owns it
+    // Shared workspace: any authenticated user may create workflows in any project
     const project = projects.findById(projectId);
     if (!project) {
       return res.status(404).json({ error: 'Project not found' });
-    }
-    if (project.user_id !== userId) {
-      return res.status(403).json({ error: 'Access denied to project' });
     }
     
     // Validate nodes and edges are arrays
@@ -117,19 +110,16 @@ router.post('/', (req: any, res: any) => {
 router.put('/:id', (req: any, res: any) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id;
     const { name, nodes, edges } = req.body;
-    
+
     const workflow = workflows.findById(id);
-    
+
     if (!workflow) {
       return res.status(404).json({ error: 'Workflow not found' });
     }
-    
-    if (workflow.user_id !== userId) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-    
+
+    // Shared workspace: any authenticated user may update any workflow (auto-save)
+
     // Validate nodes and edges if provided
     if (nodes !== undefined && !Array.isArray(nodes)) {
       return res.status(400).json({ error: 'Nodes must be an array' });
@@ -155,18 +145,15 @@ router.put('/:id', (req: any, res: any) => {
 router.delete('/:id', (req: any, res: any) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id;
-    
+
     const workflow = workflows.findById(id);
-    
+
     if (!workflow) {
       return res.status(404).json({ error: 'Workflow not found' });
     }
-    
-    if (workflow.user_id !== userId) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-    
+
+    // Shared workspace: any authenticated user may delete any workflow
+
     workflows.delete(id);
     
     res.json({ success: true, message: 'Workflow deleted' });
