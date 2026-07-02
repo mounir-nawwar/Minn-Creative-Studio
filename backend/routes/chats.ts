@@ -4,8 +4,9 @@
  */
 
 import express from 'express';
-import { chats, messages, projects, generateId } from '../services/database.ts';
+import { chats, messages, projects, assets, generateId } from '../services/database.ts';
 import { authMiddleware } from '../services/auth.ts';
+import { moveAssetToProject } from '../services/storage.ts';
 
 const router = express.Router();
 
@@ -175,27 +176,66 @@ router.post('/:id/messages', (req: any, res: any) => {
 
 /**
  * PUT /api/chats/:id
- * Update chat title
+ * Update chat title and/or move it to another project.
+ * With moveAssets=true, generated assets referenced by the chat's messages
+ * are moved too and attachment URLs are rewritten so media keeps loading.
  */
-router.put('/:id', (req: any, res: any) => {
+router.put('/:id', async (req: any, res: any) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
-    const { title } = req.body;
-    
+    const { title, projectId, moveAssets } = req.body;
+
     const chat = chats.findById(id);
-    
+
     if (!chat) {
       return res.status(404).json({ error: 'Chat not found' });
     }
-    
+
     if (chat.user_id !== userId) {
       return res.status(403).json({ error: 'Access denied' });
     }
-    
-    chats.update(id, { title });
+
+    // Validate the target project when re-homing a chat
+    if (projectId !== undefined) {
+      const project = projects.findById(projectId);
+      if (!project) {
+        return res.status(400).json({ error: 'Target project not found' });
+      }
+
+      if (moveAssets) {
+        const chatMessages = messages.findByChatId(id);
+        for (const message of chatMessages) {
+          if (!message.attachments?.length) continue;
+          let changed = false;
+          const updatedAttachments = [];
+          for (const att of message.attachments) {
+            // Attachments usually carry only the storage URL — resolve the asset row either way
+            const assetId = att.assetId || assets.findByUrl(att.url)?.id;
+            if (assetId) {
+              try {
+                const moved = await moveAssetToProject(assetId, projectId);
+                if (moved?.url && moved.url !== att.url) {
+                  updatedAttachments.push({ ...att, assetId, url: moved.url });
+                  changed = true;
+                  continue;
+                }
+              } catch (moveErr: any) {
+                console.warn(`[Chats] Could not move asset ${assetId}: ${moveErr.message}`);
+              }
+            }
+            updatedAttachments.push(att);
+          }
+          if (changed) {
+            messages.updateAttachments(message.id, updatedAttachments);
+          }
+        }
+      }
+    }
+
+    chats.update(id, { title, projectId });
     const updated = chats.findById(id);
-    
+
     res.json(updated);
   } catch (error: any) {
     console.error('Error updating chat:', error);

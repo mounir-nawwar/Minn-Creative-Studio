@@ -7,7 +7,7 @@ import express from 'express';
 import multer from 'multer';
 import { assets, projects, generateId } from '../services/database.ts';
 import { authMiddleware } from '../services/auth.ts';
-import { uploadFile, uploadBase64, uploadFromUrl, deleteFile, ALLOWED_MIME_TYPES } from '../services/storage.ts';
+import { uploadFile, uploadBase64, uploadFromUrl, deleteFile, moveAssetToProject, ALLOWED_MIME_TYPES } from '../services/storage.ts';
 
 const router = express.Router();
 
@@ -221,6 +221,33 @@ router.post('/url', async (req: any, res: any) => {
     } else {
       res.status(500).json({ error: error.message || 'Failed to fetch URL' });
     }
+  }
+});
+
+/**
+ * PATCH /api/assets/:id/move
+ * Move an asset (file + record) into another project
+ */
+router.patch('/:id/move', async (req: any, res: any) => {
+  try {
+    const { id } = req.params;
+    const { targetProjectId } = req.body;
+
+    if (!targetProjectId || typeof targetProjectId !== 'string') {
+      return res.status(400).json({ error: 'targetProjectId is required' });
+    }
+
+    const moved = await moveAssetToProject(id, targetProjectId);
+    res.json(moved);
+  } catch (error: any) {
+    console.error('Error moving asset:', error);
+    if (error.message === 'Asset not found') {
+      return res.status(404).json({ error: 'Asset not found' });
+    }
+    if (error.message === 'Target project not found') {
+      return res.status(400).json({ error: 'Target project not found' });
+    }
+    res.status(500).json({ error: error.message || 'Failed to move asset' });
   }
 });
 

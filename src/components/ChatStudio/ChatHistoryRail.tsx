@@ -1,4 +1,4 @@
-import { Plus, Trash2, MessageSquare } from 'lucide-react';
+import { Plus, Trash2, MessageSquare, FolderInput } from 'lucide-react';
 import type { Chat } from '../../lib/api';
 
 interface ChatHistoryRailProps {
@@ -7,10 +7,11 @@ interface ChatHistoryRailProps {
   onSelect: (id: string) => void;
   onNew: () => void;
   onDelete: (id: string) => void;
+  onMove: (chat: Chat) => void;
 }
 
 /** Left rail listing this project's chat sessions */
-export default function ChatHistoryRail({ chats, activeChatId, onSelect, onNew, onDelete }: ChatHistoryRailProps) {
+export default function ChatHistoryRail({ chats, activeChatId, onSelect, onNew, onDelete, onMove }: ChatHistoryRailProps) {
   return (
     <aside className="flex w-60 shrink-0 flex-col border-r border-white/5 bg-[#0a0a0a]">
       <div className="flex items-center justify-between px-4 py-3">
@@ -47,13 +48,23 @@ export default function ChatHistoryRail({ chats, activeChatId, onSelect, onNew, 
                 <p className="truncate text-[11px] text-gray-600">{chat.last_message}</p>
               )}
             </div>
-            <button
-              onClick={(e) => { e.stopPropagation(); onDelete(chat.id); }}
-              aria-label="Delete session"
-              className="mt-0.5 shrink-0 p-1 text-gray-600 opacity-0 transition-[opacity,color] duration-150 hover:text-red-400 group-hover:opacity-100"
-            >
-              <Trash2 className="h-3 w-3" />
-            </button>
+            <div className="flex shrink-0 items-center gap-0.5">
+              <button
+                onClick={(e) => { e.stopPropagation(); onMove(chat); }}
+                aria-label="Move session to a project"
+                title="Move to project"
+                className="mt-0.5 p-1 text-gray-600 opacity-0 transition-[opacity,color] duration-150 hover:text-[#0097A7] group-hover:opacity-100"
+              >
+                <FolderInput className="h-3 w-3" />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); onDelete(chat.id); }}
+                aria-label="Delete session"
+                className="mt-0.5 p-1 text-gray-600 opacity-0 transition-[opacity,color] duration-150 hover:text-red-400 group-hover:opacity-100"
+              >
+                <Trash2 className="h-3 w-3" />
+              </button>
+            </div>
           </div>
         ))}
       </div>

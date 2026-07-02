@@ -15,7 +15,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import sharp from 'sharp';
-import { assets, generateId } from './database.ts';
+import { assets, projects, generateId } from './database.ts';
 
 // Storage configuration
 export const STORAGE_PATH = process.env.STORAGE_PATH || path.join(process.cwd(), 'storage');
@@ -586,6 +586,65 @@ export async function uploadFromUrl(
     mimetype: mimeType,
     size: buffer.length
   }, options);
+}
+
+/**
+ * Move an asset (file + DB row) into another project.
+ * Used to promote playground scratch work into a real client project.
+ * If the source file is missing, the row is still moved (row consistency
+ * beats an orphaned file reference).
+ */
+export async function moveAssetToProject(assetId: string, targetProjectId: string) {
+  const asset = assets.findById(assetId);
+  if (!asset) {
+    throw new Error('Asset not found');
+  }
+
+  const targetProject = projects.findById(targetProjectId);
+  if (!targetProject) {
+    throw new Error('Target project not found');
+  }
+
+  if (asset.project_id === targetProjectId) {
+    return asset;
+  }
+
+  const targetDir = getSafeProjectPath(targetProjectId, asset.type);
+  if (!fs.existsSync(targetDir)) {
+    fs.mkdirSync(targetDir, { recursive: true });
+  }
+
+  const oldAbs = path.resolve(STORAGE_PATH, asset.storage_path);
+  if (!oldAbs.startsWith(path.resolve(STORAGE_PATH))) {
+    throw new Error('Invalid storage path');
+  }
+
+  // Avoid filename collisions in the target folder
+  let filename = asset.filename;
+  let newAbs = path.join(targetDir, filename);
+  if (fs.existsSync(newAbs)) {
+    filename = `${Date.now()}-${asset.filename}`;
+    newAbs = path.join(targetDir, filename);
+  }
+
+  if (fs.existsSync(oldAbs)) {
+    try {
+      fs.renameSync(oldAbs, newAbs);
+    } catch {
+      // Cross-device fallback
+      fs.copyFileSync(oldAbs, newAbs);
+      fs.unlinkSync(oldAbs);
+    }
+  } else {
+    console.warn(`⚠️  Source file missing for asset ${assetId} — moving the record only`);
+  }
+
+  const relativePath = path.relative(STORAGE_PATH, newAbs).replace(/\\/g, '/');
+  const publicUrl = `${PUBLIC_URL_BASE}/${relativePath}`;
+  assets.updateLocation(assetId, targetProjectId, relativePath, publicUrl, filename);
+
+  console.log(`✅ Asset ${assetId} moved → ${targetProject.name} (${relativePath})`);
+  return assets.findById(assetId);
 }
 
 /**

@@ -433,12 +433,13 @@ export const chats = {
     return stmt.all(userId) as any[];
   },
 
-  update: (id: string, data: { title?: string; lastMessage?: string }) => {
+  update: (id: string, data: { title?: string; lastMessage?: string; projectId?: string }) => {
     const fields: string[] = [];
     const values: any[] = [];
 
     if (data.title !== undefined) { fields.push('title = ?'); values.push(data.title); }
     if (data.lastMessage !== undefined) { fields.push('last_message = ?'); values.push(data.lastMessage); }
+    if (data.projectId !== undefined) { fields.push('project_id = ?'); values.push(data.projectId); }
 
     fields.push('updated_at = CURRENT_TIMESTAMP');
     values.push(id);
@@ -494,6 +495,12 @@ export const messages = {
     return messageList.map((m) => ({ ...m, attachments: parseAttachments(m.attachments) }));
   },
 
+  /** Rewrite a message's attachments (used when moving a chat's assets between projects) */
+  updateAttachments: (id: string, attachments: MessageAttachment[]) => {
+    const stmt = db.prepare('UPDATE messages SET attachments = ? WHERE id = ?');
+    stmt.run(JSON.stringify(attachments), id);
+  },
+
   deleteByChatId: (chatId: string) => {
     const stmt = db.prepare('DELETE FROM messages WHERE chat_id = ?');
     stmt.run(chatId);
@@ -528,6 +535,16 @@ export const assets = {
   findById: (id: string) => {
     const stmt = db.prepare('SELECT * FROM assets WHERE id = ?');
     const asset = stmt.get(id) as any;
+    if (asset && asset.metadata) {
+      asset.metadata = JSON.parse(asset.metadata);
+    }
+    return asset;
+  },
+
+  /** Resolve an asset from its public /storage URL (chat attachments often carry only the URL) */
+  findByUrl: (url: string) => {
+    const stmt = db.prepare('SELECT * FROM assets WHERE url = ?');
+    const asset = stmt.get(url) as any;
     if (asset && asset.metadata) {
       asset.metadata = JSON.parse(asset.metadata);
     }
@@ -592,6 +609,12 @@ export const assets = {
       ...a,
       metadata: a.metadata ? JSON.parse(a.metadata) : {}
     }));
+  },
+
+  /** Re-home an asset row after its file moved to another project's folder */
+  updateLocation: (id: string, projectId: string, storagePath: string, url: string, filename: string) => {
+    const stmt = db.prepare('UPDATE assets SET project_id = ?, storage_path = ?, url = ?, filename = ? WHERE id = ?');
+    stmt.run(projectId, storagePath, url, filename, id);
   },
 
   delete: (id: string) => {

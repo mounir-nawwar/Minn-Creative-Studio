@@ -315,7 +315,7 @@ export const chatsApi = {
       body: JSON.stringify({ role, content, ...(attachments?.length ? { attachments } : {}) })
     }),
   
-  update: (id: string, data: { title?: string }): Promise<Chat> =>
+  update: (id: string, data: { title?: string; projectId?: string; moveAssets?: boolean }): Promise<Chat> =>
     apiRequest(`/chats/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data)
@@ -401,6 +401,13 @@ export const assetsApi = {
       body: JSON.stringify({ projectId, url, ...options })
     }),
   
+  /** Move an asset (file + record) into another project */
+  move: (id: string, targetProjectId: string): Promise<Asset> =>
+    apiRequest(`/assets/${id}/move`, {
+      method: 'PATCH',
+      body: JSON.stringify({ targetProjectId })
+    }),
+
   delete: (id: string): Promise<void> =>
     apiRequest(`/assets/${id}`, { method: 'DELETE' })
 };

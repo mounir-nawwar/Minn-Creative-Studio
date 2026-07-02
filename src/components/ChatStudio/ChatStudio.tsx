@@ -1,7 +1,11 @@
+import { useState } from 'react';
 import { ArrowLeft, Sparkles } from 'lucide-react';
-import type { User } from '../../lib/api';
+import { chatsApi } from '../../lib/api';
+import type { User, Chat } from '../../lib/api';
+import { toast } from '../../store/useToastStore';
 import ProfileMenu from '../ProfileMenu';
 import StudioModeToggle from '../StudioModeToggle';
+import MoveToProjectDialog from '../Library/MoveToProjectDialog';
 import { useProjectStore, isPlaygroundProject } from '../../store/useProjectStore';
 import { useChatStudio } from './useChatStudio';
 import ChatHistoryRail from './ChatHistoryRail';
@@ -21,6 +25,7 @@ interface ChatStudioProps {
 export default function ChatStudio({ user, onLogout }: ChatStudioProps) {
   const { currentProject, clearProject } = useProjectStore();
   const playground = isPlaygroundProject(currentProject);
+  const [chatToMove, setChatToMove] = useState<Chat | null>(null);
   const {
     chats,
     messages,
@@ -79,6 +84,7 @@ export default function ChatStudio({ user, onLogout }: ChatStudioProps) {
           onSelect={setActiveChatId}
           onNew={createNewChat}
           onDelete={deleteChat}
+          onMove={setChatToMove}
         />
 
         <main className="flex min-w-0 flex-1 flex-col">
@@ -93,6 +99,24 @@ export default function ChatStudio({ user, onLogout }: ChatStudioProps) {
 
         <GenerationSettingsPanel settings={settings} onChange={setSettings} disabled={isGenerating} />
       </div>
+
+      {/* Move a session (and its generated assets) into a client project */}
+      <MoveToProjectDialog
+        open={!!chatToMove}
+        onOpenChange={(o) => { if (!o) setChatToMove(null); }}
+        subject={chatToMove?.title ?? ''}
+        excludeProjectId={currentProject?.id}
+        onConfirm={async (targetProjectId) => {
+          if (!chatToMove) return;
+          try {
+            await chatsApi.update(chatToMove.id, { projectId: targetProjectId, moveAssets: true });
+            if (activeChatId === chatToMove.id) setActiveChatId(null);
+            toast.success('Session moved', 'The chat and its generated assets now live in the project');
+          } catch (err) {
+            toast.error('Move failed', err instanceof Error ? err.message : 'Could not move the session');
+          }
+        }}
+      />
     </div>
   );
 }
