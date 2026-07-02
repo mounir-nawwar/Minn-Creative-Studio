@@ -85,10 +85,19 @@ chat (`useChat`), so the **whole** brief reaches every call — not just a few f
 4. When `done`, for each generated video the client calls `callBackend('fetchVideoFile', { url })` → backend downloads from GCS and streams to local storage → `{ storageUrl }`.
 5. Cost is tracked on completion (per-second × duration, +audio); the node stores the `storageUrl`(s).
 
-### 4) Chat message
+### 4) Chat message (drawer)
 1. `useChat.sendMessage(text, assets)` creates a chat if needed (`POST /api/chats`), posts the user message (`POST /api/chats/:id/messages`), and titles the chat on the first message.
 2. It calls `generateText({ prompt:text, model:'gemini-3-flash-preview', systemInstruction:'creative director…', imageUrls, projectContext, projectId })` → `callBackend('generateContent', …)` → `/api/gemini/proxy` → Vertex.
 3. The assistant reply is posted (`POST /api/chats/:id/messages`, role `assistant`); the 4s poll refreshes the message list.
+
+### 5) Chat Studio generation (any mode)
+1. `useChatStudio.sendMessage(text, attachments)` ensures a session exists, posts the user message **with attachments**, then dispatches on the panel's mode:
+   - **text** → `generateText` (chosen model + editable system instruction / preset)
+   - **image** → `generateImage` (Imagen via `generateImages`, Nano Banana via `generateContent`) — the **proxy** saves the assets and tracks cost, returning storage URLs
+   - **video** → `generateVideo` (Veo LRO: client polls `getOperation` every 5s, then `fetchVideoFile` saves + records the asset); a local pending bubble shows the elapsed time
+   - **audio** → `generateAudio` (TTS sync / Lyria-Pro LRO)
+2. The assistant message is posted with `attachments: [{ url, type, model }]` and a short params summary as its `content` (which feeds `chats.last_message`).
+3. `projectContext` is injected exactly like everywhere else — except in the playground, where `buildProjectContext` returns `''`.
 
 ---
 
@@ -101,10 +110,14 @@ chat (`useChat`), so the **whole** brief reaches every call — not just a few f
 | `POST /api/auth/refresh` | `apiRequest` 401 handler |
 | `GET /api/auth/me` | `auth.me` (App mount) |
 | `GET/POST/PUT/DELETE /api/projects…` | `projectsApi` (useProject) |
+| `POST /api/projects/playground` | `projectsApi.ensurePlayground` (useProject.enterPlayground) |
 | `GET /api/projects/:id/usage` | `projectsApi.getUsage` |
 | `GET/POST/PUT/DELETE /api/workflows…` | `workflowsApi` (Canvas auto-save = `PUT`) |
-| `GET/POST/PUT/DELETE /api/chats…` | `chatsApi` (useChat) |
+| `GET/POST/PUT/DELETE /api/chats…` | `chatsApi` (useChat + useChatStudio; `PUT` with `projectId`+`moveAssets` = move session) |
+| `GET /api/assets/all` | `assetsApi.listAll` (LibraryGrid) |
+| `PATCH /api/assets/:id/move` | `assetsApi.move` (MoveToProjectDialog) |
 | `GET/POST/DELETE /api/assets…` | `assetsApi` / `useAssets` |
+| `GET/POST/PUT/DELETE /api/presets…` | `presetsApi` (PresetsMenu) |
 | `POST /api/gemini/proxy` | `callBackend` (all `services/gemini/*`) |
 | `POST /api/proxy-image` | `urlToBase64`, `downloadFile` |
 | `POST /api/upscale/video` | image/video upscaler nodes |

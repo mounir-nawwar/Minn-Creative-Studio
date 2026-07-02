@@ -4,8 +4,11 @@ Guidance for Claude Code (and other AI agents) working in this repo. Read this f
 
 ## What this is
 
-**Minn Creative Studio** — a self-hosted, node-based AI creative studio. Users build image/video/audio
-generation pipelines on a React Flow canvas by wiring **nodes** together. It's a private two-user agency
+**Minn Creative Studio** — a self-hosted AI creative studio with **two creation workspaces per project**:
+a node-based **Canvas** (React Flow pipelines) and a Google-AI-Studio-style **Chat Studio** (pick a model,
+generate text/images/video/audio inline in a persistent conversation). A **Playground** entry on the project
+picker opens either workspace with no client project — backed by a hidden shared sentinel project
+(`id='playground'`). A global **Library** shows every asset across projects. It's a private two-user agency
 tool, not a public SaaS. One Node process (`server.ts`) serves both the React SPA and the Express API.
 
 ## ⚠️ The #1 thing to know: the docs you may have trained on are stale
@@ -62,14 +65,17 @@ better-sqlite3 · jsonwebtoken · zod · `@google/genai` + `google-auth-library`
 server.ts              # Express entry: mounts /api, serves SPA, /storage static
 backend/               # config · middleware · routes · services · processing · utils
 src/
-  App.tsx              # auth gate + 5-screen routing state machine
+  App.tsx              # auth gate + screen routing (login/picker/canvas/chat-studio via studioMode)
   canvas/Canvas.tsx    # React Flow host + 2s debounced auto-save
   nodes/               # BaseNode.tsx + ~49 registered node components
-  components/          # UI (sidebar, toolbar, chat, modals, …)
-  store/               # Zustand: useStore (graph), useProjectStore, useToastStore
-  hooks/               # useProject, useChat, useAssets (REST + polling)
+  components/          # UI (sidebar, toolbar, chat drawer, modals, …)
+    ChatStudio/        # full-screen chat workspace (rail/thread/composer/settings + useChatStudio)
+    Library/           # global asset gallery + move-to-project dialogs
+  store/               # Zustand: useStore (graph), useProjectStore (incl. studioMode), useToastStore
+  hooks/               # useProject (incl. enterPlayground), useChat, useAssets (REST + polling)
   services/gemini/     # AI client → POST /api/gemini/proxy
-  lib/api.ts           # REST client (auth/projects/workflows/chats/assets) + token refresh
+  lib/                 # api.ts (REST + token refresh) · models.ts (studio model registry)
+                       # · markdown.tsx · projectContext.ts (skips the playground sentinel)
   types/               # NodeType, NODE_HANDLES, validation rules
 docs/                  # the authoritative documentation
 data/  storage/        # runtime SQLite + media (gitignored)
@@ -86,7 +92,10 @@ data/  storage/        # runtime SQLite + media (gitignored)
   add handle defs to `src/types/nodeHandles.ts`, and **register it in `src/utils/nodeTypes.ts`** (unregistered files won't appear on the canvas).
 - **Auth:** protected backend routes use `authMiddleware`; the frontend attaches `Authorization: Bearer` via
   `authHeader()` and auto-refreshes on 401 in `lib/api.ts`. Keep that flow intact.
-- **Shared workspace is intentional:** `projects.findAll()` returns every user's projects. Don't "fix" it to filter by `user_id`.
+- **Shared workspace is intentional:** `projects.findAll()` returns every user's projects (minus the playground
+  sentinel), and asset/workflow routes check existence, not ownership. Don't "fix" either to filter by `user_id`.
+  Chats remain per-user. The **playground sentinel** (`id='playground'`) must stay hidden from lists,
+  un-editable, un-deletable, and excluded from `buildProjectContext`.
 - **Styling:** dark theme, single teal accent `#0097A7` (hover `#00a9bb`); don't introduce new accent colors.
   Build interactive surfaces on **Radix UI** (Dialog/AlertDialog/DropdownMenu/Avatar) and the shared primitives
   (`src/nodes/ui.tsx`, `src/components/ProjectCreation/ui.tsx`, `ProfileMenu`). **Calm motion:** no hover/tap

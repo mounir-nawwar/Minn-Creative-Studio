@@ -2,7 +2,12 @@
 
 ## 🎯 What it is
 
-Minn Creative Studio is a **visual, node-based AI creative studio**. The user works on an infinite [React Flow](https://reactflow.dev/) canvas, dropping **nodes** and connecting their handles to form a directed graph (a "workflow"). Nodes range from simple inputs (a prompt, a number, an uploaded image) to heavy AI generators (Imagen, Veo, Lyria) to processing utilities (blur, crop, upscale, mask) to a terminal **Output** node that collects and downloads results.
+Minn Creative Studio is an AI creative studio with **two creation workspaces**, switchable per project:
+
+1. **Canvas** — an infinite [React Flow](https://reactflow.dev/) canvas where the user drops **nodes** and connects their handles into a directed graph (a "workflow"). Nodes range from simple inputs (a prompt, a number, an uploaded image) to heavy AI generators (Imagen, Veo, Lyria) to processing utilities (blur, crop, upscale, mask) to a terminal **Output** node that collects and downloads results.
+2. **Chat Studio** — a Google-AI-Studio-style conversational workspace: pick a mode (text/image/video/audio) and a model, and results land inline in a persistent chat thread, with a generation-settings side panel and reusable system-instruction presets.
+
+Two supporting surfaces round it out: a **Playground** (enter either workspace with no client project — backed by a hidden shared sentinel project `id='playground'`, with move-to-project actions to promote keepers) and a global **Library** (every asset across all projects, filterable and searchable).
 
 It is a **single-tenant, two-user private tool** for an agency, not a public product — hence the hardcoded accounts and the deliberately permissive CORS.
 

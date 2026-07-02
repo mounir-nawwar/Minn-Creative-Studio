@@ -33,6 +33,7 @@ backend/
    | `/api/workflows` | `workflows.ts` | New |
    | `/api/chats` | `chats.ts` | New |
    | `/api/assets` | `assets.ts` | New |
+   | `/api/presets` | `presets.ts` | New (Chat Studio presets) |
    | `/api/` | `upload.ts` | Legacy |
    | `/api/proxy-image` | `imageProxy.ts` | Legacy |
    | `/api/gemini/proxy` | `gemini.ts` | Legacy (core AI gateway) |
@@ -129,12 +130,17 @@ A separate **legacy** `auth.ts` exists (cookie/session based, `loginLimiter` + `
 ### Projects — `projects.ts`
 | Method · Path | Purpose |
 |---|---|
-| `GET /projects` | List **all** projects (shared workspace via `projects.findAll()`) |
-| `GET /projects/:id` | Single project |
+| `GET /projects` | List **all** projects (shared workspace via `projects.findAll()`; the playground sentinel is excluded) |
+| `POST /projects/playground` | **Idempotent**: creates/returns the hidden shared **Playground sentinel** (`id='playground'`, `settings.isPlayground`). Registered before `/:id`. |
+| `GET /projects/:id` | Single project (also returns the sentinel — needed to enter playground mode) |
 | `POST /projects` | Create `{ name, description?, settings? }` |
-| `PUT /projects/:id` | Update `{ name?, description?, settings?, usage? }` |
-| `DELETE /projects/:id` | Delete project + `deleteProjectFiles(id)` storage cleanup |
+| `PUT /projects/:id` | Update `{ name?, description?, settings?, usage? }` — **403 for the playground sentinel** |
+| `DELETE /projects/:id` | Delete project + `deleteProjectFiles(id)` storage cleanup — **403 for the playground sentinel** |
 | `GET /projects/:id/usage` | `usage_logs` for the project |
+
+> **Playground:** playground mode (canvas/chat without a client project) is backed by this sentinel row so every
+> `NOT NULL project_id` path (workflows, assets, usage_logs, cost tracking) works unchanged. It never appears in
+> project lists and cannot be edited or deleted.
 
 ### Workflows — `workflows.ts`
 | Method · Path | Purpose |
@@ -145,26 +151,42 @@ A separate **legacy** `auth.ts` exists (cookie/session based, `loginLimiter` + `
 | `PUT /workflows/:id` | Update `{ name?, nodes?, edges? }` — the **canvas auto-save** target |
 | `DELETE /workflows/:id` | Delete |
 
+> **Shared workspace:** workflow routes check that the project/workflow *exists* — not who owns it. Either user
+> may open, save, or delete any workflow (required for the shared playground and shared client projects).
+
 ### Chats — `chats.ts`
 | Method · Path | Purpose |
 |---|---|
-| `GET /chats` | List chats for user |
-| `GET /chats/:id` | Chat + its `messages` |
+| `GET /chats` | List chats for user (chats stay **per-user**, unlike projects/assets) |
+| `GET /chats/:id` | Chat + its `messages` (each message includes parsed `attachments`) |
 | `GET /chats/:id/messages` | Messages only |
-| `POST /chats` | Create `{ title?, projectId? }` |
-| `POST /chats/:id/messages` | Add `{ role:'user'\|'assistant', content }` (updates `last_message`) |
-| `PUT /chats/:id` | Update `{ title }` |
+| `POST /chats` | Create `{ title?, projectId? }` (project validated for existence only) |
+| `POST /chats/:id/messages` | Add `{ role:'user'\|'assistant', content, attachments? }` — attachments validated (≤10, each `{ url, type:'image'\|'video'\|'audio', assetId?, name?, model? }`); updates `last_message` |
+| `PUT /chats/:id` | Update `{ title?, projectId?, moveAssets? }` — with `projectId` + `moveAssets:true` it **moves the chat to another project along with every generated asset** its messages reference (resolved by `assetId` or storage URL) and rewrites attachment URLs so media keeps loading |
 | `DELETE /chats/:id` | Delete chat (cascades to messages) |
 
 ### Assets — `assets.ts`
 | Method · Path | Purpose |
 |---|---|
+| `GET /assets/all?type=&projectId=&q=&limit=&offset=` | **Global library**: every asset across all projects (playground included) with `project_name` joined in; `q` searches filename + `metadata.$.prompt`. Registered before `/:id`. |
 | `GET /assets?projectId=X&type=image` | List assets (optional type filter) |
 | `GET /assets/:id` | Single asset |
 | `POST /assets/upload` | `multipart/form-data`: `file`, `projectId`, `workflowId?`, `nodeId?`, `metadata?` (≤100MB) |
 | `POST /assets/base64` | `{ base64, mimeType, filename?, projectId, … }` |
 | `POST /assets/url` | `{ url, projectId, … }` — **SSRF-protected** fetch (see storage service) |
-| `DELETE /assets/:id` | Ownership-checked delete (file + DB record) |
+| `PATCH /assets/:id/move` | `{ targetProjectId }` — relocates the file into the target project's folder and re-homes the DB row (`storage.moveAssetToProject`) |
+| `DELETE /assets/:id` | Delete (file + DB record) |
+
+> **Shared workspace:** asset routes verify the project *exists* (404), not ownership — either user can read,
+> write, move, and delete assets in any project, including the playground.
+
+### Chat presets — `presets.ts` (mounted `/api/presets`)
+| Method · Path | Purpose |
+|---|---|
+| `GET /presets` | List all presets (shared between both users). First-ever call **seeds 3 defaults**: "Creative director", "IG caption writer", "Try-on prompt builder". |
+| `POST /presets` | Create `{ name, systemInstruction }` |
+| `PUT /presets/:id` | Update `{ name?, systemInstruction? }` |
+| `DELETE /presets/:id` | Delete |
 
 ### AI gateway — `gemini.ts` (mounted `/api/gemini/proxy`, `requireAuth` + `aiLimiter`)
 One endpoint, `POST /` with `{ method, params }`. The `method` dispatches:
@@ -175,7 +197,7 @@ One endpoint, `POST /` with `{ method, params }`. The `method` dispatches:
 | `generateImages` | Imagen 4. Uploads images to storage (strips raw bytes), tracks per-image cost. |
 | `generateVideos` | Veo. Uses `vertexGenerateVideos` (direct v1 REST) → returns a long-running operation `{ operation, isLro:true }`. |
 | `getOperation` | Polls a video/audio LRO via `vertexGetOperation`; tracks cost when `done`. Returns `{ done, response:{ generatedVideos, candidates } }`. |
-| `fetchVideoFile` | Downloads a finished video (data URL / GCS / HTTP) and streams it to local storage; returns `{ storageUrl }`. |
+| `fetchVideoFile` | Downloads a finished video (data URL / GCS / HTTP), streams it to local storage, and **records it in the `assets` table** (videos generated before this fix have files but no asset rows); returns `{ storageUrl, assetId }`. |
 
 Errors: `504` if >58s, `422` if the prompt was blocked (no image), else `500 { error }`.
 
@@ -194,11 +216,12 @@ Errors: `504` if >58s, `422` if the prompt was blocked (no image), else `500 { e
 ## 🧰 services/
 
 ### `services/database.ts` — SQLite layer
-- DB at `DATABASE_PATH` or `data/minn-studio.db`. `journal_mode = WAL`, `foreign_keys = ON`. Schema initialized on import (`initializeSchema()`).
-- **8 tables:** `users`, `projects`, `workflows`, `chats`, `messages`, `assets`, `usage_logs`, `prompts` (+ indexes on the common FKs). Workflow `nodes`/`edges`, project `settings`/`usage`, asset `metadata`, prompt `tags` are stored as JSON text and parsed on read.
-- **Repository objects** with `create/findById/find…/update/delete`: `users`, `projects` (incl. `findAll()` for the shared workspace), `workflows`, `chats`, `messages`, `assets`, `usageLogs` (`log`, `getByProjectId`), `prompts`.
+- DB at `DATABASE_PATH` or `data/minn-studio.db`. `journal_mode = WAL`, `foreign_keys = ON`. Schema initialized on import (`initializeSchema()`), then **guarded migrations** run via `ensureColumn(table, column, ddl)` (PRAGMA `table_info` check → `ALTER TABLE ADD COLUMN`).
+- **9 tables:** `users`, `projects`, `workflows`, `chats`, `messages`, `assets`, `usage_logs`, `prompts`, `chat_presets` (+ indexes on the common FKs). Workflow `nodes`/`edges`, project `settings`/`usage`, asset `metadata`, prompt `tags`, and **message `attachments`** (migrated column, JSON array of `MessageAttachment`) are stored as JSON text and parsed on read.
+- `PLAYGROUND_PROJECT_ID = 'playground'` — the shared hidden sentinel; `projects.findAll()` excludes it.
+- **Repository objects** with `create/findById/find…/update/delete`: `users`, `projects` (incl. `findAll()` for the shared workspace), `workflows`, `chats` (`update` also re-homes `project_id`), `messages` (`create` accepts attachments; `updateAttachments` rewrites them after asset moves), `assets` (incl. `findByUrl`, `findAllWithProject` for the Library, `updateLocation` for moves), `usageLogs` (`log`, `getByProjectId`), `prompts`, `chatPresets`.
 - **Password hashing:** `hashPassword`/`hashPasswordAsync` = PBKDF2 100k iterations, SHA-512, 16-byte salt → `salt:hashHex`; `verifyPassword*` uses `crypto.timingSafeEqual`.
-- `generateId()` = 16 random bytes hex. `trackProjectCost(projectId, cost, metadata)` looks up the owning user and writes to `usage_logs` + rolls up `projects.usage` JSON.
+- `generateId()` = 16 random bytes hex. `trackProjectCost(projectId, cost, metadata)` looks up the owning user and writes to `usage_logs` + rolls up `projects.usage` JSON (playground spend is attributed to the sentinel's creator).
 
 ### `services/auth.ts` — JWT + seeded users
 - Config: `JWT_SECRET` (required), `JWT_REFRESH_SECRET` (defaults to `JWT_SECRET + '-refresh'`), access `'1h'`, refresh `'30d'`.
@@ -213,7 +236,7 @@ Errors: `504` if >58s, `422` if the prompt was blocked (no image), else `500 { e
   - *Content spoofing* — magic-byte signature check that the real bytes match the claimed MIME (special-cased WEBP/WAV).
   - *SSRF* — `isValidExternalUrl` blocks non-http(s), localhost/`.internal`, cloud metadata IPs (`169.254.169.254` etc.), and private ranges; handles hex/decimal/IPv4-mapped forms and validates redirect targets manually (no auto-follow).
   - *Symlinks* — refuses to delete symlinks and checks for them before recursive deletes.
-- Functions: `uploadFile`, `uploadBase64`, `uploadFromUrl`, `deleteFile(assetId,userId)` (ownership-checked), `deleteProjectFiles(projectId)`, `getStorageStats()`.
+- Functions: `uploadFile`, `uploadBase64`, `uploadFromUrl`, `deleteFile(assetId,userId)` (shared workspace — userId is audit-log only), `moveAssetToProject(assetId, targetProjectId)` (collision-safe rename with copy+unlink fallback; missing source files move the record only), `deleteProjectFiles(projectId)`, `getStorageStats()`.
 
 ### `services/vertex.ts` — Vertex AI integration
 - Resolves the project id from `GOOGLE_CLOUD_PROJECT` (or `VERTEX_DEV_PROJECT` in dev) → `VERTEX_PROJECT`; logs `[Vertex] Active Project: …`.

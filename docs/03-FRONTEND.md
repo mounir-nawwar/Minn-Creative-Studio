@@ -10,11 +10,15 @@ src/
 ├── hooks/        useProject.ts · useChat.ts · useAssets.ts · useAssetExpand.tsx
 ├── services/     geminiService.ts · performance.ts · gemini/*
 ├── contexts/     ConnectionContext.tsx
-├── lib/          api.ts · utils.ts · env.ts · projectContext.ts
+├── lib/          api.ts · utils.ts · env.ts · projectContext.ts · models.ts · markdown.tsx
 ├── types/        project.types.ts · nodeHandles.ts · handleTypes.ts · validationRules.ts · …
 ├── nodes/        BaseNode.tsx · ui.tsx (shared primitives) + ~49 node components
-├── components/   UI components (see Design System) · ProfileMenu · ProjectPickerHeader
-│                 └── ProjectCreation/  StepBasicInfo · StepVisualIdentity · StepReview · ui.tsx
+├── components/   UI components (see Design System) · ProfileMenu · ProjectPickerHeader · StudioModeToggle
+│                 ├── ProjectCreation/  StepBasicInfo · StepVisualIdentity · StepReview · ui.tsx
+│                 ├── ChatStudio/       ChatStudio · ChatHistoryRail · ChatThread · MessageBubble
+│                 │                     · MediaAttachment · ChatComposer · GenerationSettingsPanel
+│                 │                     · PresetsMenu · useChatStudio.ts
+│                 └── Library/          LibraryGrid · LibraryDialog · MoveToProjectDialog
 ├── pages/        ProjectPicker.tsx
 ├── styles/       design.tokens.css
 └── index.css
@@ -60,7 +64,7 @@ Holds the React Flow graph and canvas UI state (`useStore.ts:32-60`):
 - **Undo/redo:** `saveToHistory` keeps up to `MAX_HISTORY = 50` deep-cloned snapshots; `undo`/`redo`/`canUndo`/`canRedo` walk the stack. Mutations schedule a snapshot via `setTimeout(…,0)`.
 
 ### `store/useProjectStore.ts` — project & shell UI state
-`currentProject`, `activeWorkflowId`, `isSettingsOpen`, `isSidebarOpen` (default open), `settingsMode` (`'create'|'edit'`), `uploadEnabled` (default true). Actions: `setCurrentProject`, `setActiveWorkflowId`, `clearProject` (used on logout/back), `updateProject`, `openSettings`/`closeSettings`, `toggleSidebar`/`setSidebarOpen`, `setUploadEnabled`.
+`currentProject`, `activeWorkflowId`, `isSettingsOpen`, `isSidebarOpen` (default open), `settingsMode` (`'create'|'edit'`), `uploadEnabled` (default true), **`studioMode` (`'canvas'|'chat'`, default canvas)** — which workspace renders inside an open project. Actions: `setCurrentProject`, `setActiveWorkflowId`, `clearProject` (used on logout/back; also resets `studioMode` to canvas), `updateProject`, `openSettings`/`closeSettings`, `toggleSidebar`/`setSidebarOpen`, `setUploadEnabled`, `setStudioMode`. Also exports **`isPlaygroundProject(project)`** — true when the open "project" is the hidden playground sentinel (`PLAYGROUND_PROJECT_ID` from `constants.ts`).
 
 ### `store/useToastStore.ts` — toasts
 `toast.success/error/info/warning(title, message?, options?)`. Auto-dismiss ~4000ms (errors ~6000ms). Rendered by `ToastContainer`.
@@ -79,13 +83,43 @@ isLoading                                   → "Connecting" spinner
 !user                                       → CustomLoginPage
 user & hasApiKey === false                  → "API Key Required" screen (AI Studio only)
 user & no currentProject                    → ProjectPicker
-user & currentProject                       → main app
+user & currentProject & studioMode='canvas' → canvas workspace
+user & currentProject & studioMode='chat'   → Chat Studio workspace
 ```
 
 - **Background:** the UnicornStudio `scene.json` renders behind auth screens only, fading out (and unmounting after 700ms) once you enter the main app (`App.tsx:138-174`).
 - **Logout (`handleLogout`, `App.tsx:110`)** clears tokens, clears the project, and sets `user=null` **synchronously**, then fires `auth.logout()` in the background — this is the fix for the old "had to refresh to log out" bug.
-- **Main app shell** (`App.tsx:246-277`) wraps everything in `ReactFlowProvider` + `ConnectionProvider`: `ProjectSidebar` | (`ProjectContextBar` → `Toolbar` → `Canvas` → `ChatDrawer` → `AssetExpandModal` → `OfflineIndicator` → `ProjectCreationOverlay`).
+- **Canvas shell** wraps everything in `ReactFlowProvider` + `ConnectionProvider`: `ProjectSidebar` | (`ProjectContextBar` → `Toolbar` → `Canvas` → `ChatDrawer` → `AssetExpandModal` → `OfflineIndicator` → `ProjectCreationOverlay`).
+- **Chat Studio shell** renders `<ChatStudio user onLogout />` full-screen (no React Flow providers) plus `AssetExpandModal`, `OfflineIndicator`, and the same `ProjectCreationOverlay` block. Both workspaces carry the shared `StudioModeToggle` segmented control (Toolbar right cluster / ChatStudio header) to switch instantly.
 - Lazy-loads the heavy main-app components (`React.lazy`) so the login screen stays light.
+
+### Chat Studio — `components/ChatStudio/`
+
+A Google-AI-Studio-style conversational creation workspace (per project **and** playground):
+
+| File | Responsibility |
+|---|---|
+| `ChatStudio.tsx` | 3-pane shell + header (back to projects, project name or Playground pill, mode toggle, ProfileMenu); hosts the move-session dialog |
+| `ChatHistoryRail.tsx` | Left rail of chat sessions (`last_message` previews, new/delete/move actions) |
+| `ChatThread.tsx` | Centered scrolling conversation (max-w-3xl) with autoscroll + empty state |
+| `MessageBubble.tsx` | User bubble (teal) / assistant markdown via shared `lib/markdown.tsx`; renders `attachments` |
+| `MediaAttachment.tsx` | Inline media: image (click → expand), `VideoPreview`, `AudioPreview`; `PendingBubble` shows the in-flight generation with an elapsed timer |
+| `ChatComposer.tsx` | Auto-grow textarea, Enter-to-send, attach button (Library picker), attachment chips |
+| `GenerationSettingsPanel.tsx` | Right panel: mode (Text/Image/Video/Audio), model picker from `lib/models.ts`, params rendered from capability flags, presets menu |
+| `PresetsMenu.tsx` | Apply/save/delete reusable system-instruction presets (`/api/presets`) |
+| `useChatStudio.ts` | The engine: chats + messages with **4s polling and merge-by-id optimistic reconciliation** (poll reconcile pauses while a generation is in flight); `sendMessage` dispatches by mode — `generateText` / `generateImage` / `generateVideo` (client-side LRO poll) / `generateAudio` — and persists assistant messages with attachments. Media results are storage URLs (the proxy already saved assets + tracked cost). |
+
+**Playground mode:** the picker header's Playground dropdown calls `useProject.enterPlayground(mode)` → `POST /api/projects/playground` → selects the sentinel + sets `studioMode`. `buildProjectContext` returns `''` for the sentinel so no fake brand defaults reach prompts. Known v1 limit: the pending video bubble is local-only — closing the tab mid-Veo abandons the result.
+
+### Library — `components/Library/`
+
+| File | Responsibility |
+|---|---|
+| `LibraryGrid.tsx` | Global asset gallery over `GET /api/assets/all`: debounced search (filename + prompt), type chips, project dropdown (incl. Playground), per-card project label; `isPicker` mode reused as the Chat Studio attach-picker |
+| `LibraryDialog.tsx` | Full-screen Radix Dialog hosting the grid; opened from the **picker header** and the **canvas toolbar**; cards get a move-to-project action |
+| `MoveToProjectDialog.tsx` | Pick a target project to re-home an asset (`PATCH /api/assets/:id/move`) or a chat session (`PUT /api/chats/:id` with `moveAssets:true`) |
+
+The picker page also mounts `AssetExpandModal` so Library previews work outside the main app.
 
 ---
 
@@ -93,7 +127,7 @@ user & currentProject                       → main app
 
 | Hook | Responsibility | Endpoints / polling |
 |------|----------------|---------------------|
-| `useProject.ts` | Projects list + current project. Converts API↔local `Project` shape (lifts nested `settings.*`), splits active vs archived, soft-delete (status `archived` + `deletedAt`), `cleanupExpiredProjects` past `RETENTION_DAYS`. | `projectsApi.*`; **polls every 5s** + on mount (only while authenticated) |
+| `useProject.ts` | Projects list + current project. Converts API↔local `Project` shape (lifts nested `settings.*`), splits active vs archived, soft-delete (status `archived` + `deletedAt`), `cleanupExpiredProjects` past `RETENTION_DAYS`, **`enterPlayground(mode)`** (ensures the sentinel → selects it → sets `studioMode`). | `projectsApi.*`; **polls every 5s** + on mount (only while authenticated) |
 | `useChat.ts` | Chat sessions + AI replies. `sendMessage` ensures a chat exists, posts the user message, titles the chat on the first message, calls `generateText(...)` (model `gemini-3-flash-preview`, creative-director system prompt, project context, image attachments), posts the assistant reply. | `chatsApi.*` + `generateText`; **polls every 4s** |
 | `useAssets.ts` | Upload & list assets. `uploadAsset(file)` (FormData), `uploadBase64(...)` (generated images), `uploadFromUrl(...)`. | `assetsApi.*`; **polls every 5s** |
 | `useAssetExpand.tsx` | Thin wrapper exposing `setExpandedAsset` so output nodes can open the global full-screen preview. | — |
@@ -138,8 +172,22 @@ every AI generation. It includes only the non-empty fields — name, type/subtyp
 client + industry, description, target audience, brand tone, visual mood, brand
 colors, style keywords, "avoid" (negative) keywords, and the AI master instructions.
 Centralizing it here means the whole creative brief reaches the model (not just a
-couple of fields). Consumed by `ImagenNode`, `VeoNode`, `LLMNode`,
-`PromptEnhancerNode`, and `useChat` — see [04](./04-FRONTEND-BACKEND-CONNECTION.md).
+couple of fields). Returns `''` for the **playground sentinel** so its back-filled
+defaults never leak into prompts. Consumed by `ImagenNode`, `VeoNode`, `LLMNode`,
+`PromptEnhancerNode`, `useChat`, and `useChatStudio` — see [04](./04-FRONTEND-BACKEND-CONNECTION.md).
+
+## 🎛️ `src/lib/models.ts`
+Unified **StudioModel registry** for Chat Studio: text (Gemini 3 Flash / 3.1 Pro /
+3.1 Flash Lite), image (adapted from `nodes/imagenModels.ts` — Imagen 4 family +
+Nano Bananas), video (Veo 3.1 / 3.1 Fast), audio (Lyria 3 Clip/Pro + TTS voices).
+Each entry carries capability flags (`aspectRatio`, `resolution`, `sampleCount`,
+`duration`, `voice`, `bpm`…) that drive the settings panel, plus per-model defaults.
+`modelsForMode(mode)`, `findModel(id)`, `DEFAULT_MODEL_FOR_MODE`, `MAX_CHAT_SAMPLES = 4`
+(proxy times out ~58s per call). Model ids must match `backend/config/pricing.ts`.
+
+## 📝 `src/lib/markdown.tsx`
+Shared chat markdown renderer (`renderMarkdown`, `parseInline`, `CodeCanvas` with
+copy button) extracted from `ChatDrawer` so Chat Studio renders identically.
 
 ## 📓 Notes for AI agents
 `src/AGENTS.md` documents the connection-validation system; `src/AGENTS-REVIEW.md` is a candid self-review flagging known issues (some `any` types, O(n²) validation, unmemoized context value, silent save failures, missing ARIA). Treat the latter as a backlog, not current behavior guarantees.
