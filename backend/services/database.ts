@@ -276,6 +276,14 @@ export const users = {
   }
 };
 
+/**
+ * Sentinel shared "Playground" project id.
+ * Backs playground mode (canvas/chat without a real project) so every
+ * NOT NULL project_id path (workflows, assets, usage_logs) keeps working.
+ * Hidden from findAll() so it never shows up in project lists.
+ */
+export const PLAYGROUND_PROJECT_ID = 'playground';
+
 // Project operations
 export const projects = {
   create: (id: string, userId: string, name: string, description?: string, settings?: any) => {
@@ -309,9 +317,10 @@ export const projects = {
 
   // Shared workspace: all projects are visible to every authorized user.
   // The frontend marks a project "shared" when its user_id !== current user.
+  // The playground sentinel is excluded — it's entered explicitly, never listed.
   findAll: () => {
-    const stmt = db.prepare('SELECT * FROM projects ORDER BY updated_at DESC');
-    const projectList = stmt.all() as any[];
+    const stmt = db.prepare('SELECT * FROM projects WHERE id != ? ORDER BY updated_at DESC');
+    const projectList = stmt.all(PLAYGROUND_PROJECT_ID) as any[];
     return projectList.map(p => ({
       ...p,
       settings: p.settings ? JSON.parse(p.settings) : null,

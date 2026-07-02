@@ -4,7 +4,7 @@
  */
 
 import express from 'express';
-import { projects, generateId, usageLogs } from '../services/database.ts';
+import { projects, generateId, usageLogs, PLAYGROUND_PROJECT_ID } from '../services/database.ts';
 import { authMiddleware } from '../services/auth.ts';
 import { deleteProjectFiles } from '../services/storage.ts';
 
@@ -25,6 +25,33 @@ router.get('/', (_req: any, res: any) => {
   } catch (error: any) {
     console.error('Error fetching projects:', error);
     res.status(500).json({ error: 'Failed to fetch projects' });
+  }
+});
+
+/**
+ * POST /api/projects/playground
+ * Idempotent: ensures the shared hidden Playground sentinel project exists
+ * and returns it. Registered before /:id routes so it isn't captured as an id.
+ */
+router.post('/playground', (req: any, res: any) => {
+  try {
+    const existing = projects.findById(PLAYGROUND_PROJECT_ID);
+    if (existing) {
+      return res.json(existing);
+    }
+
+    projects.create(
+      PLAYGROUND_PROJECT_ID,
+      req.user.id,
+      'Playground',
+      'Scratch space — not a client project',
+      { isPlayground: true, status: 'active' }
+    );
+
+    res.status(201).json(projects.findById(PLAYGROUND_PROJECT_ID));
+  } catch (error: any) {
+    console.error('Error ensuring playground project:', error);
+    res.status(500).json({ error: 'Failed to open the playground' });
   }
 });
 
@@ -82,6 +109,11 @@ router.put('/:id', (req: any, res: any) => {
     const { id } = req.params;
     const { name, description, settings, usage } = req.body;
 
+    // The playground sentinel is managed by the server; it cannot be edited or archived
+    if (id === PLAYGROUND_PROJECT_ID) {
+      return res.status(403).json({ error: 'The playground cannot be edited' });
+    }
+
     const project = projects.findById(id);
 
     if (!project) {
@@ -106,6 +138,11 @@ router.put('/:id', (req: any, res: any) => {
 router.delete('/:id', async (req: any, res: any) => {
   try {
     const { id } = req.params;
+
+    // The playground sentinel is permanent scratch space
+    if (id === PLAYGROUND_PROJECT_ID) {
+      return res.status(403).json({ error: 'The playground cannot be deleted' });
+    }
 
     const project = projects.findById(id);
 
