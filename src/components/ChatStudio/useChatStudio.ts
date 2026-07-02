@@ -4,7 +4,7 @@ import { useStore } from '../../store/useStore';
 import { buildProjectContext } from '../../lib/projectContext';
 import { toast } from '../../store/useToastStore';
 import { chatsApi, Chat, ChatMessage, MessageAttachment } from '../../lib/api';
-import { generateText } from '../../services/geminiService';
+import { generateText, generateImage, generateVideo, generateAudio } from '../../services/geminiService';
 import { DEFAULT_MODEL_FOR_MODE, findModel } from '../../lib/models';
 import type { GenerationMode } from '../../lib/models';
 
@@ -166,6 +166,16 @@ export function useChatStudio() {
     return chatId;
   }, [activeChatId, currentProject, setActiveChatId, fetchChats, appendMessage]);
 
+  // The playground sentinel carries no real brand identity — don't inject it
+  const projectContext = useCallback(
+    () => (isPlayground ? undefined : buildProjectContext(currentProject!)),
+    [isPlayground, currentProject],
+  );
+
+  const onProgress = useCallback((elapsed?: string) => {
+    setPending((prev) => (prev ? { ...prev, elapsed } : prev));
+  }, []);
+
   const runTextGeneration = useCallback(async (chatId: string, text: string, attachments: MessageAttachment[]) => {
     const imageUrls = attachments.filter((a) => a.type === 'image').map((a) => a.url);
     const modelText = await generateText({
@@ -173,14 +183,105 @@ export function useChatStudio() {
       model: settings.model,
       systemInstruction: settings.systemInstruction || CREATIVE_DIRECTOR_INSTRUCTION,
       imageUrls,
-      // The playground sentinel carries no real brand identity — don't inject it
-      projectContext: isPlayground ? undefined : buildProjectContext(currentProject!),
+      projectContext: projectContext(),
       maxOutputTokens: 8192,
       projectId: currentProject!.id,
     });
     const assistantMessage = await chatsApi.addMessage(chatId, 'assistant', modelText);
     appendMessage(assistantMessage);
-  }, [settings.model, settings.systemInstruction, isPlayground, currentProject, appendMessage]);
+  }, [settings.model, settings.systemInstruction, projectContext, currentProject, appendMessage]);
+
+  const runImageGeneration = useCallback(async (chatId: string, text: string, attachments: MessageAttachment[]) => {
+    const p = settings.params;
+    const referenceImages = attachments
+      .filter((a) => a.type === 'image')
+      .map((a) => ({ url: a.url, role: 'reference', strength: 1 }));
+
+    // The proxy persists generated images as project assets and returns storage URLs
+    const result = await generateImage({
+      prompt: text,
+      model: settings.model,
+      aspectRatio: (p.aspectRatio as string) || '1:1',
+      resolution: p.resolution as string | undefined,
+      sampleCount: (p.sampleCount as number) || 1,
+      seed: p.seed as number | undefined,
+      temperature: p.temperature as number | undefined,
+      ...(referenceImages.length > 0 ? { referenceImages } : {}),
+      projectContext: projectContext(),
+      projectId: currentProject!.id,
+    });
+
+    const urls = Array.isArray(result) ? result : [result];
+    const label = findModel(settings.model)?.label ?? settings.model;
+    const summary = `Generated ${urls.length > 1 ? `${urls.length} images` : 'image'} · ${label} · ${(p.aspectRatio as string) || '1:1'}`;
+    const assistantMessage = await chatsApi.addMessage(
+      chatId, 'assistant', summary,
+      urls.map((url) => ({ url, type: 'image' as const, model: settings.model })),
+    );
+    appendMessage(assistantMessage);
+  }, [settings.model, settings.params, projectContext, currentProject, appendMessage]);
+
+  const runVideoGeneration = useCallback(async (chatId: string, text: string, attachments: MessageAttachment[]) => {
+    const p = settings.params;
+    // First attached image drives image-to-video; the rest act as style references
+    const imageAttachments = attachments.filter((a) => a.type === 'image');
+    const startFrameUrl = imageAttachments[0]?.url;
+    const referenceImages = imageAttachments.slice(1).map((a) => ({ url: a.url, role: 'reference', strength: 1 }));
+
+    const videos = await generateVideo({
+      prompt: text,
+      model: settings.model,
+      aspectRatio: (p.aspectRatio as string) || '16:9',
+      resolution: (p.resolution as string) || '720p',
+      duration: (p.duration as number) || 8,
+      negativePrompt: p.negativePrompt as string | undefined,
+      seed: p.seed as number | undefined,
+      audio: (p.audio as boolean) ?? true,
+      ...(startFrameUrl ? { startFrameUrl } : {}),
+      ...(referenceImages.length > 0 ? { referenceImages } : {}),
+      projectContext: projectContext(),
+      projectId: currentProject!.id,
+      onProgress,
+    });
+
+    const label = findModel(settings.model)?.label ?? settings.model;
+    const summary = `Generated video · ${label} · ${(p.duration as number) || 8}s ${(p.resolution as string) || '720p'}`;
+    const assistantMessage = await chatsApi.addMessage(
+      chatId, 'assistant', summary,
+      videos.map((url) => ({ url, type: 'video' as const, model: settings.model })),
+    );
+    appendMessage(assistantMessage);
+  }, [settings.model, settings.params, projectContext, currentProject, appendMessage, onProgress]);
+
+  const runAudioGeneration = useCallback(async (chatId: string, text: string, attachments: MessageAttachment[]) => {
+    const p = settings.params;
+    const isTts = settings.model.includes('tts');
+    const referenceImages = attachments.filter((a) => a.type === 'image').map((a) => ({ url: a.url }));
+
+    const url = await generateAudio({
+      prompt: text,
+      model: settings.model,
+      voice: p.voice as string | undefined,
+      negativePrompt: p.negativePrompt as string | undefined,
+      seed: p.seed as number | undefined,
+      duration: p.duration as number | undefined,
+      bpm: p.bpm as number | undefined,
+      scale: p.scale as string | undefined,
+      ...(referenceImages.length > 0 ? { referenceImages } : {}),
+      projectId: currentProject!.id,
+      onProgress,
+    });
+
+    const label = findModel(settings.model)?.label ?? settings.model;
+    const summary = isTts
+      ? `Generated speech · ${(p.voice as string) || 'Kore'}`
+      : `Generated music · ${label}`;
+    const assistantMessage = await chatsApi.addMessage(
+      chatId, 'assistant', summary,
+      [{ url, type: 'audio' as const, model: settings.model }],
+    );
+    appendMessage(assistantMessage);
+  }, [settings.model, settings.params, currentProject, appendMessage, onProgress]);
 
   const sendMessage = useCallback(async (text: string, attachments: MessageAttachment[] = []) => {
     if (!text.trim() || !currentProject || generatingRef.current) return;
@@ -191,7 +292,19 @@ export function useChatStudio() {
       generatingRef.current = true;
 
       try {
-        await runTextGeneration(chatId, text, attachments);
+        switch (settings.mode) {
+          case 'image':
+            await runImageGeneration(chatId, text, attachments);
+            break;
+          case 'video':
+            await runVideoGeneration(chatId, text, attachments);
+            break;
+          case 'audio':
+            await runAudioGeneration(chatId, text, attachments);
+            break;
+          default:
+            await runTextGeneration(chatId, text, attachments);
+        }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Generation failed';
         toast.error('Generation Error', errorMessage);
@@ -205,7 +318,7 @@ export function useChatStudio() {
       setPending(null);
       generatingRef.current = false;
     }
-  }, [currentProject, settings.mode, prepareUserMessage, runTextGeneration]);
+  }, [currentProject, settings.mode, prepareUserMessage, runTextGeneration, runImageGeneration, runVideoGeneration, runAudioGeneration]);
 
   return {
     chats,
