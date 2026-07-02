@@ -412,6 +412,34 @@ export const assetsApi = {
     apiRequest(`/assets/${id}`, { method: 'DELETE' })
 };
 
+// Chat presets API (Chat Studio system-instruction templates)
+export interface ChatPreset {
+  id: string;
+  user_id: string;
+  name: string;
+  system_instruction: string;
+  created_at: string;
+}
+
+export const presetsApi = {
+  list: (): Promise<ChatPreset[]> => apiRequest('/presets'),
+
+  create: (data: { name: string; systemInstruction: string }): Promise<ChatPreset> =>
+    apiRequest('/presets', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }),
+
+  update: (id: string, data: { name?: string; systemInstruction?: string }): Promise<ChatPreset> =>
+    apiRequest(`/presets/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    }),
+
+  delete: (id: string): Promise<void> =>
+    apiRequest(`/presets/${id}`, { method: 'DELETE' })
+};
+
 // Export all
 export default {
   auth,
@@ -419,6 +447,7 @@ export default {
   workflows: workflowsApi,
   chats: chatsApi,
   assets: assetsApi,
+  presets: presetsApi,
   setTokens,
   clearTokens,
   getAccessToken

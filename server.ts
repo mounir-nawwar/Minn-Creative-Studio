@@ -14,6 +14,7 @@ import projectsRoutes from './backend/routes/projects.ts';
 import workflowsRoutes from './backend/routes/workflows.ts';
 import chatsRoutes from './backend/routes/chats.ts';
 import assetsRoutes from './backend/routes/assets.ts';
+import presetsRoutes from './backend/routes/presets.ts';
 
 // Legacy routes (for Vertex AI integration)
 import uploadRoutes from './backend/routes/upload.ts';
@@ -58,6 +59,7 @@ async function startServer() {
   apiRouter.use('/workflows', workflowsRoutes);
   apiRouter.use('/chats', chatsRoutes);
   apiRouter.use('/assets', assetsRoutes);
+  apiRouter.use('/presets', presetsRoutes);
 
   // Legacy routes (Vertex AI integration)
   apiRouter.use('/', uploadRoutes);

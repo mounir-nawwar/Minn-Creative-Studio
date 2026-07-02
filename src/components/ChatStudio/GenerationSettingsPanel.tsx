@@ -1,8 +1,9 @@
 import { Type, Image as ImageIcon, Film, Music } from 'lucide-react';
-import { NodeField, NodeInput, NodeSelect, NodeTextArea, NodeToggle } from '../../nodes/ui';
+import { NodeField, NodeInput, NodeSelect, NodeTextArea, NodeToggle, NodeLabel } from '../../nodes/ui';
 import { modelsForMode, findModel, MAX_CHAT_SAMPLES } from '../../lib/models';
 import type { GenerationMode } from '../../lib/models';
 import { MUSICAL_KEYS } from '../../nodes/lyriaConstants';
+import PresetsMenu from './PresetsMenu';
 import type { GenerationSettings } from './useChatStudio';
 
 interface GenerationSettingsPanelProps {
@@ -63,16 +64,22 @@ export default function GenerationSettingsPanel({ settings, onChange, disabled }
         </NodeField>
         {model?.description && <p className="-mt-2 px-0.5 text-[10.5px] leading-relaxed text-gray-600">{model.description}</p>}
 
-        {/* Text: system instruction */}
+        {/* Text: presets + system instruction */}
         {supports.systemInstruction && (
-          <NodeField label="System instruction">
+          <div className="space-y-1.5">
+            <NodeLabel>System instruction</NodeLabel>
+            <PresetsMenu
+              presetId={settings.presetId}
+              systemInstruction={settings.systemInstruction}
+              onApply={(preset) => onChange({ systemInstruction: preset.system_instruction, presetId: preset.id })}
+            />
             <NodeTextArea
               rows={7}
               value={settings.systemInstruction}
               onChange={(e) => onChange({ systemInstruction: e.target.value, presetId: undefined })}
               placeholder="How should the assistant behave?"
             />
-          </NodeField>
+          </div>
         )}
 
         {/* Media params driven by capability flags */}

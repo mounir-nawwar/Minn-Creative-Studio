@@ -769,6 +769,48 @@ export const prompts = {
   }
 };
 
+// Chat preset operations (Chat Studio system-instruction templates)
+// Shared visibility: both users see and can manage every preset.
+export const chatPresets = {
+  create: (id: string, userId: string, name: string, systemInstruction: string) => {
+    const stmt = db.prepare(`
+      INSERT INTO chat_presets (id, user_id, name, system_instruction)
+      VALUES (?, ?, ?, ?)
+    `);
+    stmt.run(id, userId, name, systemInstruction);
+    return { id, userId, name, systemInstruction };
+  },
+
+  findAll: () => {
+    const stmt = db.prepare('SELECT * FROM chat_presets ORDER BY created_at ASC');
+    return stmt.all() as any[];
+  },
+
+  findById: (id: string) => {
+    const stmt = db.prepare('SELECT * FROM chat_presets WHERE id = ?');
+    return stmt.get(id) as any;
+  },
+
+  update: (id: string, data: { name?: string; systemInstruction?: string }) => {
+    const fields: string[] = [];
+    const values: any[] = [];
+
+    if (data.name !== undefined) { fields.push('name = ?'); values.push(data.name); }
+    if (data.systemInstruction !== undefined) { fields.push('system_instruction = ?'); values.push(data.systemInstruction); }
+
+    if (fields.length === 0) return;
+
+    values.push(id);
+    const stmt = db.prepare(`UPDATE chat_presets SET ${fields.join(', ')} WHERE id = ?`);
+    stmt.run(...values);
+  },
+
+  delete: (id: string) => {
+    const stmt = db.prepare('DELETE FROM chat_presets WHERE id = ?');
+    stmt.run(id);
+  }
+};
+
 // Initialize schema on import
 initializeSchema();
 runMigrations();
