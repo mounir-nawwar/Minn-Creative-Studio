@@ -66,7 +66,7 @@ export function NodeToggle({ on, onClick }: { on: boolean; onClick: () => void }
       onClick={onClick}
       className={`relative h-4 w-8 shrink-0 rounded-full transition-colors duration-150 ${on ? 'bg-[#0097A7]' : 'bg-white/15'}`}
     >
-      <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-transform duration-150 ${on ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+      <span className={`absolute left-0.5 top-0.5 h-3 w-3 rounded-full bg-white transition-transform duration-150 ${on ? 'translate-x-[16px]' : 'translate-x-0'}`} />
     </button>
   );
 }

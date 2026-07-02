@@ -323,7 +323,7 @@ const VeoNode = ({ id, data }: NodeProps<VeoNodeData>) => {
               onClick={() => { const next = !audio; setAudio(next); updateNodeData(id, { config: { ...data.config, audio: next } }); }}
               className={`relative h-4 w-8 rounded-full transition-colors duration-150 ${audio ? 'bg-[#0097A7]' : 'bg-white/15'}`}
             >
-              <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-transform duration-150 ${audio ? 'translate-x-4' : 'translate-x-0.5'}`} />
+              <span className={`absolute left-0.5 top-0.5 h-3 w-3 rounded-full bg-white transition-transform duration-150 ${audio ? 'translate-x-[16px]' : 'translate-x-0'}`} />
             </button>
           </div>
 
