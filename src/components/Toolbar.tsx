@@ -2,10 +2,11 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import * as Dialog from '@radix-ui/react-dialog';
 import { User, workflowsApi } from '../lib/api';
-import { Play, Save, Trash2, X, Clock, Loader2, ChevronDown, Zap, Pencil } from 'lucide-react';
+import { Play, Save, Trash2, X, Clock, Loader2, ChevronDown, Zap, Pencil, Library } from 'lucide-react';
 import ToggleSwitch from './ToggleSwitch';
 import ProfileMenu from './ProfileMenu';
 import StudioModeToggle from './StudioModeToggle';
+import LibraryDialog from './Library/LibraryDialog';
 import { useStore } from '../store/useStore';
 import { useProjectStore } from '../store/useProjectStore';
 import { API_BASE } from '../constants';
@@ -29,6 +30,7 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
   const [workflows, setWorkflows] = useState<any[]>([]);
   const [isEditingName, setIsEditingName] = useState(false);
   const [tempName, setTempName] = useState('');
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
@@ -317,6 +319,14 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
 
       {/* Right */}
       <div className="flex items-center gap-3">
+        <button
+          onClick={() => setIsLibraryOpen(true)}
+          title="Library — all assets across projects"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 ring-1 ring-white/10 transition-[transform,color,box-shadow] duration-150 hover:text-white hover:ring-white/20 active:scale-[0.96]"
+        >
+          <Library className="h-4 w-4" />
+        </button>
+
         <StudioModeToggle />
 
         <div className="h-7 w-px bg-white/10" />
@@ -336,6 +346,8 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
 
         <ProfileMenu user={user} onLogout={onLogout} variant="avatar" />
       </div>
+
+      <LibraryDialog open={isLibraryOpen} onOpenChange={setIsLibraryOpen} />
 
       {/* Save workflow modal */}
       <Dialog.Root open={showSaveModal} onOpenChange={setShowSaveModal}>

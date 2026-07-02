@@ -325,11 +325,31 @@ export const chatsApi = {
     apiRequest(`/chats/${id}`, { method: 'DELETE' })
 };
 
+export interface LibraryFilters {
+  type?: string;
+  projectId?: string;
+  q?: string;
+  limit?: number;
+  offset?: number;
+}
+
 // Assets API
 export const assetsApi = {
   list: (projectId: string, type?: string): Promise<Asset[]> => {
     const query = type ? `?projectId=${projectId}&type=${type}` : `?projectId=${projectId}`;
     return apiRequest(`/assets${query}`);
+  },
+
+  /** Global library: all assets across projects, with project_name from the join */
+  listAll: (filters: LibraryFilters = {}): Promise<(Asset & { project_name?: string })[]> => {
+    const params = new URLSearchParams();
+    if (filters.type) params.set('type', filters.type);
+    if (filters.projectId) params.set('projectId', filters.projectId);
+    if (filters.q) params.set('q', filters.q);
+    if (filters.limit) params.set('limit', String(filters.limit));
+    if (filters.offset) params.set('offset', String(filters.offset));
+    const query = params.toString();
+    return apiRequest(`/assets/all${query ? `?${query}` : ''}`);
   },
   
   get: (id: string): Promise<Asset> => apiRequest(`/assets/${id}`),

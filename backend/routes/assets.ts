@@ -58,6 +58,29 @@ router.get('/', async (req: any, res: any) => {
 });
 
 /**
+ * GET /api/assets/all
+ * Global library: every asset across all projects (incl. playground).
+ * Registered before /:id so "all" isn't captured as an asset id.
+ * Query params: type, projectId, q, limit, offset
+ */
+router.get('/all', async (req: any, res: any) => {
+  try {
+    const { type, projectId, q, limit, offset } = req.query;
+    const assetList = assets.findAllWithProject({
+      type: type as string | undefined,
+      projectId: projectId as string | undefined,
+      search: q as string | undefined,
+      limit: limit ? Number(limit) : undefined,
+      offset: offset ? Number(offset) : undefined,
+    });
+    res.json(assetList);
+  } catch (error: any) {
+    console.error('Error fetching library assets:', error);
+    res.status(500).json({ error: 'Failed to fetch library assets' });
+  }
+});
+
+/**
  * GET /api/assets/:id
  * Get a single asset
  */

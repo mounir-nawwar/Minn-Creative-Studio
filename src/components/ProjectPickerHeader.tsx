@@ -1,4 +1,4 @@
-import { Plus, Search, FlaskConical, MessageSquare, Workflow } from 'lucide-react';
+import { Plus, Search, FlaskConical, MessageSquare, Workflow, Library } from 'lucide-react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import type { User } from '../lib/api';
 import type { StudioMode } from '../store/useProjectStore';
@@ -11,6 +11,7 @@ interface ProjectPickerHeaderProps {
   onSearchChange: (value: string) => void;
   onNewProject: () => void;
   onEnterPlayground: (mode: StudioMode) => void;
+  onOpenLibrary: () => void;
   onLogout: () => void;
 }
 
@@ -20,6 +21,7 @@ export default function ProjectPickerHeader({
   onSearchChange,
   onNewProject,
   onEnterPlayground,
+  onOpenLibrary,
   onLogout,
 }: ProjectPickerHeaderProps) {
   return (
@@ -46,6 +48,17 @@ export default function ProjectPickerHeader({
 
         {/* Right cluster */}
         <div className="ml-auto flex items-center gap-2.5">
+          {/* Library — every asset across all projects */}
+          <button
+            type="button"
+            onClick={onOpenLibrary}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg px-3.5 text-sm font-medium text-gray-300 ring-1 ring-white/10
+              transition-[transform,color,box-shadow] duration-150 hover:text-white hover:ring-white/20 active:scale-[0.96]"
+          >
+            <Library className="h-4 w-4" />
+            Library
+          </button>
+
           {/* Playground — jump straight in, no project fields */}
           <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>

@@ -1,0 +1,196 @@
+import { useState, useEffect, useMemo } from 'react';
+import {
+  Image as ImageIcon, Video as VideoIcon, Music as AudioIcon, FileText as DocIcon,
+  Search, Filter, Play, FlaskConical,
+} from 'lucide-react';
+import { assetsApi, projectsApi, Asset } from '../../lib/api';
+import type { LibraryFilters } from '../../lib/api';
+import { useStore } from '../../store/useStore';
+import { PLAYGROUND_PROJECT_ID } from '../../constants';
+
+export type LibraryAsset = Asset & { project_name?: string };
+
+interface LibraryGridProps {
+  isPicker?: boolean;
+  onSelect?: (asset: LibraryAsset) => void;
+  initialFilters?: LibraryFilters;
+  /** Render prop for per-card actions (used by move-to-project) */
+  renderCardActions?: (asset: LibraryAsset, refresh: () => void) => React.ReactNode;
+}
+
+const TYPE_FILTERS = ['all', 'image', 'video', 'audio'] as const;
+const SEARCH_DEBOUNCE_MS = 300;
+
+function typeIcon(type: string) {
+  switch (type) {
+    case 'image': return ImageIcon;
+    case 'video': return VideoIcon;
+    case 'audio': return AudioIcon;
+    default: return DocIcon;
+  }
+}
+
+/**
+ * Global asset library: everything generated/uploaded across all projects
+ * (playground included), filterable by type/project with server-side search.
+ * Standalone from AssetGrid, which is welded to the current project.
+ */
+export default function LibraryGrid({ isPicker = false, onSelect, initialFilters, renderCardActions }: LibraryGridProps) {
+  const setExpandedAsset = useStore((s) => s.setExpandedAsset);
+  const [assets, setAssets] = useState<LibraryAsset[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [typeFilter, setTypeFilter] = useState<string>(initialFilters?.type ?? 'all');
+  const [projectFilter, setProjectFilter] = useState<string>(initialFilters?.projectId ?? '');
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  const [projectOptions, setProjectOptions] = useState<{ id: string; name: string }[]>([]);
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  const refresh = useMemo(() => () => setRefreshTick((t) => t + 1), []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(searchInput), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  useEffect(() => {
+    projectsApi.list()
+      .then((list) => setProjectOptions(list.map((p) => ({ id: p.id, name: p.name }))))
+      .catch((err) => console.error('Failed to load projects for library filter:', err));
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    assetsApi.listAll({
+      type: typeFilter === 'all' ? undefined : typeFilter,
+      projectId: projectFilter || undefined,
+      q: search || undefined,
+    })
+      .then((list) => { if (!cancelled) setAssets(list); })
+      .catch((err) => console.error('Failed to load library:', err))
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [typeFilter, projectFilter, search, refreshTick]);
+
+  const handleClick = (asset: LibraryAsset) => {
+    if (isPicker && onSelect) {
+      onSelect(asset);
+      return;
+    }
+    if (asset.type === 'image' || asset.type === 'video' || asset.type === 'audio') {
+      setExpandedAsset(asset.url, asset.type);
+    }
+  };
+
+  return (
+    <div className="flex flex-1 flex-col overflow-hidden">
+      {/* Controls */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-white/5 p-3">
+        <div className="relative min-w-[200px] flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-500" />
+          <input
+            type="text"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search by filename or prompt"
+            className="w-full rounded-lg bg-white/[0.04] py-2 pl-9 pr-3 text-[13px] text-white placeholder:text-gray-600 ring-1 ring-white/10 transition-shadow duration-150 focus:outline-none focus:ring-[1.5px] focus:ring-[#0097A7]/60"
+          />
+        </div>
+
+        <div className="flex gap-1.5">
+          {TYPE_FILTERS.map((f) => (
+            <button
+              key={f}
+              onClick={() => setTypeFilter(f)}
+              className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium capitalize ring-1 transition-[transform,color,background-color,box-shadow] duration-150 active:scale-[0.96] ${
+                typeFilter === f ? 'bg-[#0097A7] text-white ring-[#0097A7]' : 'bg-white/[0.03] text-gray-400 ring-white/10 hover:bg-white/[0.06] hover:text-white'
+              }`}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+
+        <select
+          value={projectFilter}
+          onChange={(e) => setProjectFilter(e.target.value)}
+          className="cursor-pointer rounded-lg bg-white/[0.04] px-2.5 py-1.5 text-[12px] text-gray-300 ring-1 ring-white/10 transition-shadow duration-150 focus:outline-none focus:ring-[1.5px] focus:ring-[#0097A7]/60"
+        >
+          <option value="">All projects</option>
+          <option value={PLAYGROUND_PROJECT_ID}>Playground</option>
+          {projectOptions.map((p) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Grid */}
+      <div className="custom-scrollbar flex-1 overflow-y-auto p-3">
+        {loading ? (
+          <div className="flex h-full items-center justify-center">
+            <div className="h-7 w-7 animate-spin rounded-full border-2 border-[#0097A7]/20 border-t-[#0097A7]" />
+          </div>
+        ) : assets.length === 0 ? (
+          <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/[0.04] ring-1 ring-white/10">
+              <Filter className="h-5 w-5 text-gray-600" />
+            </div>
+            <p className="text-xs text-gray-500">Nothing here yet — everything you generate shows up in the library.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {assets.map((asset) => {
+              const Icon = typeIcon(asset.type);
+              const isPlaygroundAsset = asset.project_id === PLAYGROUND_PROJECT_ID;
+              return (
+                <div
+                  key={asset.id}
+                  onClick={() => handleClick(asset)}
+                  className="group relative aspect-square cursor-pointer overflow-hidden rounded-xl bg-[#111111] ring-1 ring-white/10 transition-[transform,box-shadow] duration-150 hover:ring-[#0097A7]/40 active:scale-[0.98]"
+                >
+                  {asset.type === 'video' ? (
+                    <div className="relative h-full w-full">
+                      <video src={asset.url + '#t=0.1'} className="h-full w-full object-cover opacity-70 transition-opacity duration-150 group-hover:opacity-100" preload="metadata" />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 ring-1 ring-white/20 backdrop-blur-md transition-colors duration-150 group-hover:bg-[#0097A7]/50">
+                          <Play className="h-3 w-3 fill-white text-white" />
+                        </div>
+                      </div>
+                    </div>
+                  ) : asset.type === 'image' ? (
+                    <img src={asset.url} alt={asset.filename} className="h-full w-full object-cover opacity-80 transition-opacity duration-150 group-hover:opacity-100" loading="lazy" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center">
+                      <Icon className="h-8 w-8 text-gray-700 transition-colors group-hover:text-[#0097A7]" />
+                    </div>
+                  )}
+
+                  <span className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/[0.06]" />
+
+                  {/* Project label — always visible so the library reads at a glance */}
+                  <div className="absolute left-2 top-2 flex items-center gap-1 rounded-md bg-black/60 px-1.5 py-0.5 backdrop-blur-sm">
+                    {isPlaygroundAsset && <FlaskConical className="h-2.5 w-2.5 text-[#0097A7]" />}
+                    <span className={`max-w-[110px] truncate text-[10px] font-medium ${isPlaygroundAsset ? 'text-[#0097A7]' : 'text-gray-300'}`}>
+                      {isPlaygroundAsset ? 'Playground' : asset.project_name || 'Unknown project'}
+                    </span>
+                  </div>
+
+                  <div className="absolute inset-0 flex flex-col justify-between bg-gradient-to-t from-black/80 via-transparent to-transparent p-2.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                    <div className="flex justify-end gap-1.5">
+                      {renderCardActions?.(asset, refresh)}
+                    </div>
+                    <div className="space-y-0.5">
+                      <p className="truncate text-[12px] font-medium text-white">{asset.filename}</p>
+                      <span className="text-[11px] capitalize text-gray-400">{asset.type}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

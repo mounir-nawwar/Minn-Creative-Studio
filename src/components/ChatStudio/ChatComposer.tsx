@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Paperclip, Send, X, Library } from 'lucide-react';
-import AssetGrid from '../AssetGrid';
+import LibraryGrid from '../Library/LibraryGrid';
+import type { LibraryAsset } from '../Library/LibraryGrid';
+import { useProjectStore } from '../../store/useProjectStore';
 import type { MessageAttachment } from '../../lib/api';
 import type { GenerationMode } from '../../lib/models';
 
@@ -20,6 +22,7 @@ const PLACEHOLDER: Record<GenerationMode, string> = {
 
 /** Composer bar: attachments + prompt textarea + send */
 export default function ChatComposer({ mode, disabled, onSend }: ChatComposerProps) {
+  const currentProject = useProjectStore((s) => s.currentProject);
   const [text, setText] = useState('');
   const [attachments, setAttachments] = useState<MessageAttachment[]>([]);
   const [showPicker, setShowPicker] = useState(false);
@@ -33,12 +36,12 @@ export default function ChatComposer({ mode, disabled, onSend }: ChatComposerPro
     el.style.height = `${Math.min(el.scrollHeight, 144)}px`;
   }, [text]);
 
-  const handleAssetSelect = (asset: any) => {
+  const handleAssetSelect = (asset: LibraryAsset) => {
     setShowPicker(false);
     if (attachments.some((a) => a.assetId === asset.id)) return;
     const type: MessageAttachment['type'] =
       asset.type === 'video' ? 'video' : asset.type === 'audio' ? 'audio' : 'image';
-    setAttachments((prev) => [...prev, { assetId: asset.id, url: asset.url, type, name: asset.name || asset.filename }]);
+    setAttachments((prev) => [...prev, { assetId: asset.id, url: asset.url, type, name: asset.filename }]);
   };
 
   const handleSubmit = () => {
@@ -130,7 +133,11 @@ export default function ChatComposer({ mode, disabled, onSend }: ChatComposerPro
               </Dialog.Close>
             </div>
             <div className="flex flex-1 flex-col overflow-hidden">
-              <AssetGrid isPicker onAssetClick={handleAssetSelect} />
+              <LibraryGrid
+                isPicker
+                onSelect={handleAssetSelect}
+                initialFilters={currentProject ? { projectId: currentProject.id } : undefined}
+              />
             </div>
           </Dialog.Content>
         </Dialog.Portal>

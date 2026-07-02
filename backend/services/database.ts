@@ -553,6 +553,47 @@ export const assets = {
     }));
   },
 
+  /**
+   * Global library query: every asset across all projects (playground included),
+   * joined with the owning project's name. Search covers filename + prompt metadata.
+   */
+  findAllWithProject: (filters?: { type?: string; projectId?: string; search?: string; limit?: number; offset?: number }) => {
+    const conditions: string[] = [];
+    const params: any[] = [];
+
+    if (filters?.type) {
+      conditions.push('a.type = ?');
+      params.push(filters.type);
+    }
+    if (filters?.projectId) {
+      conditions.push('a.project_id = ?');
+      params.push(filters.projectId);
+    }
+    if (filters?.search) {
+      conditions.push("(a.filename LIKE ? OR json_extract(a.metadata, '$.prompt') LIKE ?)");
+      const like = `%${filters.search}%`;
+      params.push(like, like);
+    }
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const limit = Math.min(Math.max(filters?.limit ?? 100, 1), 500);
+    const offset = Math.max(filters?.offset ?? 0, 0);
+
+    const stmt = db.prepare(`
+      SELECT a.*, p.name AS project_name
+      FROM assets a
+      LEFT JOIN projects p ON p.id = a.project_id
+      ${where}
+      ORDER BY a.created_at DESC
+      LIMIT ? OFFSET ?
+    `);
+    const assetList = stmt.all(...params, limit, offset) as any[];
+    return assetList.map(a => ({
+      ...a,
+      metadata: a.metadata ? JSON.parse(a.metadata) : {}
+    }));
+  },
+
   delete: (id: string) => {
     const stmt = db.prepare('DELETE FROM assets WHERE id = ?');
     stmt.run(id);

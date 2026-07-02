@@ -8,6 +8,8 @@ import ProjectCard from '../components/ProjectCard';
 import ProjectPickerHeader from '../components/ProjectPickerHeader';
 import ProjectCreationOverlay from '../components/ProjectCreationOverlay';
 import DeleteProjectModal from '../components/DeleteProjectModal';
+import LibraryDialog from '../components/Library/LibraryDialog';
+import AssetExpandModal from '../components/AssetExpandModal';
 import { Project } from '../types/project.types';
 import { auth } from '../lib/api';
 import MinnLogo from '../assets/Minn.svg';
@@ -44,6 +46,7 @@ export default function ProjectPicker({ onLogout }: { onLogout: () => void }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('active');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
 
   const currentUser = auth.getCurrentUser();
 
@@ -79,8 +82,13 @@ export default function ProjectPicker({ onLogout }: { onLogout: () => void }) {
         onSearchChange={setSearchQuery}
         onNewProject={() => setIsOverlayOpen(true)}
         onEnterPlayground={(mode) => { void enterPlayground(mode); }}
+        onOpenLibrary={() => setIsLibraryOpen(true)}
         onLogout={onLogout}
       />
+
+      {/* Global asset library (+ preview modal, which the main app normally mounts) */}
+      <LibraryDialog open={isLibraryOpen} onOpenChange={setIsLibraryOpen} />
+      <AssetExpandModal />
 
       {/* Main */}
       <main className="mx-auto max-w-[1600px] px-6 pb-24 pt-24">
