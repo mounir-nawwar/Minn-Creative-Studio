@@ -3,6 +3,11 @@ import type { User } from '../../lib/api';
 import ProfileMenu from '../ProfileMenu';
 import StudioModeToggle from '../StudioModeToggle';
 import { useProjectStore, isPlaygroundProject } from '../../store/useProjectStore';
+import { useChatStudio } from './useChatStudio';
+import ChatHistoryRail from './ChatHistoryRail';
+import ChatThread from './ChatThread';
+import ChatComposer from './ChatComposer';
+import GenerationSettingsPanel from './GenerationSettingsPanel';
 
 interface ChatStudioProps {
   user: User;
@@ -16,6 +21,19 @@ interface ChatStudioProps {
 export default function ChatStudio({ user, onLogout }: ChatStudioProps) {
   const { currentProject, clearProject } = useProjectStore();
   const playground = isPlaygroundProject(currentProject);
+  const {
+    chats,
+    messages,
+    pending,
+    isGenerating,
+    settings,
+    setSettings,
+    activeChatId,
+    setActiveChatId,
+    createNewChat,
+    deleteChat,
+    sendMessage,
+  } = useChatStudio();
 
   return (
     <div className="flex h-screen w-screen flex-col bg-[#0a0a0a]">
@@ -53,9 +71,27 @@ export default function ChatStudio({ user, onLogout }: ChatStudioProps) {
         </div>
       </header>
 
-      {/* Workspace body — panes land in the next phase */}
-      <div className="flex flex-1 items-center justify-center text-sm text-gray-600">
-        Chat Studio is coming online…
+      {/* Workspace body */}
+      <div className="flex min-h-0 flex-1">
+        <ChatHistoryRail
+          chats={chats}
+          activeChatId={activeChatId}
+          onSelect={setActiveChatId}
+          onNew={createNewChat}
+          onDelete={deleteChat}
+        />
+
+        <main className="flex min-w-0 flex-1 flex-col">
+          <ChatThread
+            messages={messages}
+            pending={pending}
+            hasActiveChat={!!activeChatId}
+            onStartChat={createNewChat}
+          />
+          <ChatComposer mode={settings.mode} disabled={isGenerating} onSend={sendMessage} />
+        </main>
+
+        <GenerationSettingsPanel settings={settings} onChange={setSettings} disabled={isGenerating} />
       </div>
     </div>
   );
