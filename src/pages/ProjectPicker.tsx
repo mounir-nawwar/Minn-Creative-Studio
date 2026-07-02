@@ -29,6 +29,7 @@ export default function ProjectPicker({ onLogout }: { onLogout: () => void }) {
     loading,
     createProject,
     selectProject,
+    enterPlayground,
     updateProjectById,
     deleteProject,
     restoreProject,
@@ -77,6 +78,7 @@ export default function ProjectPicker({ onLogout }: { onLogout: () => void }) {
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onNewProject={() => setIsOverlayOpen(true)}
+        onEnterPlayground={(mode) => { void enterPlayground(mode); }}
         onLogout={onLogout}
       />
 

@@ -237,8 +237,12 @@ export const auth = {
 // Projects API
 export const projectsApi = {
   list: (): Promise<Project[]> => apiRequest('/projects'),
-  
+
   get: (id: string): Promise<Project> => apiRequest(`/projects/${id}`),
+
+  /** Idempotently create/fetch the shared hidden Playground sentinel project */
+  ensurePlayground: (): Promise<Project> =>
+    apiRequest('/projects/playground', { method: 'POST' }),
   
   create: (data: { name: string; description?: string; settings?: any }): Promise<Project> =>
     apiRequest('/projects', {

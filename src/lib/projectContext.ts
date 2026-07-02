@@ -1,4 +1,5 @@
 import type { Project } from '../types/project.types';
+import { PLAYGROUND_PROJECT_ID } from '../constants';
 
 /**
  * Builds the project "brief" string injected into every AI generation
@@ -8,6 +9,9 @@ import type { Project } from '../types/project.types';
  */
 export function buildProjectContext(project?: Partial<Project> | null): string {
   if (!project) return '';
+  // The playground sentinel has no real brand identity — its back-filled
+  // defaults (teal colors, "geometric" font…) must never reach prompts.
+  if (project.id === PLAYGROUND_PROJECT_ID) return '';
 
   const colors = [project.primaryColor, project.secondaryColor, project.accentColor].filter(Boolean);
   const client = project.clientName

@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { useProjectStore } from '../store/useProjectStore';
+import { useProjectStore, isPlaygroundProject } from '../store/useProjectStore';
 import { PROJECT_TYPES } from '../types/project.types';
-import { Settings, ArrowLeftRight, Briefcase, ChevronRight, PanelLeftOpen, DollarSign, Coins } from 'lucide-react';
+import { Settings, ArrowLeftRight, Briefcase, ChevronRight, PanelLeftOpen, DollarSign, Coins, FlaskConical } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function ProjectContextBar() {
@@ -10,6 +10,7 @@ export default function ProjectContextBar() {
 
   if (!currentProject) return null;
 
+  const playground = isPlaygroundProject(currentProject);
   const projectType = PROJECT_TYPES[currentProject.type as keyof typeof PROJECT_TYPES] || PROJECT_TYPES.personal;
   const usage = currentProject.usage || {
     totalCost: 0, textCost: 0, imageCost: 0, videoCost: 0, audioCost: 0,
@@ -43,40 +44,59 @@ export default function ProjectContextBar() {
         </AnimatePresence>
 
         {/* Project */}
-        <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.04] text-base ring-1 ring-white/10">
-            {projectType.icon}
-          </div>
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-medium text-white">{currentProject.name}</h2>
-              <span className="rounded-full bg-[#0097A7]/15 px-2 py-0.5 text-[10px] font-medium capitalize text-[#0097A7]">
-                {currentProject.status}
-              </span>
+        {playground ? (
+          <div className="flex items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0097A7]/10 ring-1 ring-[#0097A7]/25">
+              <FlaskConical className="h-4 w-4 text-[#0097A7]" />
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-gray-500">
-              <span>{projectType.label}</span>
-              <ChevronRight className="h-3 w-3" />
-              <span>{currentProject.subtype}</span>
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-medium text-white">Playground</h2>
+                <span className="rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[#0097A7] ring-1 ring-[#0097A7]/40">
+                  Scratch space
+                </span>
+              </div>
+              <p className="text-xs text-gray-500">Shared — move keepers into a project later</p>
             </div>
           </div>
-        </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.04] text-base ring-1 ring-white/10">
+                {projectType.icon}
+              </div>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-medium text-white">{currentProject.name}</h2>
+                  <span className="rounded-full bg-[#0097A7]/15 px-2 py-0.5 text-[10px] font-medium capitalize text-[#0097A7]">
+                    {currentProject.status}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                  <span>{projectType.label}</span>
+                  <ChevronRight className="h-3 w-3" />
+                  <span>{currentProject.subtype}</span>
+                </div>
+              </div>
+            </div>
 
-        <div className="h-6 w-px bg-white/10" />
+            <div className="h-6 w-px bg-white/10" />
 
-        {currentProject.clientName && (
-          <div className="flex items-center gap-2 text-xs text-gray-400">
-            <Briefcase className="h-3.5 w-3.5 text-gray-600" />
-            <span>{currentProject.clientName}</span>
-            {currentProject.clientIndustry && <span className="text-gray-600">· {currentProject.clientIndustry}</span>}
-          </div>
+            {currentProject.clientName && (
+              <div className="flex items-center gap-2 text-xs text-gray-400">
+                <Briefcase className="h-3.5 w-3.5 text-gray-600" />
+                <span>{currentProject.clientName}</span>
+                {currentProject.clientIndustry && <span className="text-gray-600">· {currentProject.clientIndustry}</span>}
+              </div>
+            )}
+
+            <div className="flex items-center gap-1.5">
+              {[currentProject.primaryColor, currentProject.secondaryColor, currentProject.accentColor].map((c, i) => (
+                <span key={i} className="h-3.5 w-3.5 rounded-full ring-1 ring-inset ring-white/10" style={{ backgroundColor: c }} />
+              ))}
+            </div>
+          </>
         )}
-
-        <div className="flex items-center gap-1.5">
-          {[currentProject.primaryColor, currentProject.secondaryColor, currentProject.accentColor].map((c, i) => (
-            <span key={i} className="h-3.5 w-3.5 rounded-full ring-1 ring-inset ring-white/10" style={{ backgroundColor: c }} />
-          ))}
-        </div>
       </div>
 
       <div className="flex items-center gap-2">
@@ -116,13 +136,16 @@ export default function ProjectContextBar() {
           </AnimatePresence>
         </div>
 
-        <button
-          onClick={() => openSettings('edit')}
-          className="inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-medium text-gray-400 ring-1 ring-white/10 transition-[transform,color,background-color,box-shadow] duration-150 hover:bg-white/5 hover:text-white hover:ring-white/20 active:scale-[0.96]"
-        >
-          <Settings className="h-3.5 w-3.5" />
-          Settings
-        </button>
+        {/* The playground sentinel can't be edited (backend-enforced) */}
+        {!playground && (
+          <button
+            onClick={() => openSettings('edit')}
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-medium text-gray-400 ring-1 ring-white/10 transition-[transform,color,background-color,box-shadow] duration-150 hover:bg-white/5 hover:text-white hover:ring-white/20 active:scale-[0.96]"
+          >
+            <Settings className="h-3.5 w-3.5" />
+            Settings
+          </button>
+        )}
 
         <button
           onClick={clearProject}

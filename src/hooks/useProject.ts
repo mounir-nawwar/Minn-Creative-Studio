@@ -185,6 +185,13 @@ export function useProject() {
     setCurrentProject(project);
   };
 
+  /** Enter the shared playground (no client project) in the chosen workspace mode */
+  const enterPlayground = async (mode: 'canvas' | 'chat'): Promise<void> => {
+    const apiProject = await projectsApi.ensurePlayground();
+    setCurrentProject(toProject(apiProject));
+    useProjectStore.getState().setStudioMode(mode);
+  };
+
   const updateCurrentProject = async (updates: Partial<Project>): Promise<void> => {
     if (!currentProject) return;
     await updateProjectById(currentProject.id, updates);
@@ -285,6 +292,7 @@ export function useProject() {
     loading,
     createProject,
     selectProject,
+    enterPlayground,
     updateCurrentProject,
     updateProjectById,
     deleteProject,
