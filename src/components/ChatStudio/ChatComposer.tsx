@@ -1,9 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Paperclip, Send, X, Library } from 'lucide-react';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import { Paperclip, Send, X, Library, Upload, Loader2 } from 'lucide-react';
 import LibraryGrid from '../Library/LibraryGrid';
 import type { LibraryAsset } from '../Library/LibraryGrid';
 import { useProjectStore } from '../../store/useProjectStore';
+import { useAssets } from '../../hooks/useAssets';
+import { toast } from '../../store/useToastStore';
 import type { MessageAttachment } from '../../lib/api';
 import type { GenerationMode } from '../../lib/models';
 
@@ -23,10 +26,13 @@ const PLACEHOLDER: Record<GenerationMode, string> = {
 /** Composer bar: attachments + prompt textarea + send */
 export default function ChatComposer({ mode, disabled, onSend }: ChatComposerProps) {
   const currentProject = useProjectStore((s) => s.currentProject);
+  const { uploadAsset } = useAssets();
   const [text, setText] = useState('');
   const [attachments, setAttachments] = useState<MessageAttachment[]>([]);
   const [showPicker, setShowPicker] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-grow the textarea up to ~6 lines
   useEffect(() => {
@@ -42,6 +48,24 @@ export default function ChatComposer({ mode, disabled, onSend }: ChatComposerPro
     const type: MessageAttachment['type'] =
       asset.type === 'video' ? 'video' : asset.type === 'audio' ? 'audio' : 'image';
     setAttachments((prev) => [...prev, { assetId: asset.id, url: asset.url, type, name: asset.filename }]);
+  };
+
+  const handleFileUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setIsUploading(true);
+    try {
+      for (const file of Array.from(files)) {
+        const result = await uploadAsset(file);
+        const type: MessageAttachment['type'] =
+          result.type === 'video' ? 'video' : result.type === 'audio' ? 'audio' : 'image';
+        setAttachments((prev) => [...prev, { assetId: result.id, url: result.url, type, name: result.name }]);
+      }
+    } catch (err) {
+      toast.error('Upload failed', err instanceof Error ? err.message : 'Could not upload the file');
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const handleSubmit = () => {
@@ -78,14 +102,49 @@ export default function ChatComposer({ mode, disabled, onSend }: ChatComposerPro
         )}
 
         <div className="flex items-end gap-2 rounded-2xl bg-[#161617] px-3 py-2.5 ring-1 ring-white/[0.08] transition-shadow duration-150 focus-within:ring-[#0097A7]/40">
-          <button
-            type="button"
-            onClick={() => setShowPicker(true)}
-            className="mb-1 shrink-0 text-gray-500 transition-colors hover:text-gray-300"
-            title="Attach asset"
-          >
-            <Paperclip className="h-4 w-4" />
-          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,video/*,audio/*"
+            multiple
+            className="hidden"
+            onChange={(e) => handleFileUpload(e.target.files)}
+          />
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger asChild>
+              <button
+                type="button"
+                disabled={isUploading}
+                className="mb-1 shrink-0 text-gray-500 transition-colors hover:text-gray-300 disabled:opacity-50"
+                title="Attach"
+              >
+                {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+              </button>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content
+                side="top"
+                align="start"
+                sideOffset={8}
+                className="z-[100] w-52 rounded-xl bg-[#0d0d0d] p-1.5 ring-1 ring-white/10 shadow-[0_16px_40px_rgba(0,0,0,0.7)] focus:outline-none data-[state=open]:[animation:menuIn_140ms_cubic-bezier(0.2,0,0,1)]"
+              >
+                <DropdownMenu.Item
+                  onSelect={() => fileInputRef.current?.click()}
+                  className="flex h-9 cursor-pointer select-none items-center gap-2.5 rounded-lg px-2.5 text-[13px] text-gray-300 outline-none transition-colors duration-100 data-[highlighted]:bg-white/5 data-[highlighted]:text-white"
+                >
+                  <Upload className="h-3.5 w-3.5 text-[#0097A7]" />
+                  Upload from device
+                </DropdownMenu.Item>
+                <DropdownMenu.Item
+                  onSelect={() => setShowPicker(true)}
+                  className="flex h-9 cursor-pointer select-none items-center gap-2.5 rounded-lg px-2.5 text-[13px] text-gray-300 outline-none transition-colors duration-100 data-[highlighted]:bg-white/5 data-[highlighted]:text-white"
+                >
+                  <Library className="h-3.5 w-3.5 text-[#0097A7]" />
+                  From Library
+                </DropdownMenu.Item>
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
           <textarea
             ref={textareaRef}
             rows={1}
