@@ -122,6 +122,10 @@ export function useChat() {
   const sendMessage = async (text: string, assets: SendAsset[]) => {
     if (!text.trim() || !currentProject) return;
 
+    // Capture history before any mutation — everything the model should
+    // remember is exactly what's in state right now, prior to this new turn.
+    const history = messages.map((m) => ({ role: m.role, content: m.content }));
+
     let chatId = activeChatId;
 
     try {
@@ -163,6 +167,7 @@ export function useChat() {
           projectContext,
           maxOutputTokens: 8192,
           projectId: currentProject?.id,
+          history,
         });
 
         // Add assistant message

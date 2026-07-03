@@ -165,7 +165,7 @@ describe('geminiService', () => {
       });
 
       const callArgs = JSON.parse(mockFetch.mock.calls[0][1].body);
-      expect(callArgs.params.contents.parts[0].text).toContain('Project Context:');
+      expect(callArgs.params.config.systemInstruction).toContain('Project Context:');
     });
 
     it('should handle maxOutputTokens config', async () => {

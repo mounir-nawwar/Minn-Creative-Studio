@@ -9,14 +9,20 @@ export const generateText = async (params: {
   projectContext?: string;
   maxOutputTokens?: number;
   projectId?: string;
+  /** Prior turns, oldest first, excluding the current prompt — sent so the model actually has conversational memory */
+  history?: { role: 'user' | 'assistant'; content: string }[];
 }, signal?: AbortSignal) => {
-  const { prompt, model, systemInstruction, imageUrls = [], videoUrls = [], projectContext, maxOutputTokens, projectId } = params;
+  const { prompt, model, systemInstruction, imageUrls = [], videoUrls = [], projectContext, maxOutputTokens, projectId, history = [] } = params;
 
-  const fullPrompt = projectContext
-    ? `Project Context: ${projectContext}\n\nTask: ${prompt}`
-    : prompt;
+  // Project context is stable across a whole chat, so it belongs in the system
+  // instruction (sent identically every turn) rather than re-stated inside the
+  // one part of the request that changes each time — that positioning is what
+  // lets Gemini's automatic prefix caching actually apply.
+  const fullSystemInstruction = projectContext
+    ? `${systemInstruction ? `${systemInstruction}\n\n` : ''}Project Context:\n${projectContext}`
+    : systemInstruction;
 
-  const parts: any[] = [{ text: fullPrompt }];
+  const parts: any[] = [{ text: prompt }];
 
   for (const url of imageUrls) {
     const { data, mimeType } = await urlToBase64(url);
@@ -28,12 +34,17 @@ export const generateText = async (params: {
     parts.push({ inlineData: { data, mimeType } });
   }
 
+  const historyTurns = history.map((h) => ({
+    role: h.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: h.content }],
+  }));
+
   try {
     const response = await callBackend('generateContent', {
       model: model,
-      contents: { parts },
+      contents: [...historyTurns, { role: 'user', parts }],
       config: {
-        systemInstruction,
+        systemInstruction: fullSystemInstruction,
         ...(maxOutputTokens && { maxOutputTokens }),
       },
       projectId,

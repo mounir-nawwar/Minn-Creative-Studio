@@ -176,7 +176,7 @@ export function useChatStudio() {
     setPending((prev) => (prev ? { ...prev, elapsed } : prev));
   }, []);
 
-  const runTextGeneration = useCallback(async (chatId: string, text: string, attachments: MessageAttachment[]) => {
+  const runTextGeneration = useCallback(async (chatId: string, text: string, attachments: MessageAttachment[], history: ChatMessage[]) => {
     const imageUrls = attachments.filter((a) => a.type === 'image').map((a) => a.url);
     const modelText = await generateText({
       prompt: text,
@@ -186,6 +186,7 @@ export function useChatStudio() {
       projectContext: projectContext(),
       maxOutputTokens: 8192,
       projectId: currentProject!.id,
+      history: history.map((m) => ({ role: m.role, content: m.content })),
     });
     const assistantMessage = await chatsApi.addMessage(chatId, 'assistant', modelText);
     appendMessage(assistantMessage);
@@ -286,6 +287,11 @@ export function useChatStudio() {
   const sendMessage = useCallback(async (text: string, attachments: MessageAttachment[] = []) => {
     if (!text.trim() || !currentProject || generatingRef.current) return;
 
+    // Capture history before prepareUserMessage appends the new user turn —
+    // messagesRef reflects state as of the last completed render, i.e.
+    // everything prior to this message.
+    const history = messagesRef.current;
+
     try {
       const chatId = await prepareUserMessage(text, attachments);
       setPending({ mode: settings.mode, prompt: text });
@@ -303,7 +309,7 @@ export function useChatStudio() {
             await runAudioGeneration(chatId, text, attachments);
             break;
           default:
-            await runTextGeneration(chatId, text, attachments);
+            await runTextGeneration(chatId, text, attachments, history);
         }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Generation failed';
