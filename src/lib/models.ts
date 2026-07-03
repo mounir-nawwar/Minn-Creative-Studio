@@ -24,6 +24,8 @@ export interface StudioModelSupports {
   temperature?: boolean;
   /** System instruction / presets apply (text mode) */
   systemInstruction?: boolean;
+  /** Web search + URL-reading tools (text mode) */
+  grounding?: boolean;
   /** Video clip lengths in seconds */
   duration?: number[];
   /** Veo native audio toggle */
@@ -60,7 +62,7 @@ export const TEXT_MODELS: StudioModel[] = [
     label: 'Gemini 3.5 Flash',
     mode: 'text',
     description: 'Latest stable flash model — frontier-level reasoning at speed',
-    supports: { temperature: true, systemInstruction: true, referenceImages: true },
+    supports: { temperature: true, systemInstruction: true, referenceImages: true, grounding: true },
     defaults: { maxOutputTokens: 8192 },
   },
   {
@@ -68,7 +70,7 @@ export const TEXT_MODELS: StudioModel[] = [
     label: 'Gemini 3 Flash (Preview)',
     mode: 'text',
     description: 'Fast everyday writing and prompt work',
-    supports: { temperature: true, systemInstruction: true, referenceImages: true },
+    supports: { temperature: true, systemInstruction: true, referenceImages: true, grounding: true },
     defaults: { maxOutputTokens: 8192 },
   },
   {
@@ -76,7 +78,7 @@ export const TEXT_MODELS: StudioModel[] = [
     label: 'Gemini 3.1 Pro',
     mode: 'text',
     description: 'Deepest reasoning for complex briefs',
-    supports: { temperature: true, systemInstruction: true, referenceImages: true },
+    supports: { temperature: true, systemInstruction: true, referenceImages: true, grounding: true },
     defaults: { maxOutputTokens: 8192 },
   },
   {
@@ -84,7 +86,7 @@ export const TEXT_MODELS: StudioModel[] = [
     label: 'Gemini 3.1 Flash Lite',
     mode: 'text',
     description: 'Cheapest and quickest for simple tasks',
-    supports: { temperature: true, systemInstruction: true, referenceImages: true },
+    supports: { temperature: true, systemInstruction: true, referenceImages: true, grounding: true },
     defaults: { maxOutputTokens: 8192 },
   },
 ];

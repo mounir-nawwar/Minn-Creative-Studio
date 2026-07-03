@@ -11,8 +11,10 @@ export const generateText = async (params: {
   projectId?: string;
   /** Prior turns, oldest first, excluding the current prompt — sent so the model actually has conversational memory */
   history?: { role: 'user' | 'assistant'; content: string }[];
+  /** Web search + URL-reading tools — lets the model look up real info instead of guessing */
+  grounding?: boolean;
 }, signal?: AbortSignal) => {
-  const { prompt, model, systemInstruction, imageUrls = [], videoUrls = [], projectContext, maxOutputTokens, projectId, history = [] } = params;
+  const { prompt, model, systemInstruction, imageUrls = [], videoUrls = [], projectContext, maxOutputTokens, projectId, history = [], grounding } = params;
 
   // Project context is stable across a whole chat, so it belongs in the system
   // instruction (sent identically every turn) rather than re-stated inside the
@@ -46,6 +48,7 @@ export const generateText = async (params: {
       config: {
         systemInstruction: fullSystemInstruction,
         ...(maxOutputTokens && { maxOutputTokens }),
+        ...(grounding && { tools: [{ googleSearch: {} }, { urlContext: {} }] }),
       },
       projectId,
     }, signal);

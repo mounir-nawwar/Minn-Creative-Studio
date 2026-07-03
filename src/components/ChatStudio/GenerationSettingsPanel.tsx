@@ -82,6 +82,19 @@ export default function GenerationSettingsPanel({ settings, onChange, disabled }
           </div>
         )}
 
+        {supports.grounding && (
+          <div className="flex items-center justify-between py-1">
+            <div>
+              <span className="text-[10px] font-medium uppercase tracking-wide text-gray-500">Search &amp; read the web</span>
+              <p className="mt-0.5 text-[10px] text-gray-600">Costs extra per search query</p>
+            </div>
+            <NodeToggle
+              on={(settings.params.grounding as boolean) ?? false}
+              onClick={() => setParam('grounding', !((settings.params.grounding as boolean) ?? false))}
+            />
+          </div>
+        )}
+
         {/* Media params driven by capability flags */}
         {supports.aspectRatio && (
           <NodeField label="Aspect ratio">

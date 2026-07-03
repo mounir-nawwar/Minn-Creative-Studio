@@ -187,10 +187,11 @@ export function useChatStudio() {
       maxOutputTokens: 8192,
       projectId: currentProject!.id,
       history: history.map((m) => ({ role: m.role, content: m.content })),
+      grounding: settings.params.grounding as boolean | undefined,
     });
     const assistantMessage = await chatsApi.addMessage(chatId, 'assistant', modelText);
     appendMessage(assistantMessage);
-  }, [settings.model, settings.systemInstruction, projectContext, currentProject, appendMessage]);
+  }, [settings.model, settings.systemInstruction, settings.params, projectContext, currentProject, appendMessage]);
 
   const runImageGeneration = useCallback(async (chatId: string, text: string, attachments: MessageAttachment[]) => {
     const p = settings.params;
