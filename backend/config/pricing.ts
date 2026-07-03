@@ -24,6 +24,7 @@ export const MODEL_PRICING: Record<string, any> = {
   'gemini-2.5-flash-preview-tts': { per1kChars: 0.005 },
 
   // Gemini text/chat models
+  'gemini-3.5-flash':             { input: 1.50,  output: 9.00  },
   'gemini-3-flash-preview':       { input: 0.50,  output: 3.00,  audioInput: 1.00  },
   'gemini-3.1-pro-preview':       { input: 2.00,  output: 12.00 },
   'gemini-3.1-flash-lite-preview':{ input: 0.25,  output: 1.50,  audioInput: 0.50  },
