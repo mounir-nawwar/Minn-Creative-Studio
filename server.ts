@@ -39,6 +39,14 @@ async function startServer() {
   const app = express();
   const PORT = parseInt(process.env.PORT || '3000');
 
+  // Trust exactly one proxy hop (Cloudflare sits directly in front of this
+  // process — no local nginx). Without this, Express ignores X-Forwarded-For
+  // and express-rate-limit throws ERR_ERL_UNEXPECTED_X_FORWARDED_FOR on every
+  // request, plus rate limits would key off Cloudflare's IP for everyone.
+  if (IS_PRODUCTION) {
+    app.set('trust proxy', 1);
+  }
+
   // Security headers — CSP and COOP disabled for simple internal tool
   app.use(helmet({
     contentSecurityPolicy: false,
