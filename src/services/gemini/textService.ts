@@ -1,4 +1,5 @@
 import { callBackend, urlToBase64 } from './client';
+import type { Project } from '../../types/project.types';
 
 export const generateText = async (params: {
   prompt: string;
@@ -129,6 +130,94 @@ export const fillProjectData = async (description: string, signal?: AbortSignal)
       config: {
         responseMimeType: "application/json",
       }
+    }, signal);
+
+    return JSON.parse(response.text);
+  } catch (err) {
+    console.error('Gemini API Error:', err);
+    throw err;
+  }
+};
+
+/**
+ * Merges a chat transcript into a project's existing fields — unlike
+ * fillProjectData, this is told what the project already knows and is
+ * explicitly instructed to combine/reconcile rather than silently drop
+ * existing detail the conversation didn't happen to repeat.
+ */
+export const mergeProjectData = async (transcript: string, existingProject: Partial<Project>, signal?: AbortSignal) => {
+  const existingSummary = JSON.stringify({
+    name: existingProject.name,
+    type: existingProject.type,
+    subtype: existingProject.subtype,
+    description: existingProject.description,
+    clientName: existingProject.clientName,
+    clientIndustry: existingProject.clientIndustry,
+    targetAudience: existingProject.targetAudience,
+    brandPersonality: existingProject.brandPersonality,
+    visualMood: existingProject.visualMood,
+    styleKeywords: existingProject.styleKeywords,
+    negativeKeywords: existingProject.negativeKeywords,
+    aiInstructions: existingProject.aiInstructions,
+    platforms: existingProject.platforms,
+    primaryColor: existingProject.primaryColor,
+    secondaryColor: existingProject.secondaryColor,
+    accentColor: existingProject.accentColor,
+  }, null, 2);
+
+  const prompt = `
+    You are a creative project setup assistant for a professional AI media studio.
+
+    Here is everything currently known about this project:
+    ${existingSummary}
+
+    Here is a new conversation with the client that surfaced more information:
+    ${transcript}
+
+    Return a JSON object with these exact fields:
+    {
+      "projectType": "marketing|fashion|advertising|branding|content|product|architecture|film|events|personal",
+      "projectSubtype": "string",
+      "name": "string",
+      "description": "string",
+      "clientName": "string",
+      "primaryColor": "#hexcode",
+      "secondaryColor": "#hexcode",
+      "accentColor": "#hexcode",
+      "fontStyle": "geometric|serif|handwritten|monospace|display|mixed",
+      "visualMood": ["string array from: minimal,bold,luxury,playful,dark,vibrant,soft,raw,corporate,cinematic,editorial,futuristic,natural,retro,abstract"],
+      "styleKeywords": "comma separated string",
+      "negativeKeywords": "comma separated string",
+      "targetAudience": "string",
+      "brandPersonality": ["string array from: professional,friendly,luxurious,bold,playful,minimalist,authoritative,warm,edgy,inspirational"],
+      "platforms": ["string array from: instagram,tiktok,youtube,facebook,linkedin,pinterest,website,print,email,billboard"],
+      "outputFormats": ["string array from: 1:1,9:16,16:9,4:5,1.91:1,A4"],
+      "aiInstructions": "detailed paragraph string",
+      "deliverables": "string"
+    }
+
+    MERGE the existing project info with the new conversation:
+    - Do NOT drop any detail from the existing info just because this conversation
+      didn't repeat it — carry it forward.
+    - Combine overlapping information rather than replacing it outright (e.g. merge
+      style keyword lists, combine visual moods, union platforms).
+    - For "description" specifically, write a thorough business narrative — history,
+      what they sell, background, and anything discussed — building on top of the
+      existing description rather than discarding it.
+    - If the existing project already has a name/type/subtype/colors and the
+      conversation didn't address them, keep the existing values exactly.
+
+    Return only valid JSON, no markdown, no explanation.
+  `;
+
+  try {
+    const response = await callBackend('generateContent', {
+      model: "gemini-3-flash-preview",
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      config: {
+        responseMimeType: "application/json",
+      },
+      projectId: existingProject.id,
     }, signal);
 
     return JSON.parse(response.text);

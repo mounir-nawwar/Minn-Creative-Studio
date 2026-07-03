@@ -50,7 +50,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
   const [signInError, setSignInError] = useState<string | null>(null);
-  const { currentProject, isSettingsOpen, closeSettings, settingsMode, clearProject, studioMode } = useProjectStore();
+  const { currentProject, isSettingsOpen, closeSettings, settingsMode, clearProject, studioMode, settingsPrefill } = useProjectStore();
   const { updateCurrentProject } = useProject();
   const setNodes = useStore((state) => state.setNodes);
   const setEdges = useStore((state) => state.setEdges);
@@ -267,6 +267,7 @@ export default function App() {
                       onClose={closeSettings}
                       mode={settingsMode}
                       existingProject={currentProject}
+                      prefillOverrides={settingsPrefill}
                       onCreate={async (data) => { await updateCurrentProject(data); closeSettings(); }}
                     />
                   )}
@@ -293,6 +294,7 @@ export default function App() {
                   onClose={closeSettings}
                   mode={settingsMode}
                   existingProject={currentProject}
+                  prefillOverrides={settingsPrefill}
                   onCreate={async (data) => { await updateCurrentProject(data); closeSettings(); }}
                 />
               )}

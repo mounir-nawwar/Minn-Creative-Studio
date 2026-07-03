@@ -17,6 +17,8 @@ interface ProjectCreationOverlayProps {
   initialData?: Partial<Project>;
   mode?: 'create' | 'edit';
   existingProject?: Project | null;
+  /** Merged on top of existingProject/initialData — e.g. an Extract-to-project result */
+  prefillOverrides?: Partial<Project> | null;
 }
 
 export default function ProjectCreationOverlay({
@@ -26,10 +28,11 @@ export default function ProjectCreationOverlay({
   initialData,
   mode = 'create',
   existingProject,
+  prefillOverrides,
 }: ProjectCreationOverlayProps) {
   const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState<Partial<Project>>(
-    existingProject || initialData || {
+  const [formData, setFormData] = useState<Partial<Project>>({
+    ...(existingProject || initialData || {
       type: 'marketing',
       subtype: 'Social Media Campaign',
       status: 'active' as ProjectStatus,
@@ -41,8 +44,9 @@ export default function ProjectCreationOverlay({
       styleKeywords: '',
       negativeKeywords: '',
       aiInstructions: '',
-    },
-  );
+    }),
+    ...(prefillOverrides || {}),
+  });
   const [isGenerating, setIsGenerating] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [isAiAssistantExpanded, setIsAiAssistantExpanded] = useState(false);

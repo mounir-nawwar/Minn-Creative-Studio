@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { ArrowLeft, Sparkles } from 'lucide-react';
+import { ArrowLeft, Sparkles, FileOutput, Loader2 } from 'lucide-react';
 import { chatsApi } from '../../lib/api';
 import type { User, Chat } from '../../lib/api';
 import { toast } from '../../store/useToastStore';
+import { mergeProjectData } from '../../services/geminiService';
 import ProfileMenu from '../ProfileMenu';
 import StudioModeToggle from '../StudioModeToggle';
 import MoveToProjectDialog from '../Library/MoveToProjectDialog';
@@ -23,9 +24,10 @@ interface ChatStudioProps {
  * Rendered by App when studioMode === 'chat'.
  */
 export default function ChatStudio({ user, onLogout }: ChatStudioProps) {
-  const { currentProject, clearProject } = useProjectStore();
+  const { currentProject, clearProject, openSettings, setSettingsPrefill } = useProjectStore();
   const playground = isPlaygroundProject(currentProject);
   const [chatToMove, setChatToMove] = useState<Chat | null>(null);
+  const [isExtracting, setIsExtracting] = useState(false);
   const {
     chats,
     messages,
@@ -39,6 +41,38 @@ export default function ChatStudio({ user, onLogout }: ChatStudioProps) {
     deleteChat,
     sendMessage,
   } = useChatStudio();
+
+  const handleExtractToProject = async () => {
+    if (!currentProject || messages.length === 0 || isExtracting) return;
+    setIsExtracting(true);
+    try {
+      const transcript = messages
+        .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
+        .join('\n');
+      const merged = await mergeProjectData(transcript, currentProject);
+      setSettingsPrefill({
+        type: merged.projectType,
+        subtype: merged.projectSubtype,
+        name: merged.name,
+        description: merged.description,
+        clientName: merged.clientName,
+        primaryColor: merged.primaryColor,
+        secondaryColor: merged.secondaryColor,
+        accentColor: merged.accentColor,
+        visualMood: merged.visualMood,
+        styleKeywords: merged.styleKeywords,
+        negativeKeywords: merged.negativeKeywords,
+        targetAudience: merged.targetAudience,
+        brandPersonality: merged.brandPersonality?.[0],
+        aiInstructions: merged.aiInstructions,
+      });
+      openSettings('edit');
+    } catch (err) {
+      toast.error('Extraction failed', err instanceof Error ? err.message : 'Could not extract project info from this chat');
+    } finally {
+      setIsExtracting(false);
+    }
+  };
 
   return (
     <div className="flex h-screen w-screen flex-col bg-[#0a0a0a]">
@@ -70,6 +104,17 @@ export default function ChatStudio({ user, onLogout }: ChatStudioProps) {
         </div>
 
         <div className="flex items-center gap-3">
+          {!playground && messages.length > 0 && (
+            <button
+              onClick={handleExtractToProject}
+              disabled={isExtracting}
+              title="Pull everything from this chat into the project's fields — you'll review before anything saves"
+              className="inline-flex h-9 items-center gap-2 rounded-lg bg-white/[0.04] px-3.5 text-[13px] font-medium text-gray-300 ring-1 ring-white/10 transition-[transform,color,box-shadow] duration-150 hover:text-white hover:ring-white/20 active:scale-[0.96] disabled:opacity-50"
+            >
+              {isExtracting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileOutput className="h-3.5 w-3.5" />}
+              Extract to project
+            </button>
+          )}
           <StudioModeToggle />
           <div className="h-7 w-px bg-white/10" />
           <ProfileMenu user={user} onLogout={onLogout} variant="avatar" />
