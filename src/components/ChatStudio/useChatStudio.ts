@@ -193,7 +193,7 @@ export function useChatStudio() {
     appendMessage(assistantMessage);
   }, [settings.model, settings.systemInstruction, settings.params, projectContext, currentProject, appendMessage]);
 
-  const runImageGeneration = useCallback(async (chatId: string, text: string, attachments: MessageAttachment[]) => {
+  const runImageGeneration = useCallback(async (chatId: string, text: string, attachments: MessageAttachment[], history: ChatMessage[]) => {
     const p = settings.params;
     const referenceImages = attachments
       .filter((a) => a.type === 'image')
@@ -211,6 +211,11 @@ export function useChatStudio() {
       ...(referenceImages.length > 0 ? { referenceImages } : {}),
       projectContext: projectContext(),
       projectId: currentProject!.id,
+      history: history.map((m) => ({
+        role: m.role,
+        content: m.content,
+        imageUrls: m.attachments?.filter((a) => a.type === 'image').map((a) => a.url),
+      })),
     });
 
     const urls = Array.isArray(result) ? result : [result];
@@ -301,7 +306,7 @@ export function useChatStudio() {
       try {
         switch (settings.mode) {
           case 'image':
-            await runImageGeneration(chatId, text, attachments);
+            await runImageGeneration(chatId, text, attachments, history);
             break;
           case 'video':
             await runVideoGeneration(chatId, text, attachments);

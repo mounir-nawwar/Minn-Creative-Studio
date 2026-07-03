@@ -24,12 +24,21 @@ export const generateImage = async (params: {
   mimeType?: string;
   grounding?: boolean;
   thinkingBudget?: number;
+  /**
+   * Prior turns, oldest first, excluding the current prompt — including any
+   * images those turns carried, so a follow-up like "make it blue" edits the
+   * image actually being discussed instead of generating something unrelated.
+   * Only usable by the Gemini/Nano-Banana path below — Imagen 4 is a one-shot
+   * text-to-image API with no conversational multi-turn support at all.
+   */
+  history?: { role: 'user' | 'assistant'; content: string; imageUrls?: string[] }[];
 }, signal?: AbortSignal): Promise<string | string[]> => {
   const {
     prompt, model, aspectRatio, imageSize, resolution, referenceImages, seed,
     guidanceStrength, cfgScale, projectContext, projectId, sampleCount = 1,
     personGeneration, enhancePrompt, addWatermark, safetySetting,
-    candidateCount, temperature, topP, topK, mimeType, grounding, thinkingBudget
+    candidateCount, temperature, topP, topK, mimeType, grounding, thinkingBudget,
+    history = [],
   } = params;
 
   const fullPrompt = projectContext
@@ -88,6 +97,21 @@ export const generateImage = async (params: {
 
     parts.push({ text: fullPrompt });
 
+    // Build conversation history once (including any images those turns
+    // carried) so the model can see and edit its own prior output rather
+    // than starting fresh every message.
+    const historyTurns: any[] = [];
+    for (const h of history) {
+      const hParts: any[] = [{ text: h.content }];
+      if (h.imageUrls?.length) {
+        for (const url of h.imageUrls) {
+          const { data, mimeType: histMimeType } = await urlToBase64(url);
+          hParts.push({ inlineData: { data, mimeType: histMimeType } });
+        }
+      }
+      historyTurns.push({ role: h.role === 'assistant' ? 'model' : 'user', parts: hParts });
+    }
+
     try {
       const imageConfig: any = {
         aspectRatio: aspectRatio as any,
@@ -122,7 +146,7 @@ export const generateImage = async (params: {
       for (let i = 0; i < numImages; i++) {
         const response = await callBackend('generateContent', {
           model: model,
-          contents: { parts },
+          contents: [...historyTurns, { role: 'user', parts }],
           config: {
             ...config,
             ...(seed !== undefined && numImages > 1 ? { seed: seed + i } : {}),
