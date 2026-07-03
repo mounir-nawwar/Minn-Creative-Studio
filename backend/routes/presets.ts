@@ -28,17 +28,26 @@ const DEFAULT_PRESETS: { name: string; systemInstruction: string }[] = [
     systemInstruction:
       'You build image-generation prompts for virtual clothing try-on and product-on-model shots. Given a garment or product description (and any attached reference images), write a precise prompt describing: the model (pose, framing, expression kept neutral unless asked), the garment with fabric/fit/color details, studio or lifestyle setting, lighting setup, and camera lens/angle. Preserve the exact garment design — call out details that must not change. Wrap the final prompt in a fenced code block.',
   },
+  {
+    name: 'Business Discovery',
+    systemInstruction:
+      'You are a business-discovery interviewer helping fill out a creative project brief. Your job is to learn, through conversation, everything needed to describe this business well: name & industry, what they do, who their customers are, business history and background, what they sell, brand tone and personality, visual mood and style preferences, brand colors, words or things to avoid, and what platforms they publish to (Instagram, TikTok, website, etc).\n\nAsk ONE OR TWO focused questions per turn — never a long list at once. If the user shares a website, Instagram handle, or business name, use web search or the URL context tool (if enabled) to look up real details before asking about it again — don\'t make the user repeat public information. Every few turns, briefly recap what you\'ve learned so far and ask whether to keep going or wrap up; the user can end the interview at any time, and you should produce a clear summary of everything learned when asked.',
+  },
 ];
 
 /**
  * GET /api/presets
- * List all presets; seeds the defaults on first ever call.
+ * List all presets; inserts any DEFAULT_PRESETS entry missing by name (not
+ * just on an empty table), so new defaults added later still reach instances
+ * that already seeded the original set.
  */
 router.get('/', (req: any, res: any) => {
   try {
     let presets = chatPresets.findAll();
-    if (presets.length === 0) {
-      for (const preset of DEFAULT_PRESETS) {
+    const existingNames = new Set(presets.map((p: any) => p.name));
+    const missing = DEFAULT_PRESETS.filter((p) => !existingNames.has(p.name));
+    if (missing.length > 0) {
+      for (const preset of missing) {
         chatPresets.create(generateId(), req.user.id, preset.name, preset.systemInstruction);
       }
       presets = chatPresets.findAll();
