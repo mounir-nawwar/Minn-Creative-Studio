@@ -30,14 +30,14 @@ export default function MessageBubble({ message, onDelete }: MessageBubbleProps)
 
   if (isUser) {
     return (
-      <div className="group flex items-end justify-end gap-1.5">
+      <div className="group flex min-w-0 items-end justify-end gap-1.5">
         <DeleteButton onClick={() => onDelete(message.id)} />
-        <div className="max-w-[75%] space-y-2">
+        <div className="min-w-0 max-w-[75%] space-y-2">
           {attachments.length > 0 && (
             <div className="flex flex-wrap justify-end gap-2">
               {attachments.map((att, i) => (
                 <div key={i} className="max-w-[200px]">
-                  <MediaAttachment att={att} />
+                  <MediaAttachment att={att} onDelete={() => onDelete(message.id)} />
                 </div>
               ))}
             </div>
@@ -51,15 +51,15 @@ export default function MessageBubble({ message, onDelete }: MessageBubbleProps)
   }
 
   return (
-    <div className="group flex items-end justify-start gap-1.5">
-      <div className="max-w-[85%] space-y-2">
+    <div className="group flex min-w-0 items-end justify-start gap-1.5">
+      <div className="min-w-0 max-w-[85%] space-y-2">
         <div className="text-[13px] leading-relaxed text-gray-200">
           {renderMarkdown(message.content)}
         </div>
         {attachments.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {attachments.map((att, i) => (
-              <MediaAttachment key={i} att={att} />
+              <MediaAttachment key={i} att={att} onDelete={() => onDelete(message.id)} />
             ))}
           </div>
         )}
