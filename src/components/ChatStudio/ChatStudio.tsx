@@ -39,6 +39,7 @@ export default function ChatStudio({ user, onLogout }: ChatStudioProps) {
     setActiveChatId,
     createNewChat,
     deleteChat,
+    deleteMessage,
     sendMessage,
   } = useChatStudio();
 
@@ -138,6 +139,7 @@ export default function ChatStudio({ user, onLogout }: ChatStudioProps) {
             pending={pending}
             hasActiveChat={!!activeChatId}
             onStartChat={createNewChat}
+            onDeleteMessage={deleteMessage}
           />
           <ChatComposer mode={settings.mode} disabled={isGenerating} onSend={sendMessage} />
         </main>

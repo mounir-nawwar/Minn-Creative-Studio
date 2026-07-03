@@ -175,6 +175,43 @@ router.post('/:id/messages', (req: any, res: any) => {
 });
 
 /**
+ * DELETE /api/chats/:id/messages/:messageId
+ * Delete a single message — lets the user trim context out of a chat
+ * without deleting the whole conversation.
+ */
+router.delete('/:id/messages/:messageId', (req: any, res: any) => {
+  try {
+    const { id, messageId } = req.params;
+    const userId = req.user.id;
+
+    const chat = chats.findById(id);
+    if (!chat) {
+      return res.status(404).json({ error: 'Chat not found' });
+    }
+    if (chat.user_id !== userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const message = messages.findById(messageId);
+    if (!message || message.chat_id !== id) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+
+    messages.delete(messageId);
+
+    // Keep the history-rail preview in sync with whatever is now last
+    const remaining = messages.findByChatId(id);
+    const lastMessage = remaining.length > 0 ? remaining[remaining.length - 1].content.substring(0, 200) : '';
+    chats.update(id, { lastMessage });
+
+    res.json({ success: true, message: 'Message deleted' });
+  } catch (error: any) {
+    console.error('Error deleting message:', error);
+    res.status(500).json({ error: 'Failed to delete message' });
+  }
+});
+
+/**
  * PUT /api/chats/:id
  * Update chat title and/or move it to another project.
  * With moveAssets=true, generated assets referenced by the chat's messages

@@ -125,6 +125,20 @@ export function useChatStudio() {
     setMessages((prev) => (prev.some((m) => m.id === message.id) ? prev : [...prev, message]));
   }, []);
 
+  /** Trim a message out of the chat — it stops counting toward context on the next turn */
+  const deleteMessage = useCallback(async (messageId: string) => {
+    if (!activeChatId) return;
+    const previous = messagesRef.current;
+    setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    try {
+      await chatsApi.deleteMessage(activeChatId, messageId);
+    } catch (error) {
+      console.error('Failed to delete message:', error);
+      toast.error('Chat Error', 'Failed to delete message');
+      setMessages(previous);
+    }
+  }, [activeChatId]);
+
   const createNewChat = useCallback(async () => {
     if (!currentProject) return;
     try {
@@ -343,6 +357,7 @@ export function useChatStudio() {
     setActiveChatId,
     createNewChat,
     deleteChat,
+    deleteMessage,
     sendMessage,
   };
 }

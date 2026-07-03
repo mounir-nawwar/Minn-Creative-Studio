@@ -10,10 +10,11 @@ interface ChatThreadProps {
   pending: PendingGeneration | null;
   hasActiveChat: boolean;
   onStartChat: () => void;
+  onDeleteMessage: (messageId: string) => void;
 }
 
 /** Scrolling conversation column with autoscroll and the in-flight bubble */
-export default function ChatThread({ messages, pending, hasActiveChat, onStartChat }: ChatThreadProps) {
+export default function ChatThread({ messages, pending, hasActiveChat, onStartChat, onDeleteMessage }: ChatThreadProps) {
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -47,7 +48,7 @@ export default function ChatThread({ messages, pending, hasActiveChat, onStartCh
     <div className="flex-1 overflow-y-auto">
       <div className="mx-auto w-full max-w-3xl space-y-5 px-6 py-6">
         {messages.map((msg) => (
-          <MessageBubble key={msg.id} message={msg} />
+          <MessageBubble key={msg.id} message={msg} onDelete={onDeleteMessage} />
         ))}
         {pending && (
           <div className="flex justify-start">

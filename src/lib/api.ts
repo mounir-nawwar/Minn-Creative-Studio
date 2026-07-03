@@ -314,6 +314,10 @@ export const chatsApi = {
       method: 'POST',
       body: JSON.stringify({ role, content, ...(attachments?.length ? { attachments } : {}) })
     }),
+
+  /** Delete a single message — trims context out of a chat without deleting the whole thing */
+  deleteMessage: (chatId: string, messageId: string): Promise<void> =>
+    apiRequest(`/chats/${chatId}/messages/${messageId}`, { method: 'DELETE' }),
   
   update: (id: string, data: { title?: string; projectId?: string; moveAssets?: boolean }): Promise<Chat> =>
     apiRequest(`/chats/${id}`, {

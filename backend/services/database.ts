@@ -489,6 +489,12 @@ export const messages = {
     return { id, chatId, role, content, attachments };
   },
 
+  findById: (id: string) => {
+    const stmt = db.prepare('SELECT * FROM messages WHERE id = ?');
+    const message = stmt.get(id) as any;
+    return message ? { ...message, attachments: parseAttachments(message.attachments) } : message;
+  },
+
   findByChatId: (chatId: string) => {
     const stmt = db.prepare('SELECT * FROM messages WHERE chat_id = ? ORDER BY created_at ASC');
     const messageList = stmt.all(chatId) as any[];
@@ -499,6 +505,12 @@ export const messages = {
   updateAttachments: (id: string, attachments: MessageAttachment[]) => {
     const stmt = db.prepare('UPDATE messages SET attachments = ? WHERE id = ?');
     stmt.run(JSON.stringify(attachments), id);
+  },
+
+  /** Delete one message — used to trim context out of a chat without deleting the whole thing */
+  delete: (id: string) => {
+    const stmt = db.prepare('DELETE FROM messages WHERE id = ?');
+    stmt.run(id);
   },
 
   deleteByChatId: (chatId: string) => {
