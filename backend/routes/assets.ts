@@ -81,6 +81,33 @@ router.get('/all', async (req: any, res: any) => {
 });
 
 /**
+ * GET /api/assets/by-url?url=...
+ * Resolve an asset's real database record from its public /storage URL.
+ * Used by the global asset-preview modal, which is opened from ~28 places
+ * (canvas node output previews, chat media, Library, etc.) knowing only a
+ * URL — this is what lets "Delete permanently" work from any of them.
+ * Registered before /:id so "by-url" isn't captured as an asset id.
+ */
+router.get('/by-url', async (req: any, res: any) => {
+  try {
+    const { url } = req.query;
+    if (!url || typeof url !== 'string') {
+      return res.status(400).json({ error: 'url is required' });
+    }
+
+    const asset = assets.findByUrl(url);
+    if (!asset) {
+      return res.status(404).json({ error: 'No matching asset found' });
+    }
+
+    res.json(asset);
+  } catch (error: any) {
+    console.error('Error resolving asset by URL:', error);
+    res.status(500).json({ error: 'Failed to resolve asset' });
+  }
+});
+
+/**
  * GET /api/assets/:id
  * Get a single asset
  */

@@ -344,6 +344,15 @@ export const assetsApi = {
     return apiRequest(`/assets${query}`);
   },
 
+  /** Resolve an asset's real record from its /storage URL — null if nothing matches (e.g. an unsaved output) */
+  findByUrl: async (url: string): Promise<Asset | null> => {
+    try {
+      return await apiRequest(`/assets/by-url?url=${encodeURIComponent(url)}`);
+    } catch {
+      return null;
+    }
+  },
+
   /** Global library: all assets across projects, with project_name from the join */
   listAll: (filters: LibraryFilters = {}): Promise<(Asset & { project_name?: string })[]> => {
     const params = new URLSearchParams();
