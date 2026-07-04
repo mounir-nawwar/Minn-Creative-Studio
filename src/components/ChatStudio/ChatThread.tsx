@@ -13,12 +13,27 @@ interface ChatThreadProps {
   onDeleteMessage: (messageId: string) => void;
 }
 
+const NEAR_BOTTOM_THRESHOLD = 120;
+
 /** Scrolling conversation column with autoscroll and the in-flight bubble */
 export default function ChatThread({ messages, pending, hasActiveChat, onStartChat, onDeleteMessage }: ChatThreadProps) {
   const endRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  // Only auto-scroll when the user hasn't scrolled away from the bottom —
+  // otherwise the 4s poll (which always produces a new messages array, even
+  // with no real change) yanks them back down while they're reading history.
+  const stickToBottomRef = useRef(true);
+
+  const handleScroll = () => {
+    const el = containerRef.current;
+    if (!el) return;
+    stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < NEAR_BOTTOM_THRESHOLD;
+  };
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (stickToBottomRef.current) {
+      endRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages, pending]);
 
   if (!hasActiveChat) {
@@ -45,7 +60,7 @@ export default function ChatThread({ messages, pending, hasActiveChat, onStartCh
   }
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div ref={containerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto">
       <div className="mx-auto w-full max-w-3xl space-y-5 px-6 py-6">
         {messages.map((msg) => (
           <MessageBubble key={msg.id} message={msg} onDelete={onDeleteMessage} />
