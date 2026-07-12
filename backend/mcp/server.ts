@@ -14,6 +14,7 @@ import { registerGenerationTools } from './tools/generate.ts';
 import { registerAssetTools } from './tools/assets.ts';
 import { registerJobTools } from './tools/jobs.ts';
 import { registerChatTools } from './tools/chats.ts';
+import { registerGraphTools } from './tools/graph.ts';
 
 /** The identity a session acts as (derived from the verified access token). */
 export interface McpUser {
@@ -48,4 +49,5 @@ function registerToolGroups(server: McpServer, ctx: ToolContext): void {
   registerAssetTools(server, ctx);
   registerJobTools(server, ctx);
   registerChatTools(server, ctx);
+  registerGraphTools(server, ctx);
 }
