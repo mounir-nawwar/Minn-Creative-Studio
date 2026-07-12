@@ -16,6 +16,7 @@ import { AUDIO_MODELS, TTS_VOICES, findModel } from '../../../src/lib/models.ts'
 import { auditLog } from '../audit.ts';
 import type { ToolContext } from '../server.ts';
 import { imagePartFromUrl } from '../media.ts';
+import { projectContextFor } from '../projectContext.ts';
 import { jsonResult, errorResult } from './util.ts';
 
 const BLOCK_NONE_SAFETY = [
@@ -59,8 +60,9 @@ export function registerGenerationTools(server: McpServer, ctx: ToolContext): vo
       title: 'Generate text',
       description:
         'Run a text/vision prompt through a Gemini model. Optionally attach images by url (Library /storage urls ' +
-        'or external http urls) and a system instruction. For brand-aware output, fetch the project with ' +
-        'get_project first and weave its settings into your prompt. Cost is tracked to the project.',
+        'or external http urls) and a system instruction. The project\'s brand context (colors, style keywords, ' +
+        'AI instructions) is injected automatically, exactly like in-app generations — pass ' +
+        'includeProjectContext:false to opt out. Cost is tracked to the project.',
       inputSchema: {
         projectId: projectIdSchema,
         prompt: z.string().min(1),
@@ -70,6 +72,7 @@ export function registerGenerationTools(server: McpServer, ctx: ToolContext): vo
         temperature: z.number().min(0).max(2).optional(),
         maxOutputTokens: z.number().int().min(1).max(65536).optional(),
         grounding: z.boolean().optional().describe('Enable Google Search + URL reading tools'),
+        includeProjectContext: z.boolean().optional().describe('Default true (no-op for playground)'),
       },
     },
     (args, extra) =>
@@ -81,13 +84,20 @@ export function registerGenerationTools(server: McpServer, ctx: ToolContext): vo
         const parts: any[] = [{ text: args.prompt }];
         for (const url of args.imageUrls ?? []) parts.push(imagePartFromUrl(url));
 
+        // Same placement as the app (textService): stable context goes in the
+        // system instruction so Gemini's prefix caching applies.
+        const context = args.includeProjectContext !== false ? projectContextFor(args.projectId) : '';
+        const systemInstruction = context
+          ? `${args.systemInstruction ? `${args.systemInstruction}\n\n` : ''}Project Context:\n${context}`
+          : args.systemInstruction;
+
         const data = await runGeneration({
           method: 'generateContent',
           params: {
             model: modelId,
             contents: [{ role: 'user', parts }],
             config: {
-              ...(args.systemInstruction && { systemInstruction: args.systemInstruction }),
+              ...(systemInstruction && { systemInstruction }),
               ...(args.maxOutputTokens && { maxOutputTokens: args.maxOutputTokens }),
               ...(args.temperature !== undefined && { temperature: args.temperature }),
               ...(args.grounding && { tools: [{ googleSearch: {} }, { urlContext: {} }] }),
@@ -110,8 +120,9 @@ export function registerGenerationTools(server: McpServer, ctx: ToolContext): vo
         'Generate images with Imagen 4 or a Gemini image model (nano-banana family). Supports aspect ratio, seed, ' +
         'sample count, and reference images (Library /storage urls or external urls) for the Gemini models — use ' +
         'references for try-ons, product placement, and style matching. Images are saved to the project ' +
-        'automatically and appear in the Library. Bake exclusions into the prompt (no negativePrompt on image models). ' +
-        'Check list_models(mode=\'image\') for capabilities per model.',
+        'automatically and appear in the Library. The project\'s brand context is injected into the prompt ' +
+        'automatically (like in-app generations) — pass includeProjectContext:false to opt out. Bake exclusions ' +
+        'into the prompt (no negativePrompt on image models). Check list_models(mode=\'image\') for capabilities.',
       inputSchema: {
         projectId: projectIdSchema,
         prompt: z.string().min(1),
@@ -127,6 +138,7 @@ export function registerGenerationTools(server: McpServer, ctx: ToolContext): vo
           .describe('Gemini image models only — Imagen 4 is one-shot text-to-image'),
         personGeneration: z.string().optional().describe("Imagen only: e.g. 'allow_adult'"),
         temperature: z.number().min(0).max(2).optional().describe('Gemini image models only'),
+        includeProjectContext: z.boolean().optional().describe('Default true (no-op for playground)'),
       },
     },
     (args, extra) =>
@@ -137,6 +149,12 @@ export function registerGenerationTools(server: McpServer, ctx: ToolContext): vo
         const aspectRatio = args.aspectRatio ?? '1:1';
         const isImagen4 = modelId.startsWith('imagen-4');
 
+        // Same prompt framing as the app (imageService)
+        const context = args.includeProjectContext !== false ? projectContextFor(args.projectId) : '';
+        const fullPrompt = context
+          ? `Project Context: ${context}\n\nTask: Generate an image based on this prompt: ${args.prompt}`
+          : args.prompt;
+
         if (isImagen4) {
           if (args.referenceImages?.length) {
             return errorResult('Imagen 4 does not accept reference images — use a Gemini image model (e.g. gemini-3.1-flash-image-preview) instead.');
@@ -145,7 +163,7 @@ export function registerGenerationTools(server: McpServer, ctx: ToolContext): vo
             method: 'generateImages',
             params: {
               model: modelId,
-              prompt: args.prompt,
+              prompt: fullPrompt,
               config: {
                 numberOfImages: args.sampleCount ?? 1,
                 aspectRatio,
@@ -169,7 +187,7 @@ export function registerGenerationTools(server: McpServer, ctx: ToolContext): vo
         const sampleCount = Math.min(args.sampleCount ?? 1, MAX_GEMINI_IMAGE_SAMPLES);
         const parts: any[] = [];
         for (const ref of args.referenceImages ?? []) parts.push(imagePartFromUrl(ref.url));
-        parts.push({ text: args.prompt });
+        parts.push({ text: fullPrompt });
 
         const baseConfig: any = {
           responseModalities: ['IMAGE'],

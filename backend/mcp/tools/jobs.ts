@@ -18,6 +18,7 @@ import { jobStore } from '../jobs.ts';
 import { auditLog } from '../audit.ts';
 import type { ToolContext } from '../server.ts';
 import { imageBytesFromUrl } from '../media.ts';
+import { projectContextFor } from '../projectContext.ts';
 import { jsonResult, errorResult } from './util.ts';
 
 const MAX_RUNNING_JOBS_PER_USER = 3;
@@ -36,7 +37,8 @@ export function registerJobTools(server: McpServer, ctx: ToolContext): void {
         `Generate video with Veo (${VIDEO_MODELS.map((m) => m.id).join(', ')}). Returns a jobId immediately — ` +
         'poll with check_job every ~15s (videos typically take 1–4 minutes). Supports aspect ratio, resolution, ' +
         'duration, negative prompt, seed, audio, a start/end frame image, and reference images (urls from the ' +
-        'Library or external).',
+        'Library or external). The project\'s brand context is injected into the prompt automatically — pass ' +
+        'includeProjectContext:false to opt out.',
       inputSchema: {
         projectId: z.string().min(1).describe("Target project id, or 'playground'"),
         prompt: z.string().min(1),
@@ -50,6 +52,7 @@ export function registerJobTools(server: McpServer, ctx: ToolContext): void {
         startFrameUrl: z.string().optional().describe('Image the video starts from'),
         endFrameUrl: z.string().optional().describe('Image the video ends on'),
         referenceImages: z.array(z.object({ url: z.string() })).max(MAX_VIDEO_REFERENCES).optional(),
+        includeProjectContext: z.boolean().optional().describe('Default true (no-op for playground)'),
       },
     },
     (args, extra) =>
@@ -88,9 +91,15 @@ export function registerJobTools(server: McpServer, ctx: ToolContext): void {
           );
         }
 
+        // Same prompt framing as the app (videoService)
+        const context = args.includeProjectContext !== false ? projectContextFor(args.projectId) : '';
+        const fullPrompt = context
+          ? `Project Context: ${context}\n\nTask: Generate a video based on this prompt: ${args.prompt}`
+          : args.prompt;
+
         const operation = await runGeneration({
           method: 'generateVideos',
-          params: { model: modelId, prompt: args.prompt, image, config, projectId: args.projectId },
+          params: { model: modelId, prompt: fullPrompt, image, config, projectId: args.projectId },
           userId: ctx.user.id,
           via: 'mcp',
         });
