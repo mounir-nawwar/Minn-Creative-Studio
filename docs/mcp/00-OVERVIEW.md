@@ -126,8 +126,8 @@ Full connect flow (what actually happens when someone adds the connector):
 
 | Phase | Status | Commit(s) | Date | Notes |
 |---|---|---|---|---|
-| 0 — Spec & docs | ✅ done | (this commit) | 2026-07-11 | |
-| A — Skeleton + OAuth + read-only tools | 🔨 in progress | | | |
+| 0 — Spec & docs | ✅ done | d11ca0d | 2026-07-12 | |
+| A — Skeleton + OAuth + read-only tools | ✅ done (local) | 9f5a532, f025912, 02c6e29, a82fb12 | 2026-07-12 | Verified locally end-to-end (SDK client, all 7 tools, audit rows, prod-mode route precedence). Remaining: deploy to VPS + connect from claude.ai/Claude Code with real login (see PHASE-A acceptance) |
 | B — Creation tools | ⬜ not started | | | |
 | C — Graph tools | ⬜ not started | | | |
 | D — Headless runner | ⬜ not started | | | |

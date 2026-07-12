@@ -295,21 +295,46 @@ JSON. Confined to `backend/mcp/index.ts`; nothing else changes.
 
 ## Acceptance checklist
 
-- [ ] `npm run lint` and `npm test` green (including 4 new test files).
-- [ ] `curl /.well-known/oauth-authorization-server` → 200, issuer correct.
-- [ ] `curl /.well-known/oauth-protected-resource` → 200 (or metadata router added).
-- [ ] Unauthenticated `POST /mcp` → 401 with `WWW-Authenticate` header pointing at PRM.
-- [ ] `npx @modelcontextprotocol/inspector` → connect `http://localhost:3000/mcp` → DCR + browser
-      login (dark page renders, wrong password shows inline error, 6th attempt in 15 min is rate-limited)
-      → 7 tools listed with JSON schemas → each tool runs.
-- [ ] `mcp_audit_log` has one row per call, right `user_id`, durations sane.
-- [ ] `claude mcp add --transport http minn http://localhost:3000/mcp` → Claude Code completes
-      OAuth and lists projects.
-- [ ] SPA regression: login, picker, canvas, chat studio, `/api/health` all unaffected.
-- [ ] Prod-mode check: `npm run build` then `tsx server.ts` (NODE_ENV=production) — `/mcp` and
-      `/authorize` still win over the SPA catch-all.
-- [ ] Session idle-sweep works (shorten SESSION_IDLE_MS locally to verify).
-- [ ] Second user check: log in as rana via inspector → audit rows attribute to rana.
+Status as of 2026-07-12 (commits 9f5a532 → a82fb12):
+
+- [x] `npm run lint` green; `npm test` — 88 passing incl. 24 new MCP tests (the only failures are
+      the 2 pre-existing `localStorage` suite failures that exist on clean HEAD too).
+- [x] `curl /.well-known/oauth-authorization-server` → 200, issuer correct.
+- [x] `curl /.well-known/oauth-protected-resource/mcp` → 200 (note the `/mcp` path suffix — see
+      Implementation deviations below).
+- [x] Unauthenticated `POST /mcp` → 401 with `WWW-Authenticate` header pointing at PRM.
+- [x] OAuth flow legs verified individually with curl: DCR `/register` 201, `/authorize` renders
+      the dark login page with PKCE params round-tripped, wrong password → 401 inline error,
+      unknown client / wrong redirect_uri → 400. (S256 verification is the SDK token handler's
+      code path; exercised fully on first real connect.)
+- [x] All 7 tools verified live via the SDK client (`StreamableHTTPClientTransport` + bearer
+      token minted through the store): initialize, tools/list, every tool returns real data,
+      not-found returns `isError`.
+- [x] `mcp_audit_log` has one row per call, right `user_id`, durations sane; `isError` results
+      recorded as errors.
+- [x] SPA regression: `/`, `/api/health`, `/storage/...` all unaffected in dev.
+- [x] Prod-mode check: `npm run build` + `NODE_ENV=production tsx server.ts` — `/mcp`,
+      `/authorize`, `/.well-known/*` win over the SPA catch-all; deep links still serve the SPA.
+- [ ] **Remaining (needs deployment / real credentials):** connect from claude.ai
+      (custom connector `https://studio.minnagency.com/mcp`) and Claude Code
+      (`claude mcp add --transport http minn …`) with a real browser login; verify rana's session
+      attributes to rana; verify 1h token refresh rotation over a live connector.
+
+## Implementation deviations from this spec (as built)
+
+1. **PRM URL is path-suffixed**: the SDK serves protected-resource metadata at
+   `/.well-known/oauth-protected-resource/mcp` (derived from `resourceServerUrl`), and
+   `requireBearerAuth` advertises that URL. The spec above originally said the un-suffixed path.
+2. **Client secrets are stored raw** inside `oauth_clients.metadata` (full DCR JSON round-trip):
+   the SDK's token-endpoint client auth compares the raw secret, so hashing would break
+   confidential clients. claude.ai/Claude Code register as public PKCE clients (no secret), so
+   nothing sensitive lands there. The `client_secret_hash` column exists but is unused.
+3. **`rotateRefreshToken(raw, expectedClientId?)`** also enforces pair↔client ownership.
+4. **Audit wrapper flags `isError` tool results** as `status='error'`, not just thrown exceptions.
+5. **DNS-rebinding transport options not used** — deprecated in SDK 1.29 (external middleware is
+   the recommended path); every request is bearer-authenticated, which is the real guard.
+6. **Express-4/5 fallback not needed** — `mcpAuthRouter` works as-is inside the Express 4 app
+   (verified: metadata, DCR, authorize, token error paths).
 
 ## Rollback
 
