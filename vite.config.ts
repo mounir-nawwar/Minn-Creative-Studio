@@ -49,7 +49,8 @@ export default defineConfig(({mode}) => {
       globals: true,
       environment: 'jsdom',
       setupFiles: './src/test/setup.ts',
-      include: ['src/**/*.{test,spec}.{js,ts,jsx,tsx}'],
+      // Backend tests declare `// @vitest-environment node` per-file (default here is jsdom)
+      include: ['src/**/*.{test,spec}.{js,ts,jsx,tsx}', 'backend/**/*.{test,spec}.ts'],
       exclude: ['**/node_modules/**', '**/dist/**'],
     }
   };
