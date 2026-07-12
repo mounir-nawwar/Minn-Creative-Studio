@@ -700,6 +700,8 @@ export async function trackProjectCost(
     audioCount?: number;
     tokenCount?: number;
     type: 'image' | 'video' | 'audio' | 'text';
+    /** Origin of the spend — 'mcp' marks generations Claude ran through the connector */
+    via?: string;
   }
 ): Promise<void> {
   if (cost <= 0) return;
@@ -717,6 +719,7 @@ export async function trackProjectCost(
     imageCount: metadata.imageCount,
     videoCount: metadata.videoCount,
     audioCount: metadata.audioCount,
+    ...(metadata.via ? { via: metadata.via } : {}),
   });
 
   console.log(`[Cost] $${cost.toFixed(4)} for ${metadata.type} · projectId=${projectId}`);
