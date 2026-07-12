@@ -10,6 +10,10 @@ import { registerProjectTools } from './tools/projects.ts';
 import { registerWorkflowTools } from './tools/workflows.ts';
 import { registerLibraryTools } from './tools/library.ts';
 import { registerModelTools } from './tools/models.ts';
+import { registerGenerationTools } from './tools/generate.ts';
+import { registerAssetTools } from './tools/assets.ts';
+import { registerJobTools } from './tools/jobs.ts';
+import { registerChatTools } from './tools/chats.ts';
 
 /** The identity a session acts as (derived from the verified access token). */
 export interface McpUser {
@@ -40,4 +44,8 @@ function registerToolGroups(server: McpServer, ctx: ToolContext): void {
   registerWorkflowTools(server, ctx);
   registerLibraryTools(server, ctx);
   registerModelTools(server, ctx);
+  registerGenerationTools(server, ctx);
+  registerAssetTools(server, ctx);
+  registerJobTools(server, ctx);
+  registerChatTools(server, ctx);
 }
