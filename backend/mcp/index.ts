@@ -14,9 +14,11 @@
 
 import type express from 'express';
 import { mcpAuthRouter } from '@modelcontextprotocol/sdk/server/auth/router.js';
+import { requireBearerAuth } from '@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js';
 import { getPublicBaseUrl } from './config.ts';
 import { MinnOAuthProvider } from './auth/provider.ts';
 import authRoutes from './auth/routes.ts';
+import { handleMcpPost, handleMcpGet, handleMcpDelete } from './transport.ts';
 
 export function mountMcp(app: express.Express): void {
   const baseUrl = getPublicBaseUrl();
@@ -33,5 +35,13 @@ export function mountMcp(app: express.Express): void {
   );
   app.use('/mcp/auth', authRoutes);
 
-  console.log(`[MCP] OAuth endpoints mounted — issuer ${baseUrl}`);
+  const bearer = requireBearerAuth({
+    verifier: provider,
+    resourceMetadataUrl: `${baseUrl}/.well-known/oauth-protected-resource/mcp`,
+  });
+  app.post('/mcp', bearer, handleMcpPost);
+  app.get('/mcp', bearer, handleMcpGet);
+  app.delete('/mcp', bearer, handleMcpDelete);
+
+  console.log(`[MCP] Connector mounted at /mcp — issuer ${baseUrl}`);
 }
