@@ -108,3 +108,26 @@ The real fix is Phase E.
 
 Additive (new tool files + `backend/mcp/graph/`). No schema change. Worst case: bad graphs written
 to a workflow — recover by deleting the workflow in the UI.
+
+## As built (2026-07-13, commits 684df3b + 06caa84)
+
+1. **Registries imported directly from frontend source** (`src/types/nodeHandles.ts`,
+   `validationRules.ts`, `src/types.ts`) — verified backend-safe under Node (the `reactflow`
+   import in `handleTypes.ts` is type-only in practice). Guarded by `graph.test.ts`.
+2. **Validator parity**: `backend/mcp/graph/validate.ts` ports the canvas `validateConnection`
+   exactly (handle fallback, blocked pairs, allowedInputs/Outputs, unknown wildcard, strict type
+   equality) and adds duplicate-id/dangling-edge/duplicate-connection/cycle checks. Multiple edges
+   into one target handle are allowed (matches the canvas — that's multi-reference wiring).
+3. **Delta vs whole-graph validation**: add_node/connect_nodes validate only the change (+ cycle
+   check), so legacy graphs with oddities never block small edits; `set_workflow` and
+   `validate_workflow` run the full report and set_workflow is all-or-nothing.
+4. **Value nodes get `data.output`** from their catalog `outputFromConfig` key (prompt/seed/number/
+   text/cfgScale/guidanceStrength/motionIntensity/imageUpload/videoUpload) so downstream nodes can
+   Run without a human first pressing Run on each value node.
+5. **Conventions confirmed from the canvas**: node id `${type}-${Date.now()}` (collision-bumped),
+   fresh data `{label, type, config}`, edge ids `e-<src>-<handle>-<dst>-<handle>`.
+6. **Missing-prompt = warning, not error** (imagen/nanoBanana/veo/lyria/llm without a prompt edge
+   or config.prompt) — a start-frame-only veo is legitimate.
+7. Live-verified: 6-node pipeline (prompt+seed → imagen → describer/output, + veo on startFrame)
+   built via MCP, guardrails rejecting blocked/mismatch/duplicate/unknown, auto-layout columns
+   sane, prompt value pre-wired into output.
