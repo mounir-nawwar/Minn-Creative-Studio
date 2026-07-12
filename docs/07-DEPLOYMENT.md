@@ -93,6 +93,27 @@ The active project is read from `GOOGLE_CLOUD_PROJECT` (logged on boot as `[Vert
 - **Media:** everything under `STORAGE_PATH` (`storage/projects/<projectId>/…`). Back up the directory.
 - The DB and `storage/` are runtime artifacts and should be **gitignored** (they are).
 
+## 🔌 MCP endpoint (`/mcp`)
+
+The same Node process also serves a **remote MCP connector** (see [docs/mcp/00-OVERVIEW.md](./mcp/00-OVERVIEW.md))
+so Claude (claude.ai / Desktop / phone / Claude Code) can operate the studio.
+
+- **Env:** set `PUBLIC_BASE_URL=https://studio.minnagency.com` in the VPS `.env` (OAuth issuer +
+  token metadata URLs). After changing: `pm2 restart minn-studio --update-env`.
+- **Cloudflare constraints:**
+  - Proxied responses time out around **100s** → MCP tools respond in JSON-response mode (short
+    request/response). Long generations (video, Lyria-Pro) are **start-job / check-job** tool
+    pairs — never one long request.
+  - If SSE is ever enabled on `/mcp` or `/api/workflows/:id/events` (Phase E): heartbeat comments
+    every ~15s, and verify Cloudflare isn't buffering the stream.
+  - Do **not** cache `/.well-known/*`, `/authorize`, `/token`, `/register`, `/mcp` (all dynamic).
+- **Connect a client:**
+  - claude.ai / Desktop / mobile: Settings → Connectors → *Add custom connector* →
+    `https://studio.minnagency.com/mcp` → log in with your own Minn credentials on the OAuth page.
+  - Claude Code: `claude mcp add --transport http minn https://studio.minnagency.com/mcp`.
+- **Attribution & audit:** every MCP action runs as the logged-in user; tool calls are recorded in
+  the `mcp_audit_log` table; MCP-created content is tagged `via: 'mcp'` in metadata.
+
 ## 🔁 Related runbooks
 
 - **`SETUP_NOTES.local.md`** (repo root, private — not committed): step-by-step for moving Vertex to a **new Google account/project** when the $300 free credit runs out. No code/nginx/Cloudflare changes — only `GOOGLE_CLOUD_PROJECT` + gcloud ADC and a `pm2 restart minn-studio --update-env`.
