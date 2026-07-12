@@ -6,6 +6,10 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { registerProjectTools } from './tools/projects.ts';
+import { registerWorkflowTools } from './tools/workflows.ts';
+import { registerLibraryTools } from './tools/library.ts';
+import { registerModelTools } from './tools/models.ts';
 
 /** The identity a session acts as (derived from the verified access token). */
 export interface McpUser {
@@ -31,7 +35,9 @@ export function createMcpServer(user: McpUser): McpServer {
   return server;
 }
 
-/** Phase A.5 fills this in with the read-only tool groups. */
-function registerToolGroups(_server: McpServer, _ctx: ToolContext): void {
-  // no tools yet — the endpoint itself lands first (Phase A.4)
+function registerToolGroups(server: McpServer, ctx: ToolContext): void {
+  registerProjectTools(server, ctx);
+  registerWorkflowTools(server, ctx);
+  registerLibraryTools(server, ctx);
+  registerModelTools(server, ctx);
 }

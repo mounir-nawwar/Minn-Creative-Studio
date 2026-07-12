@@ -76,12 +76,23 @@ export function createAuditLog(database: SqliteDb) {
       }
     },
 
-    /** Wrap a tool handler: times it, records ok/error, rethrows the original error. */
+    /**
+     * Wrap a tool handler: times it, records ok/error, rethrows the original
+     * error. Results shaped like a CallToolResult with `isError: true` (the
+     * MCP way of reporting tool-level failures without throwing) are recorded
+     * as errors too.
+     */
     async wrap<T>(ctx: AuditContext, tool: string, params: unknown, fn: () => Promise<T>): Promise<T> {
       const started = Date.now();
       try {
         const result = await fn();
-        this.record({ ...ctx, tool, params, status: 'ok', durationMs: Date.now() - started });
+        const asToolResult = result as { isError?: boolean; content?: Array<{ text?: string }> } | null;
+        if (asToolResult && asToolResult.isError === true) {
+          const message = asToolResult.content?.[0]?.text?.slice(0, 200) ?? 'Tool returned an error result';
+          this.record({ ...ctx, tool, params, status: 'error', error: message, durationMs: Date.now() - started });
+        } else {
+          this.record({ ...ctx, tool, params, status: 'ok', durationMs: Date.now() - started });
+        }
         return result;
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);

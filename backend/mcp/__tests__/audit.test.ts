@@ -41,6 +41,18 @@ describe('mcp audit log', () => {
     expect(row.error).toBe('Project not found');
   });
 
+  test('isError tool results are recorded as errors without throwing', async () => {
+    const result = await audit.wrap({ userId: 'user-1' }, 'get_project', { projectId: 'nope' }, async () => ({
+      isError: true,
+      content: [{ type: 'text', text: 'Project not found: nope' }],
+    }));
+    expect(result.isError).toBe(true);
+
+    const [row] = rows();
+    expect(row.status).toBe('error');
+    expect(row.error).toBe('Project not found: nope');
+  });
+
   test('oversized params are truncated to the byte budget', async () => {
     const huge = { blob: 'x'.repeat(MAX_AUDIT_PARAM_BYTES * 3) };
     await audit.wrap({ userId: 'user-1' }, 'search_library', huge, async () => null);
