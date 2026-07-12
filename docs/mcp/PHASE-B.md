@@ -112,3 +112,30 @@ Chats are **per-user** (unlike projects/assets) — only expose the caller's own
 Tools are additive. The proxy refactor is the only risk surface — revert `backend/routes/gemini.ts`
 + delete `backend/services/generation.ts` restores the exact previous behavior. `mcp_jobs` table is
 additive.
+
+## As built (2026-07-12, commits c770c19 → 063778a)
+
+Deviations/notes versus the spec above:
+
+1. **Tool names/scope**: shipped `generate_text`, `generate_image`, `generate_speech`,
+   `generate_music_clip`, `upload_asset_from_url`, `move_asset`, `start_video_job`,
+   `start_music_job`, `check_job`, `list_chats`, `get_chat`, `create_chat`, `post_chat_message`
+   (13 new; 20 total). `generate_image` has **no negativePrompt** — neither app image path
+   supports one; exclusions go in the prompt. Reference images are Gemini-image-model only
+   (Imagen 4 is one-shot, enforced with a helpful error).
+2. **Reference URLs**: Library `/storage/...` (or absolute) urls are read from disk with a
+   path-traversal guard (`backend/mcp/media.ts`); external http(s) urls flow through the existing
+   `_imageUrl` → `resolveImageUrls` path (images) or a direct fetch (video frames).
+3. **Sample caps**: Imagen ≤4 per call; Gemini image models ≤2 (sequential one-image calls).
+4. **Jobs**: `mcp_jobs` kinds `video`/`audio` as specced; ≤3 running jobs per user; `check_job`
+   is callable by any authenticated user (shared-workspace semantics), results idempotent.
+   Lyria-Pro audio arrives WAV-normalized from `vertexGetOperation` and is persisted via
+   `uploadBase64` with `via:'mcp'`.
+5. **Environment finding**: Imagen 4 models return Vertex 404 (`NOT_FOUND`) on the current GCP
+   project — not enabled/allowlisted there. Gemini image models (`gemini-3.1-flash-image-preview`
+   etc.) verified working. Revisit if Imagen access is enabled on the Google side.
+6. **Live-verified locally**: chat tools, `generate_text` ($0.00003), `generate_image` via
+   gemini-3.1-flash-image-preview ($0.067) — asset row + usage rows carried `via:'mcp'`, audit
+   logged everything including the Imagen failure. Video/music jobs are unit-covered and
+   code-mirrored from the app's poll loop but not yet run end-to-end (video costs); first real
+   run happens from a connected Claude client.
