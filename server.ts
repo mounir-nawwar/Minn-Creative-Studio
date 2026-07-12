@@ -26,6 +26,9 @@ import videoRoutes from './backend/routes/video.ts';
 import batchsizeRoutes from './backend/routes/batchsize.ts';
 import promptRoutes from './backend/routes/prompts.ts';
 
+// MCP connector (remote MCP server + OAuth endpoints)
+import { mountMcp } from './backend/mcp/index.ts';
+
 // Initialize database on startup
 import './backend/services/database.ts';
 
@@ -97,6 +100,10 @@ async function startServer() {
   });
 
   app.use('/api', apiRouter);
+
+  // MCP connector — must mount before the SPA catch-all below, or the prod
+  // `app.get('*')` would swallow /mcp and every OAuth endpoint.
+  mountMcp(app);
 
   // Serve static storage files
   const STORAGE_PATH = process.env.STORAGE_PATH || path.join(process.cwd(), 'storage');

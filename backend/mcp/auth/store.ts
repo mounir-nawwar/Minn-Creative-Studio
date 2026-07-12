@@ -224,9 +224,10 @@ export function createOAuthStore(database: SqliteDb) {
     /**
      * Refresh rotation: validates the presented refresh token, revokes its whole
      * pair, and issues a fresh pair for the same client/user/scope. A replayed
-     * (already-rotated) refresh token returns undefined.
+     * (already-rotated) refresh token — or one owned by a different client when
+     * expectedClientId is given — returns undefined.
      */
-    rotateRefreshToken(rawToken: string): IssuedTokenPair | undefined {
+    rotateRefreshToken(rawToken: string, expectedClientId?: string): IssuedTokenPair | undefined {
       const row = database
         .prepare(`
           SELECT * FROM oauth_tokens
@@ -235,6 +236,7 @@ export function createOAuthStore(database: SqliteDb) {
         `)
         .get(sha256(rawToken)) as TokenRow | undefined;
       if (!row) return undefined;
+      if (expectedClientId && row.client_id !== expectedClientId) return undefined;
       database
         .prepare('UPDATE oauth_tokens SET revoked_at = CURRENT_TIMESTAMP WHERE pair_id = ? AND revoked_at IS NULL')
         .run(row.pair_id);
