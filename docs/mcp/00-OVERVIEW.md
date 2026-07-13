@@ -132,7 +132,10 @@ Full connect flow (what actually happens when someone adds the connector):
 | C — Graph tools | ✅ done | 684df3b, 06caa84 | 2026-07-13 | 30 tools total. Validator mirrors the canvas one-for-one (same registries imported from src). Live-verified: 6-node pipeline built via set_workflow + add_node/connect_nodes, guardrails reject blocked/mismatch/duplicate/cycle, auto-layout works. Canvas concurrency remains last-writer-wins until Phase E |
 | D — Headless runner | ✅ done | 0785a54 | 2026-07-13 | 33 tools. Live-verified: 6-node pipeline run headlessly (prompt+seed → gemini image → describer → output), outputs written into the graph, `crop` correctly skipped, costs tracked. Pixel nodes have no server executor by design |
 | E — Live canvas sync | ✅ done | c3d86a5 | 2026-07-13 | 3s poll of a new version endpoint + merge (`src/lib/graphMerge.ts`). Also fixes the pre-existing two-human overwrite bug. SSE rejected: EventSource can't send the Bearer header; Cloudflare buffers streams. API-level verified; visual confirmation is a user check |
-| F — Hardening & onboarding | ⬜ not started | | | |
+| F — Hardening & onboarding | ✅ done | e6a0348, 52ce896 | 2026-07-13 | 35 tools. Scopes (read/write/generate) enforced from the token, per-user rate limits, $20/day spend ceiling, 90-day audit retention, get_audit_log + get_connector_status, and an E2E harness that boots the real app + real SDK client (the SDK-upgrade gate). PHASE-F.md is the operating runbook |
+
+**All phases complete.** The connector is feature-done; PHASE-F.md is the day-to-day runbook
+(connect / revoke / troubleshoot).
 
 ## Decisions log
 

@@ -36,6 +36,7 @@ Full, code-verified docs live in [`docs/`](./docs). Consult them before large ch
 | `docs/05-NODES.md` | `BaseNode` + every node, handles, models |
 | `docs/06-DESIGN-SYSTEM.md` | Exact colors, tokens, typography, components |
 | `docs/07-DEPLOYMENT.md` | VPS/Cloudflare/pm2, build/run, Vertex setup |
+| `docs/mcp/` | **The MCP connector** — `00-OVERVIEW.md` (architecture, auth, status tracker) + `PHASE-A..F.md`. `PHASE-F.md` is the operating runbook |
 
 ## Commands
 
@@ -62,8 +63,11 @@ better-sqlite3 · jsonwebtoken · zod · `@google/genai` + `google-auth-library`
 ## Layout
 
 ```
-server.ts              # Express entry: mounts /api, serves SPA, /storage static
+server.ts              # Express entry: createApp() mounts /api + /mcp, serves SPA, /storage static
 backend/               # config · middleware · routes · services · processing · utils
+  services/            # …incl. generation.ts (the ONE Vertex path) · graphRunner.ts (headless pipeline runner)
+  mcp/                 # MCP connector: OAuth 2.1 AS (auth/), Streamable HTTP transport, guard.ts
+                       # (scopes/limits/spend), audit.ts, jobs.ts, graph/, tools/ — 35 tools
 src/
   App.tsx              # auth gate + screen routing (login/picker/canvas/chat-studio via studioMode)
   canvas/Canvas.tsx    # React Flow host + 2s debounced auto-save
@@ -86,7 +90,13 @@ data/  storage/        # runtime SQLite + media (gitignored)
 - **Node state is immutable.** Always update a node via `updateNodeData(nodeId, partial)` from `src/store/useStore.ts`.
   Never mutate `node.data` directly. New node data must stay JSON-serializable (the canvas auto-saves it).
 - **All AI calls go through `src/services/gemini/*`** → `callBackend(method, params)` → `POST /api/gemini/proxy`.
-  Don't call Vertex from the frontend or add new ad-hoc AI endpoints; extend the proxy's `method` switch in `backend/routes/gemini.ts`.
+  Don't call Vertex from the frontend or add new ad-hoc AI endpoints. The proxy route is now a thin wrapper around
+  **`backend/services/generation.ts` (`runGeneration`)** — the single Vertex execution path, shared with the MCP
+  connector, where cost tracking / storage upload / asset rows live. Extend the `method` switch there, not in the route.
+- **The MCP connector** (`backend/mcp/`, mounted at `/mcp`) lets Claude drive the studio remotely: generate, build
+  canvas graphs, run pipelines. It reuses the app's services directly — never duplicate logic into it, and keep
+  `src/lib/models.ts`, `src/lib/projectContext.ts`, and `src/types/nodeHandles.ts` free of browser-only imports
+  (the backend imports them; guard tests will fail if that breaks). See `docs/mcp/`.
 - **New nodes:** create the component in `src/nodes/` (wrap it in `<BaseNode>`), build its body from the shared
   `src/nodes/ui.tsx` primitives (`NodeField`, `NodeInput`, `NodeSelect`, `RunButton`, `NodeToggle`, `NodeOutput`),
   add handle defs to `src/types/nodeHandles.ts`, and **register it in `src/utils/nodeTypes.ts`** (unregistered files won't appear on the canvas).
