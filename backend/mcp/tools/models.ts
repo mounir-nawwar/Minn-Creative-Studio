@@ -10,7 +10,7 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { TEXT_MODELS, CHAT_IMAGE_MODELS, VIDEO_MODELS, AUDIO_MODELS, type StudioModel } from '../../../src/lib/models.ts';
 import { MODEL_PRICING } from '../../config/pricing.ts';
-import { auditLog } from '../audit.ts';
+import { guard } from '../guard.ts';
 import type { ToolContext } from '../server.ts';
 import { jsonResult } from './util.ts';
 
@@ -29,7 +29,7 @@ export function registerModelTools(server: McpServer, ctx: ToolContext): void {
       annotations: { readOnlyHint: true },
     },
     (args, extra) =>
-      auditLog.wrap({ userId: ctx.user.id, sessionId: extra.sessionId }, 'list_models', args, async () => {
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'list_models', args, async () => {
         const models = (args.mode ? ALL_MODELS.filter((m) => m.mode === args.mode) : ALL_MODELS).map((model) => ({
           id: model.id,
           label: model.label,

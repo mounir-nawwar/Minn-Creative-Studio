@@ -13,7 +13,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { projects, workflows, generateId } from '../../services/database.ts';
-import { auditLog } from '../audit.ts';
+import { guard } from '../guard.ts';
 import type { ToolContext } from '../server.ts';
 import { jsonResult, errorResult } from './util.ts';
 import {
@@ -91,7 +91,7 @@ export function registerGraphTools(server: McpServer, ctx: ToolContext): void {
       annotations: { readOnlyHint: true },
     },
     (args, extra) =>
-      auditLog.wrap({ userId: ctx.user.id, sessionId: extra.sessionId }, 'describe_node_types', args, async () => {
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'describe_node_types', args, async () => {
         if (args.nodeType) {
           const info = describeNodeType(args.nodeType);
           if (!info) return errorResult(`Unknown node type: ${args.nodeType}. Valid: ${listNodeTypes().join(', ')}`);
@@ -119,7 +119,7 @@ export function registerGraphTools(server: McpServer, ctx: ToolContext): void {
       inputSchema: { projectId: z.string().min(1), name: z.string().min(1).max(120) },
     },
     (args, extra) =>
-      auditLog.wrap({ userId: ctx.user.id, sessionId: extra.sessionId }, 'create_workflow', args, async () => {
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'create_workflow', args, async () => {
         if (!projects.findById(args.projectId)) return errorResult(`Project not found: ${args.projectId}`);
         const id = generateId();
         workflows.create(id, args.projectId, ctx.user.id, args.name, [], []);
@@ -143,7 +143,7 @@ export function registerGraphTools(server: McpServer, ctx: ToolContext): void {
       },
     },
     (args, extra) =>
-      auditLog.wrap({ userId: ctx.user.id, sessionId: extra.sessionId }, 'add_node', args, async () => {
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'add_node', args, async () => {
         const workflow = loadWorkflow(args.workflowId);
         if (!workflow) return errorResult(`Workflow not found: ${args.workflowId}`);
         if (!knownNodeType(args.nodeType)) {
@@ -175,7 +175,7 @@ export function registerGraphTools(server: McpServer, ctx: ToolContext): void {
       },
     },
     (args, extra) =>
-      auditLog.wrap({ userId: ctx.user.id, sessionId: extra.sessionId }, 'update_node', args, async () => {
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'update_node', args, async () => {
         const workflow = loadWorkflow(args.workflowId);
         if (!workflow) return errorResult(`Workflow not found: ${args.workflowId}`);
         const existing = workflow.nodes.find((n) => n.id === args.nodeId);
@@ -212,7 +212,7 @@ export function registerGraphTools(server: McpServer, ctx: ToolContext): void {
       inputSchema: { workflowId: z.string().min(1), nodeId: z.string().min(1) },
     },
     (args, extra) =>
-      auditLog.wrap({ userId: ctx.user.id, sessionId: extra.sessionId }, 'remove_node', args, async () => {
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'remove_node', args, async () => {
         const workflow = loadWorkflow(args.workflowId);
         if (!workflow) return errorResult(`Workflow not found: ${args.workflowId}`);
         if (!workflow.nodes.some((n) => n.id === args.nodeId)) return errorResult(`Node not found: ${args.nodeId}`);
@@ -240,7 +240,7 @@ export function registerGraphTools(server: McpServer, ctx: ToolContext): void {
       },
     },
     (args, extra) =>
-      auditLog.wrap({ userId: ctx.user.id, sessionId: extra.sessionId }, 'connect_nodes', args, async () => {
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'connect_nodes', args, async () => {
         const workflow = loadWorkflow(args.workflowId);
         if (!workflow) return errorResult(`Workflow not found: ${args.workflowId}`);
 
@@ -281,7 +281,7 @@ export function registerGraphTools(server: McpServer, ctx: ToolContext): void {
       inputSchema: { workflowId: z.string().min(1), edgeId: z.string().min(1) },
     },
     (args, extra) =>
-      auditLog.wrap({ userId: ctx.user.id, sessionId: extra.sessionId }, 'disconnect_nodes', args, async () => {
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'disconnect_nodes', args, async () => {
         const workflow = loadWorkflow(args.workflowId);
         if (!workflow) return errorResult(`Workflow not found: ${args.workflowId}`);
         if (!workflow.edges.some((e) => e.id === args.edgeId)) return errorResult(`Edge not found: ${args.edgeId}`);
@@ -322,7 +322,7 @@ export function registerGraphTools(server: McpServer, ctx: ToolContext): void {
       },
     },
     (args, extra) =>
-      auditLog.wrap({ userId: ctx.user.id, sessionId: extra.sessionId }, 'set_workflow', args, async () => {
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'set_workflow', args, async () => {
         const workflow = loadWorkflow(args.workflowId);
         if (!workflow) return errorResult(`Workflow not found: ${args.workflowId}`);
 
@@ -358,7 +358,7 @@ export function registerGraphTools(server: McpServer, ctx: ToolContext): void {
       annotations: { readOnlyHint: true },
     },
     (args, extra) =>
-      auditLog.wrap({ userId: ctx.user.id, sessionId: extra.sessionId }, 'validate_workflow', args, async () => {
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'validate_workflow', args, async () => {
         const workflow = loadWorkflow(args.workflowId);
         if (!workflow) return errorResult(`Workflow not found: ${args.workflowId}`);
         return jsonResult(validateGraph(workflow.nodes, workflow.edges));
@@ -373,7 +373,7 @@ export function registerGraphTools(server: McpServer, ctx: ToolContext): void {
       inputSchema: { workflowId: z.string().min(1) },
     },
     (args, extra) =>
-      auditLog.wrap({ userId: ctx.user.id, sessionId: extra.sessionId }, 'auto_layout', args, async () => {
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'auto_layout', args, async () => {
         const workflow = loadWorkflow(args.workflowId);
         if (!workflow) return errorResult(`Workflow not found: ${args.workflowId}`);
         const saved = saveGraph(args.workflowId, autoLayout(workflow.nodes, workflow.edges), workflow.edges);

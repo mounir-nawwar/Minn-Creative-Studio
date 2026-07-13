@@ -15,7 +15,7 @@ import { projects } from '../../services/database.ts';
 import { uploadBase64 } from '../../services/storage.ts';
 import { VIDEO_MODELS, AUDIO_MODELS, findModel } from '../../../src/lib/models.ts';
 import { jobStore } from '../jobs.ts';
-import { auditLog } from '../audit.ts';
+import { guard } from '../guard.ts';
 import type { ToolContext } from '../server.ts';
 import { imageBytesFromUrl } from '../media.ts';
 import { projectContextFor } from '../projectContext.ts';
@@ -56,7 +56,7 @@ export function registerJobTools(server: McpServer, ctx: ToolContext): void {
       },
     },
     (args, extra) =>
-      auditLog.wrap({ userId: ctx.user.id, sessionId: extra.sessionId }, 'start_video_job', args, async () => {
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'start_video_job', args, async () => {
         if (!projects.findById(args.projectId)) return errorResult(`Project not found: ${args.projectId}`);
         const modelId = args.model ?? 'veo-3.1-fast-generate-001';
         const model = findModel(modelId);
@@ -145,7 +145,7 @@ export function registerJobTools(server: McpServer, ctx: ToolContext): void {
       },
     },
     (args, extra) =>
-      auditLog.wrap({ userId: ctx.user.id, sessionId: extra.sessionId }, 'start_music_job', args, async () => {
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'start_music_job', args, async () => {
         if (!projects.findById(args.projectId)) return errorResult(`Project not found: ${args.projectId}`);
         if (jobStore.countRunning(ctx.user.id) >= MAX_RUNNING_JOBS_PER_USER) {
           return errorResult(`You already have ${MAX_RUNNING_JOBS_PER_USER} jobs running — check_job them first.`);
@@ -204,7 +204,7 @@ export function registerJobTools(server: McpServer, ctx: ToolContext): void {
       inputSchema: { jobId: z.string().min(1) },
     },
     (args, extra) =>
-      auditLog.wrap({ userId: ctx.user.id, sessionId: extra.sessionId }, 'check_job', args, async () => {
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'check_job', args, async () => {
         const job = jobStore.getJob(args.jobId);
         if (!job) return errorResult(`Job not found: ${args.jobId}`);
         if (job.status === 'done') return jsonResult({ jobId: job.id, status: 'done', ...job.result }, 'Job done');

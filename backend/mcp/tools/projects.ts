@@ -5,7 +5,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { projects, workflows, assets, usageLogs } from '../../services/database.ts';
-import { auditLog } from '../audit.ts';
+import { guard } from '../guard.ts';
 import type { ToolContext } from '../server.ts';
 import { jsonResult, errorResult } from './util.ts';
 
@@ -35,7 +35,7 @@ export function registerProjectTools(server: McpServer, ctx: ToolContext): void 
       annotations: { readOnlyHint: true },
     },
     (_args, extra) =>
-      auditLog.wrap({ userId: ctx.user.id, sessionId: extra.sessionId }, 'list_projects', {}, async () => {
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'list_projects', {}, async () => {
         const rows = projects.findAll();
         return jsonResult(
           { projects: rows.map((row) => toProjectSummary(row, ctx.user.id)) },
@@ -55,7 +55,7 @@ export function registerProjectTools(server: McpServer, ctx: ToolContext): void 
       annotations: { readOnlyHint: true },
     },
     (args, extra) =>
-      auditLog.wrap({ userId: ctx.user.id, sessionId: extra.sessionId }, 'get_project', args, async () => {
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'get_project', args, async () => {
         const row = projects.findById(args.projectId);
         if (!row) return errorResult(`Project not found: ${args.projectId}`);
         return jsonResult({
@@ -82,7 +82,7 @@ export function registerProjectTools(server: McpServer, ctx: ToolContext): void 
       annotations: { readOnlyHint: true },
     },
     (args, extra) =>
-      auditLog.wrap({ userId: ctx.user.id, sessionId: extra.sessionId }, 'get_usage_summary', args, async () => {
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'get_usage_summary', args, async () => {
         const project = projects.findById(args.projectId);
         if (!project) return errorResult(`Project not found: ${args.projectId}`);
 

@@ -7,7 +7,7 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { assets } from '../../services/database.ts';
 import { getPublicBaseUrl } from '../config.ts';
-import { auditLog } from '../audit.ts';
+import { guard } from '../guard.ts';
 import type { ToolContext } from '../server.ts';
 import { jsonResult } from './util.ts';
 
@@ -38,7 +38,7 @@ export function registerLibraryTools(server: McpServer, ctx: ToolContext): void 
       annotations: { readOnlyHint: true },
     },
     (args, extra) =>
-      auditLog.wrap({ userId: ctx.user.id, sessionId: extra.sessionId }, 'search_library', args, async () => {
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'search_library', args, async () => {
         const rows = assets.findAllWithProject({
           type: args.type,
           projectId: args.projectId,

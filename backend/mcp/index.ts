@@ -20,6 +20,8 @@ import { MinnOAuthProvider } from './auth/provider.ts';
 import authRoutes from './auth/routes.ts';
 import { handleMcpPost, handleMcpGet, handleMcpDelete } from './transport.ts';
 import { jobStore } from './jobs.ts';
+import { SCOPES } from './guard.ts';
+import { auditLog } from './audit.ts';
 
 export function mountMcp(app: express.Express): void {
   const baseUrl = getPublicBaseUrl();
@@ -27,6 +29,7 @@ export function mountMcp(app: express.Express): void {
 
   // Workflow runs are driven in-process — any left 'running' by a restart are lost.
   jobStore.failInterruptedRuns();
+  auditLog.startRetentionSweep();
 
   app.use(
     mcpAuthRouter({
@@ -34,7 +37,7 @@ export function mountMcp(app: express.Express): void {
       issuerUrl: new URL(baseUrl),
       resourceServerUrl: new URL(`${baseUrl}/mcp`),
       resourceName: 'Minn Creative Studio',
-      scopesSupported: ['read'],
+      scopesSupported: [...SCOPES],
     })
   );
   app.use('/mcp/auth', authRoutes);

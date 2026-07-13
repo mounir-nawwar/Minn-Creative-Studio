@@ -7,7 +7,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { projects, workflows } from '../../services/database.ts';
-import { auditLog } from '../audit.ts';
+import { guard } from '../guard.ts';
 import type { ToolContext } from '../server.ts';
 import { jsonResult, errorResult } from './util.ts';
 
@@ -35,7 +35,7 @@ export function registerWorkflowTools(server: McpServer, ctx: ToolContext): void
       annotations: { readOnlyHint: true },
     },
     (args, extra) =>
-      auditLog.wrap({ userId: ctx.user.id, sessionId: extra.sessionId }, 'list_workflows', args, async () => {
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'list_workflows', args, async () => {
         if (args.projectId) {
           if (!projects.findById(args.projectId)) {
             return errorResult(`Project not found: ${args.projectId}`);
@@ -59,7 +59,7 @@ export function registerWorkflowTools(server: McpServer, ctx: ToolContext): void
       annotations: { readOnlyHint: true },
     },
     (args, extra) =>
-      auditLog.wrap({ userId: ctx.user.id, sessionId: extra.sessionId }, 'get_workflow', args, async () => {
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'get_workflow', args, async () => {
         const row = workflows.findById(args.workflowId);
         if (!row) return errorResult(`Workflow not found: ${args.workflowId}`);
         return jsonResult({

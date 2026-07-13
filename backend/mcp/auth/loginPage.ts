@@ -30,9 +30,15 @@ export function renderLoginPage({ clientName, scopes, oauthParams, error }: Logi
     .map(([name, value]) => `<input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(value)}">`)
     .join('\n        ');
 
-  const scopeLine = scopes.length > 0
-    ? `It will get <strong>${escapeHtml(scopes.join(', '))}</strong> access, acting as you.`
-    : 'It will act as you.';
+  const SCOPE_LABELS: Record<string, string> = {
+    read: 'read your projects, workflows, and library',
+    write: 'build and edit canvas workflows, chats, and assets',
+    generate: 'generate images, video, audio, and text (this spends Vertex credit)',
+  };
+  const granted = scopes.length > 0 ? scopes : ['read', 'write', 'generate'];
+  const scopeList = granted
+    .map((scope) => `<li>${escapeHtml(SCOPE_LABELS[scope] ?? scope)}</li>`)
+    .join('');
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -61,6 +67,8 @@ export function renderLoginPage({ clientName, scopes, oauthParams, error }: Logi
     h1 { font-size: 17px; font-weight: 600; color: #fff; letter-spacing: -0.01em; }
     .sub { margin-top: 8px; font-size: 13px; line-height: 1.5; color: #9ca3af; }
     .sub strong { color: #d1d5db; font-weight: 500; }
+    .scopes { margin: 10px 0 0; padding-left: 18px; font-size: 13px; line-height: 1.7; color: #d1d5db; }
+    .scopes li::marker { color: #0097A7; }
     .client {
       margin: 20px 0; padding: 10px 14px; border-radius: 10px; font-size: 13px;
       background: rgba(0,151,167,.08); color: #67cfdb;
@@ -95,7 +103,8 @@ export function renderLoginPage({ clientName, scopes, oauthParams, error }: Logi
   <main class="card">
     <div class="logo">✦</div>
     <h1>Connect Claude to Minn Creative Studio</h1>
-    <p class="sub">Sign in with your studio account. ${scopeLine}</p>
+    <p class="sub">Sign in with your studio account. Acting as you, it will be able to:</p>
+    <ul class="scopes">${scopeList}</ul>
     <p class="client">Requested by: ${escapeHtml(clientName)}</p>
     ${error ? `<p class="error">${escapeHtml(error)}</p>` : ''}
     <form method="POST" action="/mcp/auth/login" autocomplete="on">

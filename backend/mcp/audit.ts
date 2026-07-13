@@ -9,6 +9,18 @@ import { MAX_AUDIT_PARAM_BYTES } from './config.ts';
 
 type SqliteDb = typeof db;
 
+/** How long tool-call history is kept. */
+const RETENTION_DAYS = 90;
+const RETENTION_SWEEP_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+export interface AuditQuery {
+  userId?: string;
+  tool?: string;
+  status?: 'ok' | 'error';
+  since?: string;
+  limit?: number;
+}
+
 export interface AuditContext {
   userId: string;
   sessionId?: string;
@@ -74,6 +86,39 @@ export function createAuditLog(database: SqliteDb) {
         // Auditing must never take a tool call down with it.
         console.error('[MCP] Failed to write audit log row:', err);
       }
+    },
+
+    /** Recent tool calls, newest first (powers the get_audit_log tool). */
+    query(filters: AuditQuery = {}) {
+      const conditions: string[] = [];
+      const params: unknown[] = [];
+      if (filters.userId) { conditions.push('user_id = ?'); params.push(filters.userId); }
+      if (filters.tool) { conditions.push('tool = ?'); params.push(filters.tool); }
+      if (filters.status) { conditions.push('status = ?'); params.push(filters.status); }
+      if (filters.since) { conditions.push('created_at >= ?'); params.push(filters.since); }
+
+      const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+      const limit = Math.min(Math.max(filters.limit ?? 50, 1), 500);
+      return database
+        .prepare(`SELECT id, user_id, session_id, tool, params, status, error, duration_ms, created_at
+                  FROM mcp_audit_log ${where} ORDER BY id DESC LIMIT ?`)
+        .all(...params, limit) as Array<Record<string, unknown>>;
+    },
+
+    /** Drop history older than the retention window. */
+    prune(): number {
+      const result = database
+        .prepare(`DELETE FROM mcp_audit_log WHERE created_at < datetime('now', '-${RETENTION_DAYS} days')`)
+        .run();
+      if (result.changes > 0) console.log(`[MCP] Pruned ${result.changes} audit row(s) older than ${RETENTION_DAYS} days`);
+      return result.changes;
+    },
+
+    /** Prune at boot, then daily. No cron on the VPS — an interval is enough. */
+    startRetentionSweep(): void {
+      this.prune();
+      const timer = setInterval(() => this.prune(), RETENTION_SWEEP_INTERVAL_MS);
+      timer.unref();
     },
 
     /**

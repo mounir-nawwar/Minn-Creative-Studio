@@ -17,6 +17,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { SESSION_IDLE_MS } from './config.ts';
 import { createMcpServer, type McpUser } from './server.ts';
+import { registerSessionScopes, releaseSessionScopes } from './guard.ts';
 
 interface McpSession {
   transport: StreamableHTTPServerTransport;
@@ -73,10 +74,15 @@ export async function handleMcpPost(req: Request, res: Response): Promise<void> 
       enableJsonResponse: true,
       onsessioninitialized: (sid) => {
         sessions.set(sid, { transport, userId: user.id, lastSeen: Date.now() });
+        // Scopes come from the verified token, never from anything the caller asserts.
+        registerSessionScopes(sid, user.id, req.auth?.scopes);
       },
     });
     transport.onclose = () => {
-      if (transport.sessionId) sessions.delete(transport.sessionId);
+      if (transport.sessionId) {
+        sessions.delete(transport.sessionId);
+        releaseSessionScopes(transport.sessionId);
+      }
     };
 
     await createMcpServer(user).connect(transport);

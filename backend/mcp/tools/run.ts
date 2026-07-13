@@ -12,7 +12,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { workflows } from '../../services/database.ts';
 import { runWorkflow, runSingleNode, planRun, supportedNodeTypes, type NodeRunResult } from '../../services/graphRunner.ts';
 import { jobStore } from '../jobs.ts';
-import { auditLog } from '../audit.ts';
+import { guard } from '../guard.ts';
 import type { ToolContext } from '../server.ts';
 import { jsonResult, errorResult } from './util.ts';
 
@@ -44,7 +44,7 @@ export function registerRunTools(server: McpServer, ctx: ToolContext): void {
       },
     },
     (args, extra) =>
-      auditLog.wrap({ userId: ctx.user.id, sessionId: extra.sessionId }, 'run_workflow', args, async () => {
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'run_workflow', args, async () => {
         const workflow = workflows.findById(args.workflowId);
         if (!workflow) return errorResult(`Workflow not found: ${args.workflowId}`);
         if (jobStore.countRunningOfKind(ctx.user.id, 'workflow') > 0) {
@@ -133,7 +133,7 @@ export function registerRunTools(server: McpServer, ctx: ToolContext): void {
       inputSchema: { workflowId: z.string().min(1), nodeId: z.string().min(1) },
     },
     (args, extra) =>
-      auditLog.wrap({ userId: ctx.user.id, sessionId: extra.sessionId }, 'run_node', args, async () => {
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'run_node', args, async () => {
         const workflow = workflows.findById(args.workflowId);
         if (!workflow) return errorResult(`Workflow not found: ${args.workflowId}`);
         const result = await runSingleNode(
@@ -153,7 +153,7 @@ export function registerRunTools(server: McpServer, ctx: ToolContext): void {
       inputSchema: { jobId: z.string().min(1) },
     },
     (args, extra) =>
-      auditLog.wrap({ userId: ctx.user.id, sessionId: extra.sessionId }, 'cancel_run', args, async () => {
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'cancel_run', args, async () => {
         const job = jobStore.getJob(args.jobId);
         if (!job || job.kind !== 'workflow') return errorResult(`Workflow run not found: ${args.jobId}`);
         if (job.status !== 'running') return errorResult(`That run is already ${job.status}.`);

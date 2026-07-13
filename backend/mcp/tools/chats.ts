@@ -8,7 +8,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { chats, messages, projects, generateId, type MessageAttachment } from '../../services/database.ts';
-import { auditLog } from '../audit.ts';
+import { guard } from '../guard.ts';
 import type { ToolContext } from '../server.ts';
 import { jsonResult, errorResult } from './util.ts';
 
@@ -40,7 +40,7 @@ export function registerChatTools(server: McpServer, ctx: ToolContext): void {
       annotations: { readOnlyHint: true },
     },
     (args, extra) =>
-      auditLog.wrap({ userId: ctx.user.id, sessionId: extra.sessionId }, 'list_chats', args, async () => {
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'list_chats', args, async () => {
         let rows = chats.findByUserId(ctx.user.id);
         if (args.projectId) rows = rows.filter((c: any) => c.project_id === args.projectId);
         return jsonResult(
@@ -67,7 +67,7 @@ export function registerChatTools(server: McpServer, ctx: ToolContext): void {
       annotations: { readOnlyHint: true },
     },
     (args, extra) =>
-      auditLog.wrap({ userId: ctx.user.id, sessionId: extra.sessionId }, 'get_chat', args, async () => {
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'get_chat', args, async () => {
         const chat = ownChat(args.chatId, ctx.user.id);
         if (!chat) return errorResult(`Chat not found: ${args.chatId}`);
         const messageRows = messages.findByChatId(args.chatId);
@@ -99,7 +99,7 @@ export function registerChatTools(server: McpServer, ctx: ToolContext): void {
       },
     },
     (args, extra) =>
-      auditLog.wrap({ userId: ctx.user.id, sessionId: extra.sessionId }, 'create_chat', args, async () => {
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'create_chat', args, async () => {
         if (!projects.findById(args.projectId)) return errorResult(`Project not found: ${args.projectId}`);
         const id = generateId();
         chats.create(id, ctx.user.id, args.title ?? 'New chat', args.projectId);
@@ -122,7 +122,7 @@ export function registerChatTools(server: McpServer, ctx: ToolContext): void {
       },
     },
     (args, extra) =>
-      auditLog.wrap({ userId: ctx.user.id, sessionId: extra.sessionId }, 'post_chat_message', args, async () => {
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'post_chat_message', args, async () => {
         const chat = ownChat(args.chatId, ctx.user.id);
         if (!chat) return errorResult(`Chat not found: ${args.chatId}`);
         const id = generateId();

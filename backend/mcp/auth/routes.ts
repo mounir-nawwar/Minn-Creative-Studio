@@ -9,6 +9,7 @@
 import express from 'express';
 import { loginLimiter } from '../../config/cors.ts';
 import { login } from '../../services/auth.ts';
+import { SCOPES } from '../guard.ts';
 import { oauthStore, generateOpaqueToken } from './store.ts';
 import { renderLoginPage } from './loginPage.ts';
 
@@ -62,6 +63,10 @@ router.post('/login', loginLimiter, async (req: express.Request, res: express.Re
       return;
     }
 
+    // Clients that request no scopes get the full set — Claude surfaces don't
+    // let a user pick, and a read-only connector would be useless here.
+    const grantedScope = scope?.trim() ? scope : SCOPES.join(' ');
+
     const code = generateOpaqueToken('mcp_code_');
     oauthStore.createAuthorizationCode({
       code,
@@ -69,7 +74,7 @@ router.post('/login', loginLimiter, async (req: express.Request, res: express.Re
       userId: auth.user.id,
       redirectUri: redirect_uri,
       codeChallenge: code_challenge,
-      scope,
+      scope: grantedScope,
       resource,
     });
 

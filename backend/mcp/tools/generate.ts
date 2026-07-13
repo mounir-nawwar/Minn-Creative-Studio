@@ -13,7 +13,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { runGeneration } from '../../services/generation.ts';
 import { projects, assets } from '../../services/database.ts';
 import { AUDIO_MODELS, TTS_VOICES, findModel } from '../../../src/lib/models.ts';
-import { auditLog } from '../audit.ts';
+import { guard } from '../guard.ts';
 import type { ToolContext } from '../server.ts';
 import { imagePartFromUrl } from '../media.ts';
 import { projectContextFor } from '../projectContext.ts';
@@ -76,7 +76,7 @@ export function registerGenerationTools(server: McpServer, ctx: ToolContext): vo
       },
     },
     (args, extra) =>
-      auditLog.wrap({ userId: ctx.user.id, sessionId: extra.sessionId }, 'generate_text', args, async () => {
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'generate_text', args, async () => {
         requireProject(args.projectId);
         const modelId = args.model ?? 'gemini-3-flash-preview';
         requireModelOfMode(modelId, 'text');
@@ -142,7 +142,7 @@ export function registerGenerationTools(server: McpServer, ctx: ToolContext): vo
       },
     },
     (args, extra) =>
-      auditLog.wrap({ userId: ctx.user.id, sessionId: extra.sessionId }, 'generate_image', args, async () => {
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'generate_image', args, async () => {
         requireProject(args.projectId);
         const modelId = args.model ?? 'imagen-4.0-generate-001';
         requireModelOfMode(modelId, 'image');
@@ -233,7 +233,7 @@ export function registerGenerationTools(server: McpServer, ctx: ToolContext): vo
       },
     },
     (args, extra) =>
-      auditLog.wrap({ userId: ctx.user.id, sessionId: extra.sessionId }, 'generate_speech', args, async () => {
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'generate_speech', args, async () => {
         requireProject(args.projectId);
         const model = AUDIO_MODELS.find((m) => m.id.includes('tts'))?.id ?? 'gemini-2.5-flash-preview-tts';
         const data = await runGeneration({
@@ -276,7 +276,7 @@ export function registerGenerationTools(server: McpServer, ctx: ToolContext): vo
       },
     },
     (args, extra) =>
-      auditLog.wrap({ userId: ctx.user.id, sessionId: extra.sessionId }, 'generate_music_clip', args, async () => {
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'generate_music_clip', args, async () => {
         requireProject(args.projectId);
         const model = AUDIO_MODELS.find((m) => m.id.includes('clip'))?.id ?? 'lyria-3-clip-preview';
         const data = await runGeneration({

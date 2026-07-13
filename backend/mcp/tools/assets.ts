@@ -9,7 +9,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { uploadFromUrl, moveAssetToProject } from '../../services/storage.ts';
 import { projects } from '../../services/database.ts';
 import { getPublicBaseUrl } from '../config.ts';
-import { auditLog } from '../audit.ts';
+import { guard } from '../guard.ts';
 import type { ToolContext } from '../server.ts';
 import { jsonResult, errorResult } from './util.ts';
 
@@ -27,7 +27,7 @@ export function registerAssetTools(server: McpServer, ctx: ToolContext): void {
       },
     },
     (args, extra) =>
-      auditLog.wrap({ userId: ctx.user.id, sessionId: extra.sessionId }, 'upload_asset_from_url', args, async () => {
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'upload_asset_from_url', args, async () => {
         if (!projects.findById(args.projectId)) {
           return errorResult(`Project not found: ${args.projectId}`);
         }
@@ -54,7 +54,7 @@ export function registerAssetTools(server: McpServer, ctx: ToolContext): void {
       },
     },
     (args, extra) =>
-      auditLog.wrap({ userId: ctx.user.id, sessionId: extra.sessionId }, 'move_asset', args, async () => {
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'move_asset', args, async () => {
         try {
           const moved = await moveAssetToProject(args.assetId, args.targetProjectId);
           return jsonResult(
