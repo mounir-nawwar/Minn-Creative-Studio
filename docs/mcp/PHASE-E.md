@@ -71,3 +71,38 @@ This fixes the two-human overwrite bug independent of MCP.
 
 Feature-flag the hook (`VITE_LIVE_SYNC=0` or a constant) — canvas reverts to load-once behavior.
 Server endpoint is additive.
+
+## As built (2026-07-13, commit c3d86a5)
+
+**Polling, not SSE** — the plan above assumed SSE; two facts killed it:
+1. `EventSource` **cannot send an `Authorization: Bearer` header**, and this app has no cookie auth
+   (JWT in localStorage). The workarounds are a token in the query string (leaks into logs) or a
+   fetch+ReadableStream reader (hand-rolled reconnect/refresh logic).
+2. Cloudflare buffers long-lived streams, so SSE would have needed heartbeat tuning to even survive.
+
+A 3s probe of a **new cheap endpoint** `GET /api/workflows/:id/version` (returns `{id, updatedAt}`
+only — the graph itself can be large) is simpler, proxy-proof, and well inside "feels live" for a
+two-person tool. Swapping in SSE later only changes the trigger; the merge below is the real work.
+
+**Files**: `backend/routes/workflows.ts` (version route, registered before `/:id`),
+`src/lib/api.ts` (`workflowsApi.getVersion`), `src/lib/graphMerge.ts` (pure merge + tests),
+`src/hooks/useWorkflowSync.ts` (poll + apply), `src/canvas/Canvas.tsx` (wiring).
+
+**Merge semantics** (`mergeGraphs`, bias = never lose work):
+- **Clean canvas** (nothing pending): adopt the server graph wholesale.
+- **Dirty canvas** (edits waiting on the 2s debounce): local wins for `position`/`config`/`label`
+  (what a human is manipulating); the **server wins for `output`/`outputs`/`error`** (only the
+  backend produces those); nodes/edges added on either side are kept; **deletions are not
+  propagated while dirty** — removing a node someone is editing is worse than briefly showing one
+  deleted elsewhere (a reload reconciles).
+- **Echo suppression**: the canvas records the `updated_at` its own save returned, and sets an
+  `applyingRemoteRef` flag before the hook writes to the store, so a pulled-in graph never bounces
+  back out as a fake "local" auto-save.
+
+**Bonus fix**: this also closes the pre-existing two-human hazard where the canvas's next auto-save
+silently overwrote the other user's changes.
+
+**Verification**: merge covered by unit tests (`graphMerge.test.ts` — 5 cases incl. "server result
+adopted while the user's in-progress config and drag survive"); the version probe was verified live
+(unchanged when idle, changes the instant an MCP `add_node` lands). The visual confirmation —
+watching nodes appear in an open canvas — is a user-side check (agent can't log into the SPA).

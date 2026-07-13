@@ -131,7 +131,7 @@ Full connect flow (what actually happens when someone adds the connector):
 | B — Creation tools | ✅ done | c770c19, 84bca09, 4f76730, 6fb2cf5, 063778a | 2026-07-12 | 20 tools total. Live-verified: text + gemini-image gen via MCP with via:mcp tagging + costs. Note: Imagen 4 returns Vertex 404 on the current GCP project (not allowlisted) — Gemini image models work. Video/music job pair code-complete, not yet exercised end-to-end (costs) |
 | C — Graph tools | ✅ done | 684df3b, 06caa84 | 2026-07-13 | 30 tools total. Validator mirrors the canvas one-for-one (same registries imported from src). Live-verified: 6-node pipeline built via set_workflow + add_node/connect_nodes, guardrails reject blocked/mismatch/duplicate/cycle, auto-layout works. Canvas concurrency remains last-writer-wins until Phase E |
 | D — Headless runner | ✅ done | 0785a54 | 2026-07-13 | 33 tools. Live-verified: 6-node pipeline run headlessly (prompt+seed → gemini image → describer → output), outputs written into the graph, `crop` correctly skipped, costs tracked. Pixel nodes have no server executor by design |
-| E — Live canvas sync | ⬜ not started | | | |
+| E — Live canvas sync | ✅ done | c3d86a5 | 2026-07-13 | 3s poll of a new version endpoint + merge (`src/lib/graphMerge.ts`). Also fixes the pre-existing two-human overwrite bug. SSE rejected: EventSource can't send the Bearer header; Cloudflare buffers streams. API-level verified; visual confirmation is a user check |
 | F — Hardening & onboarding | ⬜ not started | | | |
 
 ## Decisions log
