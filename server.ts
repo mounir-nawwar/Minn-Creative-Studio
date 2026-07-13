@@ -1,7 +1,7 @@
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import helmet from 'helmet';
@@ -38,9 +38,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const IS_PRODUCTION = AUTH_CONFIG.isProduction;
 
-async function startServer() {
+/**
+ * Builds the Express app (API + MCP connector, and optionally the SPA).
+ * Exported so tests can boot the real thing in-process — `serveFrontend: false`
+ * skips Vite/dist, which a backend test has no use for.
+ */
+export async function createApp({ serveFrontend = true }: { serveFrontend?: boolean } = {}) {
   const app = express();
-  const PORT = parseInt(process.env.PORT || '3000');
 
   // Trust exactly one proxy hop (Cloudflare sits directly in front of this
   // process — no local nginx). Without this, Express ignores X-Forwarded-For
@@ -110,13 +114,15 @@ async function startServer() {
   app.use('/storage', express.static(STORAGE_PATH));
 
   // Serve frontend
-  if (!IS_PRODUCTION) {
-    const vite = await createViteServer({ server: { middlewareMode: true }, appType: 'spa', base: '/' });
-    app.use('/', vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use('/', express.static(distPath));
-    app.get('*', (_req, res) => res.sendFile(path.join(distPath, 'index.html')));
+  if (serveFrontend) {
+    if (!IS_PRODUCTION) {
+      const vite = await createViteServer({ server: { middlewareMode: true }, appType: 'spa', base: '/' });
+      app.use('/', vite.middlewares);
+    } else {
+      const distPath = path.join(process.cwd(), 'dist');
+      app.use('/', express.static(distPath));
+      app.get('*', (_req, res) => res.sendFile(path.join(distPath, 'index.html')));
+    }
   }
 
   // Error handler
@@ -125,12 +131,22 @@ async function startServer() {
     res.status(err.status || 500).json({ success: false, error: err.message || 'Internal Server Error' });
   });
 
+  return { app, storagePath: STORAGE_PATH };
+}
+
+async function startServer() {
+  const PORT = parseInt(process.env.PORT || '3000');
+  const { app, storagePath } = await createApp();
+
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n✅ Minn Creative Studio running on http://localhost:${PORT}`);
-    console.log(`📁 Storage: ${STORAGE_PATH}`);
+    console.log(`📁 Storage: ${storagePath}`);
     console.log(`🔐 Auth: Local (2 users: mounir.nawwar, rana.tadmori)`);
     console.log(`🤖 Vertex AI: Configure GOOGLE_APPLICATION_CREDENTIALS\n`);
   });
 }
 
-startServer();
+// Only auto-start when run as the entry point (tests import createApp directly)
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  startServer();
+}
