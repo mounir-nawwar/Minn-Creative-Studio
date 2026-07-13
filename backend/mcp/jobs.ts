@@ -12,7 +12,7 @@ import { db, generateId } from '../services/database.ts';
 
 type SqliteDb = typeof db;
 
-export type McpJobKind = 'video' | 'audio';
+export type McpJobKind = 'video' | 'audio' | 'workflow';
 export type McpJobStatus = 'running' | 'done' | 'error';
 
 export interface McpJob {
@@ -40,25 +40,49 @@ function parseJson<T>(value: string | null, fallback: T): T {
   }
 }
 
-export function createJobStore(database: SqliteDb) {
+const CREATE_JOBS_TABLE = `
+  CREATE TABLE IF NOT EXISTS mcp_jobs (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    project_id TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK(kind IN ('video','audio','workflow')),
+    operation_name TEXT NOT NULL,
+    model TEXT,
+    params TEXT DEFAULT '{}',
+    status TEXT NOT NULL DEFAULT 'running' CHECK(status IN ('running','done','error')),
+    result TEXT,
+    error TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_mcp_jobs_user ON mcp_jobs(user_id);
+  CREATE INDEX IF NOT EXISTS idx_mcp_jobs_status ON mcp_jobs(status);
+`;
+
+/**
+ * Phase B shipped the table with CHECK(kind IN ('video','audio')). A CHECK
+ * can't be ALTERed in SQLite, so widen it by rebuilding once (rows preserved).
+ */
+function migrateJobKinds(database: SqliteDb): void {
+  const existing = database
+    .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='mcp_jobs'")
+    .get() as { sql?: string } | undefined;
+  if (!existing?.sql || existing.sql.includes("'workflow'")) return;
+
   database.exec(`
-    CREATE TABLE IF NOT EXISTS mcp_jobs (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      project_id TEXT NOT NULL,
-      kind TEXT NOT NULL CHECK(kind IN ('video','audio')),
-      operation_name TEXT NOT NULL,
-      model TEXT,
-      params TEXT DEFAULT '{}',
-      status TEXT NOT NULL DEFAULT 'running' CHECK(status IN ('running','done','error')),
-      result TEXT,
-      error TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE INDEX IF NOT EXISTS idx_mcp_jobs_user ON mcp_jobs(user_id);
-    CREATE INDEX IF NOT EXISTS idx_mcp_jobs_status ON mcp_jobs(status);
+    ALTER TABLE mcp_jobs RENAME TO mcp_jobs_legacy;
+    ${CREATE_JOBS_TABLE}
+    INSERT INTO mcp_jobs (id, user_id, project_id, kind, operation_name, model, params, status, result, error, created_at, updated_at)
+      SELECT id, user_id, project_id, kind, operation_name, model, params, status, result, error, created_at, updated_at
+      FROM mcp_jobs_legacy;
+    DROP TABLE mcp_jobs_legacy;
   `);
+  console.log("[MCP] Migrated mcp_jobs: kind now allows 'workflow'");
+}
+
+export function createJobStore(database: SqliteDb) {
+  database.exec(CREATE_JOBS_TABLE);
+  migrateJobKinds(database);
 
   function rowToJob(row: any): McpJob | undefined {
     if (!row) return undefined;
@@ -111,6 +135,35 @@ export function createJobStore(database: SqliteDb) {
         .prepare(`SELECT COUNT(*) as n FROM mcp_jobs WHERE user_id = ? AND status = 'running'`)
         .get(userId) as { n: number };
       return row.n;
+    },
+
+    countRunningOfKind(userId: string, kind: McpJobKind): number {
+      const row = database
+        .prepare(`SELECT COUNT(*) as n FROM mcp_jobs WHERE user_id = ? AND kind = ? AND status = 'running'`)
+        .get(userId, kind) as { n: number };
+      return row.n;
+    },
+
+    /** Live progress for a running job (workflow runs report per-node results here). */
+    updateProgress(id: string, progress: Record<string, unknown>): void {
+      database
+        .prepare(`UPDATE mcp_jobs SET result = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'running'`)
+        .run(JSON.stringify(progress), id);
+    },
+
+    /**
+     * Runner state lives in memory, so a process restart orphans any 'running'
+     * job. Fail them at boot rather than leaving check_job polling forever.
+     * (Video/audio jobs are Vertex-side and recoverable — only workflow runs,
+     * which we drive ourselves, are truly lost.)
+     */
+    failInterruptedRuns(): number {
+      const result = database
+        .prepare(`UPDATE mcp_jobs SET status = 'error', error = 'Interrupted by a server restart', updated_at = CURRENT_TIMESTAMP
+                  WHERE kind = 'workflow' AND status = 'running'`)
+        .run();
+      if (result.changes > 0) console.log(`[MCP] Marked ${result.changes} interrupted workflow run(s) as failed`);
+      return result.changes;
     },
   };
 }

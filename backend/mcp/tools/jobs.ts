@@ -198,8 +198,9 @@ export function registerJobTools(server: McpServer, ctx: ToolContext): void {
     {
       title: 'Check a generation job',
       description:
-        'Poll a start_video_job / start_music_job job. Returns running (with elapsed time), done (with asset urls), ' +
-        'or error. Finished results are stored — re-checking a done job is free and idempotent.',
+        'Poll any job: start_video_job, start_music_job, or run_workflow. Returns running (with elapsed time and, ' +
+        'for workflow runs, per-node progress), done (with asset urls / node results), or error. Finished results ' +
+        'are stored — re-checking a done job is free and idempotent.',
       inputSchema: { jobId: z.string().min(1) },
     },
     (args, extra) =>
@@ -208,6 +209,21 @@ export function registerJobTools(server: McpServer, ctx: ToolContext): void {
         if (!job) return errorResult(`Job not found: ${args.jobId}`);
         if (job.status === 'done') return jsonResult({ jobId: job.id, status: 'done', ...job.result }, 'Job done');
         if (job.status === 'error') return errorResult(`Job failed: ${job.error}`);
+
+        // Workflow runs are driven in-process: the runner writes progress into
+        // the job row, so there is no upstream operation to poll.
+        if (job.kind === 'workflow') {
+          return jsonResult(
+            {
+              jobId: job.id,
+              status: 'running',
+              elapsedSeconds: elapsedSeconds(job.created_at),
+              checkAgainInSeconds: 10,
+              ...(job.result ?? {}),
+            },
+            'Workflow running'
+          );
+        }
 
         try {
           const operation = await runGeneration({

@@ -19,10 +19,14 @@ import { getPublicBaseUrl } from './config.ts';
 import { MinnOAuthProvider } from './auth/provider.ts';
 import authRoutes from './auth/routes.ts';
 import { handleMcpPost, handleMcpGet, handleMcpDelete } from './transport.ts';
+import { jobStore } from './jobs.ts';
 
 export function mountMcp(app: express.Express): void {
   const baseUrl = getPublicBaseUrl();
   const provider = new MinnOAuthProvider();
+
+  // Workflow runs are driven in-process — any left 'running' by a restart are lost.
+  jobStore.failInterruptedRuns();
 
   app.use(
     mcpAuthRouter({
