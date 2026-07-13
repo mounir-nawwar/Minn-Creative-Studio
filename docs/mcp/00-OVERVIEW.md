@@ -130,7 +130,7 @@ Full connect flow (what actually happens when someone adds the connector):
 | A — Skeleton + OAuth + read-only tools | ✅ done (local) | 9f5a532, f025912, 02c6e29, a82fb12 | 2026-07-12 | Verified locally end-to-end (SDK client, all 7 tools, audit rows, prod-mode route precedence). Remaining: deploy to VPS + connect from claude.ai/Claude Code with real login (see PHASE-A acceptance) |
 | B — Creation tools | ✅ done | c770c19, 84bca09, 4f76730, 6fb2cf5, 063778a | 2026-07-12 | 20 tools total. Live-verified: text + gemini-image gen via MCP with via:mcp tagging + costs. Note: Imagen 4 returns Vertex 404 on the current GCP project (not allowlisted) — Gemini image models work. Video/music job pair code-complete, not yet exercised end-to-end (costs) |
 | C — Graph tools | ✅ done | 684df3b, 06caa84 | 2026-07-13 | 30 tools total. Validator mirrors the canvas one-for-one (same registries imported from src). Live-verified: 6-node pipeline built via set_workflow + add_node/connect_nodes, guardrails reject blocked/mismatch/duplicate/cycle, auto-layout works. Canvas concurrency remains last-writer-wins until Phase E |
-| D — Headless runner | ⬜ not started | | | |
+| D — Headless runner | ✅ done | 0785a54 | 2026-07-13 | 33 tools. Live-verified: 6-node pipeline run headlessly (prompt+seed → gemini image → describer → output), outputs written into the graph, `crop` correctly skipped, costs tracked. Pixel nodes have no server executor by design |
 | E — Live canvas sync | ⬜ not started | | | |
 | F — Hardening & onboarding | ⬜ not started | | | |
 

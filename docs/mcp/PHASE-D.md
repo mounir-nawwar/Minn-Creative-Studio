@@ -86,3 +86,32 @@ New: `backend/mcp/runner/` (or `backend/services/graphRunner.ts` if the app late
 ## Rollback
 
 Additive (runner module + 3 tools). Jobs table already exists. Disable = unregister tools.
+
+## As built (2026-07-13, commit 0785a54)
+
+1. **Location**: `backend/services/graphRunner.ts` (service, not `backend/mcp/`) so a future in-app
+   "Run all" button can reuse it. Tools live in `backend/mcp/tools/run.ts`.
+2. **Tools**: `run_workflow` (background job + jobId), `run_node` (synchronous, single node),
+   `cancel_run`. `check_job` was extended to report workflow progress
+   (`{completed, total, currentNode, results[]}`) — no separate polling tool.
+3. **Executor coverage** (`EXECUTORS` registry): value nodes (prompt/text/number/seed/cfgScale/
+   guidanceStrength/motionIntensity/imageUpload/videoUpload/listSelector/toggle), promptConcatenator,
+   promptEnhancer, llm, vision/imageDescriber/videoDescriber, imagen + nanoBanana (references, seeds,
+   sampleCount), veo + imageToVideo (**server-side LRO polling**, 5s × 120), lyria clips, output.
+   Everything else → `skipped` with a reason; dependents are skipped too, siblings still run.
+   **Lyria Pro is refused inside a run** (use `start_music_job`) — a run shouldn't block for minutes
+   on an LRO that has its own job pattern.
+4. **Cost fuse**: pre-flight estimate from `MODEL_PRICING` (images: `perImage`, or ~$0.10/image for
+   token-billed Gemini image models; video: `calculateCost` with duration/resolution/audio × samples).
+   Runs above `MCP_MAX_RUN_COST_USD` (default **$5**) are refused unless `confirmCost: true`.
+   Text spend isn't estimable up front and is ignored in the estimate (still tracked after the fact).
+5. **Writeback**: after each node the runner **re-reads the workflow and merges only that node's
+   data** onto the latest graph, minimizing clobber if a human is editing concurrently (full fix =
+   Phase E). Partial progress is therefore visible in the Canvas mid-run.
+6. **Concurrency**: one workflow run per user (`countRunningOfKind`); cancel flags are in-memory.
+   `mcp_jobs` CHECK was widened to allow `kind='workflow'` via a **guarded table rebuild** (SQLite
+   can't ALTER a CHECK) — rows preserved, runs once. Interrupted runs are failed at boot
+   (`failInterruptedRuns`), since the runner's state is in-process.
+7. **Live-verified**: prompt+seed → gemini image → imageDescriber → output, plus a `crop` node that
+   correctly reported `skipped`. Outputs landed in `data.output`, the describer consumed the image
+   the runner had just generated, and usage rows carried `via:'mcp'`.
