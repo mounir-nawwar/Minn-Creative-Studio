@@ -22,6 +22,7 @@ import { useConnectionContext } from '../contexts/ConnectionContext';
 import { type SourceInfo } from '../contexts/ConnectionContext';
 import { checkConnection } from '../store/connection-validator';
 import { type WorkflowNodeData } from '../types';
+import { useWorkflowSync } from '../hooks/useWorkflowSync';
 
 const CanvasContent = () => {
   const {
@@ -48,6 +49,18 @@ const CanvasContent = () => {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const pendingRef = useRef<string | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // True while local edits are queued for the debounced save — live sync merges
+  // rather than replaces when this is set.
+  const dirtyRef = useRef(false);
+  // Set just before live sync writes to the store, so the graph it just pulled
+  // in doesn't immediately bounce back out as a "local" auto-save.
+  const applyingRemoteRef = useRef(false);
+
+  const isDirty = useCallback(() => dirtyRef.current, []);
+  const onBeforeApply = useCallback(() => {
+    applyingRemoteRef.current = true;
+  }, []);
+  const { markSaved } = useWorkflowSync({ workflowId: activeWorkflowId, isDirty, onBeforeApply });
 
   useEffect(() => {
     pendingRef.current = pendingNodeType;
@@ -57,10 +70,17 @@ const CanvasContent = () => {
   useEffect(() => {
     if (!activeWorkflowId) return;
 
+    // Changes we just pulled from the server are not local edits.
+    if (applyingRemoteRef.current) {
+      applyingRemoteRef.current = false;
+      return;
+    }
+    dirtyRef.current = true;
+
     const saveWorkflow = async () => {
       setSaveStatus('saving');
       try {
-        await workflowsApi.update(activeWorkflowId, {
+        const saved = await workflowsApi.update(activeWorkflowId, {
           nodes: nodes.map(n => {
             const nodeData = { ...n.data };
             // Strip transient base64 data URLs — they exceed size limits
@@ -89,6 +109,10 @@ const CanvasContent = () => {
             data: e.data ? stripUndefined(e.data) : null,
           }))
         });
+        // Our own write defines the new server revision — record it so live
+        // sync doesn't mistake the echo for someone else's change.
+        dirtyRef.current = false;
+        if (saved?.updated_at) markSaved(saved.updated_at);
         setSaveStatus('saved');
         setTimeout(() => setSaveStatus('idle'), 2000);
       } catch (err) {
@@ -104,7 +128,7 @@ const CanvasContent = () => {
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  }, [nodes, edges, activeWorkflowId]);
+  }, [nodes, edges, activeWorkflowId, markSaved]);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {

@@ -271,7 +271,11 @@ export const workflowsApi = {
   },
   
   get: (id: string): Promise<Workflow> => apiRequest(`/workflows/${id}`),
-  
+
+  /** Cheap revision probe for canvas live sync (timestamp only, no graph payload) */
+  getVersion: (id: string): Promise<{ id: string; updatedAt: string }> =>
+    apiRequest(`/workflows/${id}/version`),
+
   create: (data: { projectId: string; name?: string; nodes?: any[]; edges?: any[] }): Promise<Workflow> =>
     apiRequest('/workflows', {
       method: 'POST',

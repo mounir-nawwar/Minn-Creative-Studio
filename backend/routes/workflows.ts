@@ -104,6 +104,25 @@ router.post('/', (req: any, res: any) => {
 });
 
 /**
+ * GET /api/workflows/:id/version
+ * Cheap revision probe for the canvas's live sync: returns only the timestamp,
+ * so an open canvas can poll without pulling the whole graph (node data can
+ * carry large outputs). Registered before /:id so "version" isn't eaten by it.
+ */
+router.get('/:id/version', (req: any, res: any) => {
+  try {
+    const row = workflows.findById(req.params.id);
+    if (!row) {
+      return res.status(404).json({ error: 'Workflow not found' });
+    }
+    res.json({ id: row.id, updatedAt: row.updated_at });
+  } catch (error: any) {
+    console.error('Error fetching workflow version:', error);
+    res.status(500).json({ error: 'Failed to fetch workflow version' });
+  }
+});
+
+/**
  * PUT /api/workflows/:id
  * Update a workflow (auto-save)
  */
