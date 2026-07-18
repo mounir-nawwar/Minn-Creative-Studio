@@ -1,8 +1,9 @@
 // @vitest-environment node
 /**
- * Guard: MCP generations inject the SAME brand context the app injects.
- * buildProjectContext (frontend lib) must stay backend-importable, keep its
- * playground guard, and render the fields the settings JSON carries.
+ * Guard: MCP generations inject the SAME brand context the app injects, and a
+ * project Claude creates through create_project produces that context. The
+ * builder must stay backend-importable, keep its playground guard, and render
+ * the fields the settings JSON carries.
  */
 import { describe, test, expect } from 'vitest';
 import { buildProjectContext } from '../../../src/lib/projectContext.ts';
@@ -30,6 +31,24 @@ describe('buildProjectContext under Node (MCP injection guard)', () => {
     expect(context).toContain('Style keywords: silk, editorial, soft light');
     expect(context).toContain('Avoid: clutter, neon');
     expect(context).toContain('Instructions: Always keep garments center frame.');
+  });
+
+  test('the settings that create_project writes render as brand context', () => {
+    // Mirrors what create_project stores: flat brand fields become `settings`,
+    // then get_project/generation read them back through buildProjectContext.
+    const settings = {
+      type: 'branding',
+      clientName: 'Nadi',
+      primaryColor: '#0097A7',
+      styleKeywords: 'clean, geometric',
+      negativeKeywords: 'gradients',
+      aiInstructions: 'Flat vector only.',
+      status: 'active',
+    };
+    const context = buildProjectContext({ id: 'p2', name: 'Nadi Rebrand', ...settings } as any);
+    expect(context).toContain('Client: Nadi');
+    expect(context).toContain('Style keywords: clean, geometric');
+    expect(context).toContain('Instructions: Flat vector only.');
   });
 
   test('the playground sentinel yields no context', () => {

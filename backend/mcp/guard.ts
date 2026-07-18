@@ -28,6 +28,7 @@ const TOOL_SCOPES: Record<string, Scope> = {
   get_audit_log: 'read', get_connector_status: 'read',
 
   // write (mutates app data, costs nothing)
+  create_project: 'write', update_project: 'write',
   create_workflow: 'write', add_node: 'write', update_node: 'write', remove_node: 'write',
   connect_nodes: 'write', disconnect_nodes: 'write', set_workflow: 'write', auto_layout: 'write',
   create_chat: 'write', post_chat_message: 'write',

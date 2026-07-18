@@ -137,6 +137,12 @@ Full connect flow (what actually happens when someone adds the connector):
 **All phases complete.** The connector is feature-done; PHASE-F.md is the day-to-day runbook
 (connect / revoke / troubleshoot).
 
+### Post-F additions
+
+| Date | Change | Commit |
+|---|---|---|
+| 2026-07-13 | `create_project` + `update_project` (write scope) — Claude can create client projects with full brand identity (colors, style/negative keywords, AI instructions) written to the same `settings` JSON the wizard uses, so buildProjectContext feeds every later generation. 37 tools. | (this commit) |
+
 ## Decisions log
 
 | # | Decision | Rationale | Date |

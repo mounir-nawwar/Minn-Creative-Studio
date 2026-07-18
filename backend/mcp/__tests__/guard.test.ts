@@ -13,6 +13,8 @@ const nextSession = () => `test-session-${++session}`;
 describe('tool → scope mapping', () => {
   test('classifies reads, writes, and paid tools', () => {
     expect(scopeForTool('list_projects')).toBe('read');
+    expect(scopeForTool('create_project')).toBe('write');
+    expect(scopeForTool('update_project')).toBe('write');
     expect(scopeForTool('set_workflow')).toBe('write');
     expect(scopeForTool('generate_image')).toBe('generate');
     expect(scopeForTool('run_workflow')).toBe('generate');

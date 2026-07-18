@@ -1,10 +1,14 @@
 /**
- * Read-only project tools: list_projects, get_project, get_usage_summary.
+ * Project tools: list_projects, get_project, get_usage_summary (read) and
+ * create_project, update_project (write). Brand fields go into the same
+ * `settings` JSON the app's project wizard writes, so a project Claude creates
+ * is indistinguishable from one made in the UI — and buildProjectContext picks
+ * it up automatically for every later generation.
  */
 
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { projects, workflows, assets, usageLogs } from '../../services/database.ts';
+import { projects, workflows, assets, usageLogs, generateId, PLAYGROUND_PROJECT_ID } from '../../services/database.ts';
 import { guard } from '../guard.ts';
 import type { ToolContext } from '../server.ts';
 import { jsonResult, errorResult } from './util.ts';
@@ -21,6 +25,34 @@ function toProjectSummary(row: any, callerUserId: string) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+/** Brand-identity fields — mirrors the app's project wizard (toApiProject settings). */
+const brandFields = {
+  type: z.string().optional().describe("e.g. 'fashion', 'branding', 'product', 'content'"),
+  subtype: z.string().optional(),
+  clientName: z.string().optional(),
+  clientIndustry: z.string().optional(),
+  targetAudience: z.string().optional(),
+  brandPersonality: z.array(z.string()).optional().describe("e.g. ['luxurious','minimalist']"),
+  visualMood: z.array(z.string()).optional().describe("e.g. ['minimal','editorial','luxury']"),
+  primaryColor: z.string().optional().describe('hex, e.g. #101010'),
+  secondaryColor: z.string().optional(),
+  accentColor: z.string().optional(),
+  fontStyle: z.string().optional(),
+  styleKeywords: z.string().optional().describe('comma-separated'),
+  negativeKeywords: z.string().optional().describe('comma-separated — things to avoid'),
+  aiInstructions: z.string().optional().describe('freeform master brief injected into every generation'),
+  platforms: z.array(z.string()).optional(),
+};
+
+/** Drop undefined keys so update_project merges cleanly onto existing settings. */
+function pickBrandSettings(args: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const key of Object.keys(brandFields)) {
+    if (args[key] !== undefined) out[key] = args[key];
+  }
+  return out;
 }
 
 export function registerProjectTools(server: McpServer, ctx: ToolContext): void {
@@ -108,6 +140,70 @@ export function registerProjectTools(server: McpServer, ctx: ToolContext): void 
           totals: { cost: Number(totalCost.toFixed(4)), byType },
           projectUsage: project.usage ?? {},
         });
+      })
+  );
+
+  server.registerTool(
+    'create_project',
+    {
+      title: 'Create a project',
+      description:
+        'Create a new client project with its brand identity (colors, style keywords, negative keywords, target ' +
+        'audience, AI instructions). Everything except name is optional, but the more brand detail you set, the more ' +
+        'on-brand every later generation into this project will be — the brand context is injected automatically. ' +
+        'Returns the new projectId to pass to generation and graph tools.',
+      inputSchema: {
+        name: z.string().min(1).max(120),
+        description: z.string().max(4000).optional(),
+        ...brandFields,
+      },
+    },
+    (args, extra) =>
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'create_project', args, async () => {
+        const settings = { ...pickBrandSettings(args), status: 'active' };
+        const id = generateId();
+        projects.create(id, ctx.user.id, args.name, args.description, settings);
+        return jsonResult(
+          { projectId: id, name: args.name, settings },
+          `Created project "${args.name}"`
+        );
+      })
+  );
+
+  server.registerTool(
+    'update_project',
+    {
+      title: 'Update a project',
+      description:
+        "Change a project's name, description, or brand identity. Only the fields you pass are changed — brand " +
+        'settings are merged onto the existing ones, so you can fill in colors or AI instructions on a project that ' +
+        'was created bare. The playground cannot be edited.',
+      inputSchema: {
+        projectId: z.string().min(1),
+        name: z.string().min(1).max(120).optional(),
+        description: z.string().max(4000).optional(),
+        ...brandFields,
+      },
+    },
+    (args, extra) =>
+      guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'update_project', args, async () => {
+        if (args.projectId === PLAYGROUND_PROJECT_ID) {
+          return errorResult('The playground is a shared scratch space and cannot be edited.');
+        }
+        const existing = projects.findById(args.projectId);
+        if (!existing) return errorResult(`Project not found: ${args.projectId}`);
+
+        const mergedSettings = { ...(existing.settings ?? {}), ...pickBrandSettings(args) };
+        projects.update(args.projectId, {
+          ...(args.name !== undefined && { name: args.name }),
+          ...(args.description !== undefined && { description: args.description }),
+          settings: mergedSettings,
+        });
+        const updated = projects.findById(args.projectId);
+        return jsonResult(
+          { projectId: args.projectId, ...toProjectSummary(updated, ctx.user.id), settings: updated.settings },
+          'Project updated'
+        );
       })
   );
 }
