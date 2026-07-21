@@ -83,7 +83,7 @@ export const NODE_CATALOG: Partial<Record<NodeType, CatalogEntry>> = {
   imagen: {
     description: 'THE image generation node (Imagen 4 or Gemini image models, chosen via config.model). Prompt comes from the prompt input edge; reference images from edges into the reference handle.',
     configFields: [
-      { name: 'model', type: 'string', description: "Image model id — see list_models(mode='image'). Note: Imagen 4 ids may not be enabled on the GCP project; gemini-3.1-flash-image-preview is the workhorse" },
+      { name: 'model', type: 'string', description: "Image model id — see list_models(mode='image'). Note: Imagen 4 ids may not be enabled on the GCP project; gemini-3.1-flash-image is the workhorse" },
       { name: 'aspectRatio', type: 'string', values: ['1:1', '3:4', '4:3', '9:16', '16:9'], default: '1:1' },
       { name: 'resolution', type: 'string', description: 'Gemini image models: 1K/2K/4K' },
       { name: 'sampleCount', type: 'number', default: 1 },

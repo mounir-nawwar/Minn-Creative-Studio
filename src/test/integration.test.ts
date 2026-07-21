@@ -96,7 +96,7 @@ describe('Integration Tests: Generate → Upload → Store Flow', () => {
 
       const result = await generateImage({
         prompt: 'A sunset',
-        model: 'gemini-3.1-flash-image-preview',
+        model: 'gemini-3.1-flash-image',
         aspectRatio: '16:9',
         projectId: 'test-project',
       });
@@ -115,7 +115,7 @@ describe('Integration Tests: Generate → Upload → Store Flow', () => {
 
       const result = await generateImage({
         prompt: 'A sunset',
-        model: 'gemini-3.1-flash-image-preview',
+        model: 'gemini-3.1-flash-image',
         aspectRatio: '16:9',
       });
 
@@ -290,7 +290,7 @@ describe('Integration Tests: Generate → Upload → Store Flow', () => {
 
       const result = await generateImage({
         prompt: 'Test',
-        model: 'gemini-3.1-flash-image-preview',
+        model: 'gemini-3.1-flash-image',
         aspectRatio: '1:1',
         projectId: 'test-project',
       });
@@ -309,7 +309,7 @@ describe('Integration Tests: Generate → Upload → Store Flow', () => {
 
       await generateImage({
         prompt: 'Test',
-        model: 'gemini-3.1-flash-image-preview',
+        model: 'gemini-3.1-flash-image',
         aspectRatio: '1:1',
       });
 

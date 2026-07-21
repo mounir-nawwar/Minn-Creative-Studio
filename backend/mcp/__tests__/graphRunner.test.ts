@@ -14,7 +14,7 @@ describe('run planning', () => {
   const nodes = [
     node('p1', 'prompt', { prompt: 'a cat' }),
     node('s1', 'seed', { seed: 7 }),
-    node('img', 'imagen', { model: 'gemini-3.1-flash-image-preview', sampleCount: 2 }),
+    node('img', 'imagen', { model: 'gemini-3.1-flash-image', sampleCount: 2 }),
     node('desc', 'imageDescriber'),
     node('crop', 'crop'),
   ];

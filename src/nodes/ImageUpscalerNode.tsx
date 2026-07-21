@@ -11,13 +11,13 @@ import { toast } from '../store/useToastStore';
 import { NodeField, NodeLabel, NodeSelect, NodeToggle, RunButton } from './ui';
 
 const UPSCALE_MODELS = [
-  { id: 'gemini-3.1-flash-image-preview', label: 'Nano Banana (Free)', price: 0 },
+  { id: 'gemini-3.1-flash-image', label: 'Nano Banana (Free)', price: 0 },
   { id: 'imagen-4-upscale', label: 'Imagen 4 Upscale', price: 0.06 },
   { id: 'imagen-1-upscale', label: 'Imagen 1 Upscale', price: 0.003 },
 ];
 
 const ImageUpscalerNode = ({ id, data }: any) => {
-  const [model, setModel] = useState(data.config?.model || 'gemini-3.1-flash-image-preview');
+  const [model, setModel] = useState(data.config?.model || 'gemini-3.1-flash-image');
   const [scale, setScale] = useState(data.config?.scale || '2x');
   const [preserveStyle, setPreserveStyle] = useState(data.config?.preserveStyle ?? true);
   const updateNodeData = useStore((state) => state.updateNodeData);

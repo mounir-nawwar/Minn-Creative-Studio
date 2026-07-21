@@ -157,7 +157,7 @@ export function registerGenerationTools(server: McpServer, ctx: ToolContext): vo
 
         if (isImagen4) {
           if (args.referenceImages?.length) {
-            return errorResult('Imagen 4 does not accept reference images — use a Gemini image model (e.g. gemini-3.1-flash-image-preview) instead.');
+            return errorResult('Imagen 4 does not accept reference images — use a Gemini image model (e.g. gemini-3.1-flash-image) instead.');
           }
           const data = await runGeneration({
             method: 'generateImages',

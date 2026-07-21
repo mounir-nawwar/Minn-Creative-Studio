@@ -47,7 +47,7 @@ interface ImagenNodeData {
 }
 
 const ImagenNode = ({ id, data }: NodeProps<ImagenNodeData>) => {
-  const [model, setModel] = useState(data.config?.model || 'gemini-3.1-flash-image-preview');
+  const [model, setModel] = useState(data.config?.model || 'gemini-3.1-flash-image');
   const [aspectRatio, setAspectRatio] = useState(data.config?.aspectRatio || '1:1');
   const [resolution, setResolution] = useState(data.config?.resolution || '1K');
   const [sampleCount, setSampleCount] = useState(data.config?.sampleCount || 1);

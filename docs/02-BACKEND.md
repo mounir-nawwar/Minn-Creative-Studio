@@ -80,9 +80,9 @@ The source of truth for cost tracking. Exact table (`pricing.ts:1-30`):
 | `imagen-4.0-fast-generate-001` | $0.02 / image |
 | `imagen-4-upscale` | $0.06 / image |
 | `imagen-1-upscale` | $0.003 / image |
-| `gemini-3.1-flash-image-preview` | in $0.50, out $3.00, **imageOut $60.00** / 1M tok |
+| `gemini-3.1-flash-image` | in $0.50, out $3.00, **imageOut $60.00** / 1M tok |
 | `gemini-2.5-flash-image` | in $0.50, out $3.00, imageOut $60.00 / 1M |
-| `gemini-3-pro-image-preview` | in $2.00, out $12.00, imageOut $120.00 / 1M |
+| `gemini-3-pro-image` | in $2.00, out $12.00, imageOut $120.00 / 1M |
 | `veo-3.1-fast-generate-001` | per sec: 720p $0.10, 1080p $0.12, 4K $0.30, +audio $0.10 |
 | `veo-3.1-generate-001` | per sec: 720p $0.40, 1080p $0.40, 4K $0.60, +audio $0.40 |
 | `lyria-3-pro-preview` | $0.08 / song |

@@ -104,7 +104,7 @@ describe('geminiService', () => {
 
       const result = await generateImage({
         prompt: 'Test prompt',
-        model: 'gemini-3.1-flash-image-preview',
+        model: 'gemini-3.1-flash-image',
         aspectRatio: '1:1',
       });
 
@@ -122,7 +122,7 @@ describe('geminiService', () => {
 
       const result = await generateImage({
         prompt: 'Test prompt',
-        model: 'gemini-3.1-flash-image-preview',
+        model: 'gemini-3.1-flash-image',
         aspectRatio: '1:1',
       });
 

@@ -132,10 +132,10 @@ Deviations/notes versus the spec above:
    Lyria-Pro audio arrives WAV-normalized from `vertexGetOperation` and is persisted via
    `uploadBase64` with `via:'mcp'`.
 5. **Environment finding**: Imagen 4 models return Vertex 404 (`NOT_FOUND`) on the current GCP
-   project — not enabled/allowlisted there. Gemini image models (`gemini-3.1-flash-image-preview`
+   project — not enabled/allowlisted there. Gemini image models (`gemini-3.1-flash-image`
    etc.) verified working. Revisit if Imagen access is enabled on the Google side.
 6. **Live-verified locally**: chat tools, `generate_text` ($0.00003), `generate_image` via
-   gemini-3.1-flash-image-preview ($0.067) — asset row + usage rows carried `via:'mcp'`, audit
+   gemini-3.1-flash-image ($0.067) — asset row + usage rows carried `via:'mcp'`, audit
    logged everything including the Imagen failure. Video/music jobs are unit-covered and
    code-mirrored from the app's poll loop but not yet run end-to-end (video costs); first real
    run happens from a connected Claude client.

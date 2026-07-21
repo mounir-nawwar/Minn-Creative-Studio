@@ -113,7 +113,7 @@ today's spend, and the limits in force.
 | "Daily spend limit reached" | $20 of Vertex credit used today (app + MCP) | Wait, or raise `MCP_DAILY_SPEND_LIMIT_USD` |
 | "This run is estimated at $X, above the ceiling" | Expensive pipeline | Have Claude re-run with `confirmCost: true`, or trim the plan |
 | Tools missing after an update | Client cached the old tool list | Restart the Claude client |
-| Imagen 4 → `NOT_FOUND` | Imagen not enabled on the GCP project | Use a Gemini image model (`gemini-3.1-flash-image-preview`) |
+| Imagen 4 → `NOT_FOUND` | Imagen not enabled on the GCP project | Use a Gemini image model (`gemini-3.1-flash-image`) |
 | Workflow run says "Interrupted by a server restart" | pm2 restarted mid-run (runner state is in-process) | Re-run it |
 
 ---

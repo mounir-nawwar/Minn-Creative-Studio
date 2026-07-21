@@ -31,7 +31,7 @@ const BLOCK_NONE_SAFETY = [
 
 const VIDEO_POLL_INTERVAL_MS = 5000;
 const VIDEO_MAX_POLLS = 120; // ~10 minutes, same ceiling as the app
-const DEFAULT_IMAGE_MODEL = 'gemini-3.1-flash-image-preview';
+const DEFAULT_IMAGE_MODEL = 'gemini-3.1-flash-image';
 const DEFAULT_VIDEO_MODEL = 'veo-3.1-fast-generate-001';
 const DEFAULT_TEXT_MODEL = 'gemini-3-flash-preview';
 const DEFAULT_AUDIO_MODEL = 'lyria-3-clip-preview';

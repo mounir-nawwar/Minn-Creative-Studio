@@ -48,9 +48,9 @@ Image generation. **In:** Prompt (prompt), Reference Image (image, opt), Seed (s
 | `imagen-4.0-ultra-generate-001` | Imagen 4 Ultra | $0.06/img | imagen4 | 5 aspect ratios, sampleCount, seed, personGeneration, enhancePrompt, addWatermark, safetySetting |
 | `imagen-4.0-generate-001` | Imagen 4 | $0.04/img | imagen4 | same as Ultra |
 | `imagen-4.0-fast-generate-001` | Imagen 4 Fast | $0.02/img | imagen4 | same as Ultra |
-| `gemini-3.1-flash-image-preview` | Nano Banana 2 | free* | nanoBanana2 | 12 aspect ratios, resolution 512–4K, referenceImages, style, grounding, temp/topP/topK |
+| `gemini-3.1-flash-image` | Nano Banana 2 | free* | nanoBanana2 | 12 aspect ratios, resolution 512–4K, referenceImages, style, grounding, temp/topP/topK |
 | `gemini-2.5-flash-image` | Nano Banana 1 | free* | nanoBanana | 10 aspect ratios, resolution 512–2K, referenceImages, style |
-| `gemini-3-pro-image-preview` | Nano Banana Pro | free* | nanoBananaPro | resolution 512–4K, thinkingLevel, grounding, referenceImages, style |
+| `gemini-3-pro-image` | Nano Banana Pro | free* | nanoBananaPro | resolution 512–4K, thinkingLevel, grounding, referenceImages, style |
 
 *"free" = no flat per-image `price` in the UI model list; these Gemini image models are **token-billed** per `pricing.ts` (input/output + `imageOutput` rate). `ImagenAdvancedPanel.tsx` renders the collapsible advanced controls. References support roles (style/composition/character/subject/background) via `ReferenceStrip`.
 

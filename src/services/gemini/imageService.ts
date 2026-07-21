@@ -226,7 +226,7 @@ export const upscaleImage = async (params: {
   projectId?: string;
   model?: string;
 }, signal?: AbortSignal) => {
-  const { imageUrl, scale, preserveStyle, projectId, model = 'gemini-3.1-flash-image-preview' } = params;
+  const { imageUrl, scale, preserveStyle, projectId, model = 'gemini-3.1-flash-image' } = params;
 
   const { data, mimeType } = await urlToBase64(imageUrl);
 
@@ -295,7 +295,7 @@ export const relightImage = async (params: {
 
   try {
     const response = await callBackend('generateContent', {
-      model: 'gemini-3.1-flash-image-preview',
+      model: 'gemini-3.1-flash-image',
       contents: {
         parts: [
           { text: `Relight this image with light from ${lightDirection}. Light color: ${lightColor}. Intensity: ${intensity}. Style: ${style}.` },
@@ -333,7 +333,7 @@ export const inpaintImage = async (params: {
 
   try {
     const response = await callBackend('generateContent', {
-      model: 'gemini-3.1-flash-image-preview',
+      model: 'gemini-3.1-flash-image',
       contents: {
         parts: [
           { text: `Inpaint this image based on the provided mask and prompt: "${prompt}". Mode: ${mode === 'mask' ? 'Fill the masked area' : 'Fill the unmasked area'}.` },
@@ -372,7 +372,7 @@ export const transferStyle = async (params: {
 
   try {
     const response = await callBackend('generateContent', {
-      model: 'gemini-3.1-flash-image-preview',
+      model: 'gemini-3.1-flash-image',
       contents: {
         parts: [
           { text: `Transfer the style from the style image to the content image. Strength: ${strength}. Preserve structure: ${preserveStructure}.` },

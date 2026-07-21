@@ -105,7 +105,7 @@ export const IMAGE_MODELS: ImageModel[] = [
     }
   },
   {
-    id: 'gemini-3.1-flash-image-preview',
+    id: 'gemini-3.1-flash-image',
     label: 'Nano Banana 2',
     price: null,
     family: 'nanoBanana2',
@@ -157,7 +157,7 @@ export const IMAGE_MODELS: ImageModel[] = [
     }
   },
   {
-    id: 'gemini-3-pro-image-preview',
+    id: 'gemini-3-pro-image',
     label: 'Nano Banana Pro',
     price: null,
     family: 'nanoBananaPro',

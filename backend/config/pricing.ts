@@ -8,9 +8,9 @@ export const MODEL_PRICING: Record<string, any> = {
 
   // Gemini image-generating models — token-billed
   // imageOutput is the per-1M-token rate for image output tokens (separate from text output)
-  'gemini-3.1-flash-image-preview': { input: 0.50,  output: 3.00,  imageOutput: 60.00  },
+  'gemini-3.1-flash-image': { input: 0.50,  output: 3.00,  imageOutput: 60.00  },
   'gemini-2.5-flash-image':         { input: 0.50,  output: 3.00,  imageOutput: 60.00  },
-  'gemini-3-pro-image-preview':     { input: 2.00,  output: 12.00, imageOutput: 120.00 },
+  'gemini-3-pro-image':     { input: 2.00,  output: 12.00, imageOutput: 120.00 },
 
   // Veo (per second of video generated)
   'veo-3.1-fast-generate-001': { '720p': 0.10, '1080p': 0.12, '4K': 0.30, withAudio: 0.10 },
