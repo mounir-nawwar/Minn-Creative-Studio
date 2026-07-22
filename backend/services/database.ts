@@ -563,16 +563,31 @@ export const assets = {
     return asset;
   },
 
-  findByProjectId: (projectId: string, type?: string) => {
+  findByProjectId: (projectId: string, type?: string, search?: string, limit?: number, offset?: number) => {
     let query = 'SELECT * FROM assets WHERE project_id = ?';
     const params: any[] = [projectId];
     
-    if (type) {
+    if (type && type !== 'all') {
       query += ' AND type = ?';
       params.push(type);
     }
+
+    if (search) {
+      query += " AND (filename LIKE ? OR json_extract(metadata, '$.prompt') LIKE ?)";
+      const like = `%${search}%`;
+      params.push(like, like);
+    }
     
     query += ' ORDER BY created_at DESC';
+
+    if (limit !== undefined) {
+      query += ' LIMIT ?';
+      params.push(Math.min(Math.max(limit, 1), 500));
+      if (offset !== undefined) {
+        query += ' OFFSET ?';
+        params.push(Math.max(offset, 0));
+      }
+    }
     
     const stmt = db.prepare(query);
     const assetList = stmt.all(...params) as any[];

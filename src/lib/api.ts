@@ -347,9 +347,16 @@ export interface LibraryFilters {
 
 // Assets API
 export const assetsApi = {
-  list: (projectId: string, type?: string): Promise<Asset[]> => {
-    const query = type ? `?projectId=${projectId}&type=${type}` : `?projectId=${projectId}`;
-    return apiRequest(`/assets${query}`);
+  list: (
+    projectId: string,
+    options?: { type?: string; q?: string; limit?: number; offset?: number }
+  ): Promise<Asset[]> => {
+    const params = new URLSearchParams({ projectId });
+    if (options?.type && options.type !== 'all') params.set('type', options.type);
+    if (options?.q) params.set('q', options.q);
+    if (options?.limit !== undefined) params.set('limit', String(options.limit));
+    if (options?.offset !== undefined) params.set('offset', String(options.offset));
+    return apiRequest(`/assets?${params.toString()}`);
   },
 
   /** Resolve an asset's real record from its /storage URL — null if nothing matches (e.g. an unsaved output) */

@@ -32,12 +32,12 @@ router.use(authMiddleware);
 
 /**
  * GET /api/assets
- * Get all assets for a project
- * Query params: projectId, type
+ * Get assets for a project
+ * Query params: projectId, type, q, limit, offset
  */
 router.get('/', async (req: any, res: any) => {
   try {
-    const { projectId, type } = req.query;
+    const { projectId, type, q, limit, offset } = req.query;
 
     if (!projectId) {
       return res.status(400).json({ error: 'Project ID is required' });
@@ -49,7 +49,13 @@ router.get('/', async (req: any, res: any) => {
       return res.status(404).json({ error: 'Project not found' });
     }
     
-    const assetList = assets.findByProjectId(projectId as string, type as string);
+    const assetList = assets.findByProjectId(
+      projectId as string,
+      type as string | undefined,
+      q as string | undefined,
+      limit ? Number(limit) : undefined,
+      offset ? Number(offset) : undefined
+    );
     res.json(assetList);
   } catch (error: any) {
     console.error('Error fetching assets:', error);

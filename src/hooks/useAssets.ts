@@ -2,11 +2,10 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { assetsApi, Asset as ApiAsset } from '../lib/api';
 import { Asset, AssetType } from '../types/project.types';
 import { useProjectStore } from '../store/useProjectStore';
-import { API_BASE } from '../constants';
-import { getAccessToken } from '../lib/api';
 
 // Polling interval in milliseconds
 const POLL_INTERVAL = 5000; // 5 seconds
+const PAGE_SIZE = 10;
 
 // Convert API asset to local Asset type
 function toAsset(apiAsset: ApiAsset): Asset {
@@ -32,35 +31,152 @@ function toAsset(apiAsset: ApiAsset): Asset {
   } as Asset;
 }
 
-export function useAssets() {
+export interface UseAssetsOptions {
+  type?: string;
+  search?: string;
+  pageSize?: number;
+}
+
+export function useAssets(options?: UseAssetsOptions) {
   const { currentProject } = useProjectStore();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Fetch assets
+  const pageSize = options?.pageSize || PAGE_SIZE;
+  const typeFilter = options?.type;
+  const searchFilter = options?.search;
+
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const nextBatchRef = useRef<Asset[] | null>(null);
+  const isLastBatchRef = useRef(false);
+  const isPrefetchingRef = useRef(false);
+  const loadMoreRequestedRef = useRef(false);
+  const currentOffsetRef = useRef(0);
+  const optionsRef = useRef({ typeFilter, searchFilter, projectId: currentProject?.id });
+
+  useEffect(() => {
+    optionsRef.current = { typeFilter, searchFilter, projectId: currentProject?.id };
+  }, [typeFilter, searchFilter, currentProject?.id]);
+
+  const prefetchNextBatchRef = useRef<(offset: number) => void>(() => {});
+
+  const appendBatch = useCallback((batch: Asset[]) => {
+    setAssets((prev) => [...prev, ...batch]);
+    currentOffsetRef.current += batch.length;
+
+    if (isLastBatchRef.current || batch.length < pageSize) {
+      setHasMore(false);
+    } else {
+      setHasMore(true);
+      prefetchNextBatchRef.current(currentOffsetRef.current);
+    }
+  }, [pageSize]);
+
+  const prefetchNextBatch = useCallback(async (offset: number) => {
+    const { projectId, typeFilter: type, searchFilter: q } = optionsRef.current;
+    if (!projectId || isPrefetchingRef.current) return;
+
+    isPrefetchingRef.current = true;
+    try {
+      const apiAssets = await assetsApi.list(projectId, {
+        type,
+        q,
+        limit: pageSize,
+        offset,
+      });
+      const batch = apiAssets.map(toAsset);
+      isPrefetchingRef.current = false;
+      nextBatchRef.current = batch;
+
+      if (batch.length < pageSize) {
+        isLastBatchRef.current = true;
+      }
+
+      if (loadMoreRequestedRef.current) {
+        loadMoreRequestedRef.current = false;
+        setLoadingMore(false);
+        appendBatch(batch);
+      }
+    } catch (err) {
+      console.error('Failed to prefetch assets:', err);
+      isPrefetchingRef.current = false;
+      setLoadingMore(false);
+    }
+  }, [pageSize, appendBatch]);
+
+  useEffect(() => {
+    prefetchNextBatchRef.current = prefetchNextBatch;
+  }, [prefetchNextBatch]);
+
+  // Initial fetch
   const fetchAssets = useCallback(async () => {
     if (!currentProject) {
       setAssets([]);
       setLoading(false);
+      setHasMore(false);
       return;
     }
 
+    setLoading(true);
+    setLoadingMore(false);
+    setHasMore(false);
+    nextBatchRef.current = null;
+    isLastBatchRef.current = false;
+    isPrefetchingRef.current = false;
+    loadMoreRequestedRef.current = false;
+    currentOffsetRef.current = 0;
+
     try {
-      const apiAssets = await assetsApi.list(currentProject.id);
-      setAssets(apiAssets.map(toAsset));
+      const apiAssets = await assetsApi.list(currentProject.id, {
+        type: typeFilter,
+        q: searchFilter,
+        limit: pageSize,
+        offset: 0,
+      });
+      const batch1 = apiAssets.map(toAsset);
+      setAssets(batch1);
       setLoading(false);
+      currentOffsetRef.current = batch1.length;
+
+      if (batch1.length < pageSize) {
+        setHasMore(false);
+      } else {
+        setHasMore(true);
+        prefetchNextBatch(pageSize);
+      }
     } catch (error) {
       console.error('Failed to fetch assets:', error);
       setLoading(false);
     }
-  }, [currentProject?.id]);
+  }, [currentProject?.id, typeFilter, searchFilter, pageSize, prefetchNextBatch]);
 
-  // Initial fetch and polling
   useEffect(() => {
     fetchAssets();
-    pollingRef.current = setInterval(fetchAssets, POLL_INTERVAL);
+  }, [fetchAssets]);
+
+  // Polling to keep visible assets fresh
+  useEffect(() => {
+    if (!currentProject) return;
+
+    pollingRef.current = setInterval(async () => {
+      if (!currentProject?.id || loadingMore || isPrefetchingRef.current) return;
+      try {
+        const countToFetch = Math.max(currentOffsetRef.current, pageSize);
+        const apiAssets = await assetsApi.list(currentProject.id, {
+          type: typeFilter,
+          q: searchFilter,
+          limit: countToFetch,
+          offset: 0,
+        });
+        const fresh = apiAssets.map(toAsset);
+        setAssets(fresh);
+      } catch (err) {
+        // quiet on poll
+      }
+    }, POLL_INTERVAL);
 
     return () => {
       if (pollingRef.current) {
@@ -68,7 +184,20 @@ export function useAssets() {
         pollingRef.current = null;
       }
     };
-  }, [fetchAssets]);
+  }, [currentProject?.id, typeFilter, searchFilter, pageSize, loadingMore]);
+
+  const loadMore = useCallback(() => {
+    if (!hasMore || loading || loadingMore) return;
+
+    if (nextBatchRef.current !== null) {
+      const batch = nextBatchRef.current;
+      nextBatchRef.current = null;
+      appendBatch(batch);
+    } else {
+      setLoadingMore(true);
+      loadMoreRequestedRef.current = true;
+    }
+  }, [hasMore, loading, loadingMore, appendBatch]);
 
   /**
    * Primary Upload Method - Uses Backend API for maximum reliability (bypasses CORS)
@@ -160,8 +289,6 @@ export function useAssets() {
   const addAsset = async (assetData: Partial<Asset>): Promise<Asset> => {
     if (!currentProject) throw new Error('No project selected');
 
-    // Note: The API handles asset creation via upload methods
-    // This is a placeholder for creating asset records without file upload
     const asset: Asset = {
       id: `temp-${Date.now()}`,
       name: assetData.name || 'Untitled',
@@ -176,7 +303,6 @@ export function useAssets() {
       metadata: assetData.metadata || {},
     } as Asset;
 
-    // Refresh to get the actual asset if it was created server-side
     await fetchAssets();
 
     return asset;
@@ -185,13 +311,10 @@ export function useAssets() {
   const updateAsset = async (assetId: string, updates: Partial<Asset>) => {
     if (!currentProject) return;
     
-    // Note: The API would need an update endpoint for this
-    // For now, we'll update locally and refresh
     setAssets(prev => prev.map(a => 
       a.id === assetId ? { ...a, ...updates } : a
     ));
     
-    // Refresh to sync with server
     await fetchAssets();
   };
 
@@ -200,7 +323,6 @@ export function useAssets() {
     
     try {
       await assetsApi.delete(assetId);
-      // Refresh assets list
       await fetchAssets();
     } catch (error) {
       console.error('Failed to delete asset:', error);
@@ -215,6 +337,9 @@ export function useAssets() {
   return {
     assets,
     loading,
+    loadingMore,
+    hasMore,
+    loadMore,
     uploadProgress,
     uploadAsset,
     uploadBase64,
