@@ -53,6 +53,11 @@ function LibraryAssetCard({
   const Icon = typeIcon(asset.type);
   const isPlaygroundAsset = asset.project_id === PLAYGROUND_PROJECT_ID;
   const shouldLoad = index <= visibleMediaIndex;
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    setLoaded(false);
+  }, [asset.url]);
 
   useEffect(() => {
     if (shouldLoad && asset.type !== 'image' && asset.type !== 'video') {
@@ -82,32 +87,55 @@ function LibraryAssetCard({
       className="group relative aspect-square cursor-pointer overflow-hidden rounded-xl bg-[#111111] ring-1 ring-white/10 transition-[transform,box-shadow] duration-150 hover:ring-[#0097A7]/40 active:scale-[0.98]"
     >
       {asset.type === 'video' ? (
-        <div className="relative h-full w-full">
+        <div className="relative h-full w-full bg-[#111111]">
           <video
             src={asset.url + '#t=0.1'}
-            className="h-full w-full object-cover opacity-70 transition-opacity duration-150 group-hover:opacity-100"
+            className={`h-full w-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-70 group-hover:opacity-100' : 'opacity-0'}`}
             preload="metadata"
-            onLoadedData={() => onMediaLoaded(index)}
-            onError={() => onMediaLoaded(index)}
+            onLoadedData={() => {
+              setLoaded(true);
+              onMediaLoaded(index);
+            }}
+            onError={() => {
+              setLoaded(true);
+              onMediaLoaded(index);
+            }}
           />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 ring-1 ring-white/20 backdrop-blur-md transition-colors duration-150 group-hover:bg-[#0097A7]/50">
-              <Play className="h-3 w-3 fill-white text-white" />
+          {loaded && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 ring-1 ring-white/20 backdrop-blur-md transition-colors duration-150 group-hover:bg-[#0097A7]/50">
+                <Play className="h-3 w-3 fill-white text-white" />
+              </div>
             </div>
-          </div>
+          )}
         </div>
       ) : asset.type === 'image' ? (
-        <img
-          src={asset.url}
-          alt={asset.filename}
-          className="h-full w-full object-cover opacity-80 transition-opacity duration-150 group-hover:opacity-100"
-          loading="lazy"
-          onLoad={() => onMediaLoaded(index)}
-          onError={() => onMediaLoaded(index)}
-        />
+        <div className="relative h-full w-full bg-[#111111]">
+          <img
+            src={asset.url}
+            alt={asset.filename}
+            className={`h-full w-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-80 group-hover:opacity-100' : 'opacity-0'}`}
+            loading="lazy"
+            onLoad={() => {
+              setLoaded(true);
+              onMediaLoaded(index);
+            }}
+            onError={() => {
+              setLoaded(true);
+              onMediaLoaded(index);
+            }}
+          />
+        </div>
       ) : (
         <div className="flex h-full w-full items-center justify-center">
           <Icon className="h-8 w-8 text-gray-700 transition-colors group-hover:text-[#0097A7]" />
+        </div>
+      )}
+
+      {/* Skeleton overlay shown until 100% loaded */}
+      {!loaded && (asset.type === 'image' || asset.type === 'video') && (
+        <div className="absolute inset-0 flex h-full w-full animate-pulse items-center justify-center bg-[#151515]">
+          <Icon className="h-6 w-6 text-gray-800" />
         </div>
       )}
 
@@ -120,15 +148,18 @@ function LibraryAssetCard({
         </span>
       </div>
 
-      <div className="absolute inset-0 flex flex-col justify-between bg-gradient-to-t from-black/80 via-transparent to-transparent p-2.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-        <div className="flex justify-end gap-1.5">
-          {renderCardActions?.(asset, refresh)}
+      {/* Grid overlay shown on hover */}
+      {(!loaded || asset.type !== 'image' && asset.type !== 'video' ? true : loaded) && (
+        <div className="absolute inset-0 flex flex-col justify-between bg-gradient-to-t from-black/80 via-transparent to-transparent p-2.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+          <div className="flex justify-end gap-1.5">
+            {renderCardActions?.(asset, refresh)}
+          </div>
+          <div className="space-y-0.5">
+            <p className="truncate text-[12px] font-medium text-white">{asset.filename}</p>
+            <span className="text-[11px] capitalize text-gray-400">{asset.type}</span>
+          </div>
         </div>
-        <div className="space-y-0.5">
-          <p className="truncate text-[12px] font-medium text-white">{asset.filename}</p>
-          <span className="text-[11px] capitalize text-gray-400">{asset.type}</span>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -177,9 +208,10 @@ export default function LibraryGrid({ isPicker = false, onSelect, initialFilters
       .catch((err) => console.error('Failed to load projects for library filter:', err));
   }, []);
 
+  // Reset index to 0 ONLY on actual search/filter/refresh actions
   useEffect(() => {
     setVisibleMediaIndex(0);
-  }, [assets]);
+  }, [typeFilter, projectFilter, search, refreshTick]);
 
   const handleMediaLoaded = useCallback((index: number) => {
     setVisibleMediaIndex((prev) => {
@@ -190,7 +222,7 @@ export default function LibraryGrid({ isPicker = false, onSelect, initialFilters
     });
   }, []);
 
-  // Safety self-healing timeout to guarantee sequential loading never blocks
+  // Safety self-healing timeout to guarantee sequential loading never blocks (3.5s)
   useEffect(() => {
     if (visibleMediaIndex >= assets.length) return;
     const timer = setTimeout(() => {
@@ -200,7 +232,7 @@ export default function LibraryGrid({ isPicker = false, onSelect, initialFilters
         }
         return prev;
       });
-    }, 1500);
+    }, 3500);
     return () => clearTimeout(timer);
   }, [visibleMediaIndex, assets.length]);
 

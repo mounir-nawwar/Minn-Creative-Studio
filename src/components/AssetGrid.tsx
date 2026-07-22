@@ -9,6 +9,7 @@ import { Asset, AssetType } from '../types/project.types';
 import { useStore } from '../store/useStore';
 import DeleteAssetModal from './DeleteAssetModal';
 import { RETENTION_DAYS } from '../constants';
+import { useProjectStore } from '../store/useProjectStore';
 
 interface AssetGridProps {
   onAssetClick?: (asset: Asset) => void;
@@ -53,6 +54,11 @@ function ProjectAssetCard({
 }: ProjectAssetCardProps) {
   const Icon = getIcon(asset.type);
   const shouldLoad = index <= visibleMediaIndex;
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    setLoaded(false);
+  }, [asset.url]);
 
   useEffect(() => {
     if (shouldLoad && asset.type !== 'image' && asset.type !== 'video') {
@@ -76,68 +82,94 @@ function ProjectAssetCard({
       className="group relative aspect-square cursor-pointer overflow-hidden rounded-xl bg-[#111111] ring-1 ring-white/10 transition-[transform,box-shadow] duration-150 hover:ring-[#0097A7]/40 active:scale-[0.98]"
     >
       {asset.type === 'video' ? (
-        <div className="relative h-full w-full">
+        <div className="relative h-full w-full bg-[#111111]">
           <video
             src={asset.url + '#t=0.1'}
-            className="h-full w-full object-cover opacity-70 transition-opacity duration-150 group-hover:opacity-100"
+            className={`h-full w-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-70 group-hover:opacity-100' : 'opacity-0'}`}
             preload="metadata"
-            onLoadedData={() => onMediaLoaded(index)}
-            onError={() => onMediaLoaded(index)}
+            onLoadedData={() => {
+              setLoaded(true);
+              onMediaLoaded(index);
+            }}
+            onError={() => {
+              setLoaded(true);
+              onMediaLoaded(index);
+            }}
           />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 ring-1 ring-white/20 backdrop-blur-md transition-colors duration-150 group-hover:bg-[#0097A7]/50">
-              <Play className="h-3 w-3 fill-white text-white" />
+          {loaded && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 ring-1 ring-white/20 backdrop-blur-md transition-colors duration-150 group-hover:bg-[#0097A7]/50">
+                <Play className="h-3 w-3 fill-white text-white" />
+              </div>
             </div>
-          </div>
+          )}
         </div>
       ) : asset.type === 'image' ? (
-        <img
-          src={asset.thumbnailUrl || asset.url}
-          alt={asset.name}
-          className="h-full w-full object-cover opacity-80 transition-opacity duration-150 group-hover:opacity-100"
-          onLoad={() => onMediaLoaded(index)}
-          onError={() => onMediaLoaded(index)}
-        />
+        <div className="relative h-full w-full bg-[#111111]">
+          <img
+            src={asset.thumbnailUrl || asset.url}
+            alt={asset.name}
+            className={`h-full w-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-80 group-hover:opacity-100' : 'opacity-0'}`}
+            onLoad={() => {
+              setLoaded(true);
+              onMediaLoaded(index);
+            }}
+            onError={() => {
+              setLoaded(true);
+              onMediaLoaded(index);
+            }}
+          />
+        </div>
       ) : (
         <div className="flex h-full w-full items-center justify-center">
           <Icon className="h-8 w-8 text-gray-700 transition-colors group-hover:text-[#0097A7]" />
         </div>
       )}
 
+      {/* Skeleton overlay shown until 100% loaded */}
+      {!loaded && (asset.type === 'image' || asset.type === 'video') && (
+        <div className="absolute inset-0 flex h-full w-full animate-pulse items-center justify-center bg-[#151515]">
+          <Icon className="h-6 w-6 text-gray-800" />
+        </div>
+      )}
+
       <span className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/[0.06]" />
 
-      <div className="absolute inset-0 flex flex-col justify-between bg-gradient-to-t from-black/80 via-transparent to-transparent p-2.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-        <div className="flex justify-end gap-1.5">
-          <button
-            onClick={(e) => { e.stopPropagation(); toggleFavorite(asset.id, asset.isFavorited); }}
-            className={`inline-flex h-7 w-7 items-center justify-center rounded-lg ring-1 ring-white/10 backdrop-blur-md transition-[transform,color,background-color] duration-150 active:scale-[0.96] ${asset.isFavorited ? 'bg-red-500 text-white' : 'bg-black/40 text-gray-300 hover:text-white'}`}
-          >
-            <Heart className={`h-3.5 w-3.5 ${asset.isFavorited ? 'fill-current' : ''}`} />
-          </button>
-          {!isPicker && (
+      {/* Grid overlay shown on hover */}
+      {(!loaded || asset.type !== 'image' && asset.type !== 'video' ? true : loaded) && (
+        <div className="absolute inset-0 flex flex-col justify-between bg-gradient-to-t from-black/80 via-transparent to-transparent p-2.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+          <div className="flex justify-end gap-1.5">
             <button
-              onClick={(e) => { e.stopPropagation(); handleAddToCanvas(asset); }}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-black/40 text-gray-300 ring-1 ring-white/10 backdrop-blur-md transition-[transform,color] duration-150 hover:text-white active:scale-[0.96]"
-              title="Add to canvas"
+              onClick={(e) => { e.stopPropagation(); toggleFavorite(asset.id, asset.isFavorited); }}
+              className={`inline-flex h-7 w-7 items-center justify-center rounded-lg ring-1 ring-white/10 backdrop-blur-md transition-[transform,color,background-color] duration-150 active:scale-[0.96] ${asset.isFavorited ? 'bg-red-500 text-white' : 'bg-black/40 text-gray-300 hover:text-white'}`}
             >
-              <Plus className="h-3.5 w-3.5" />
+              <Heart className={`h-3.5 w-3.5 ${asset.isFavorited ? 'fill-current' : ''}`} />
             </button>
-          )}
-        </div>
+            {!isPicker && (
+              <button
+                onClick={(e) => { e.stopPropagation(); handleAddToCanvas(asset); }}
+                className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-black/40 text-gray-300 ring-1 ring-white/10 backdrop-blur-md transition-[transform,color] duration-150 hover:text-white active:scale-[0.96]"
+                title="Add to canvas"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
 
-        <div className="space-y-1">
-          <p className="truncate text-[12px] font-medium text-white">{asset.name}</p>
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] capitalize text-gray-400">{asset.type}</span>
-            <button
-              onClick={(e) => { e.stopPropagation(); setAssetToDelete(asset); }}
-              className="p-0.5 text-gray-400 transition-colors hover:text-red-400"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
+          <div className="space-y-1">
+            <p className="truncate text-[12px] font-medium text-white">{asset.name}</p>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] capitalize text-gray-400">{asset.type}</span>
+              <button
+                onClick={(e) => { e.stopPropagation(); setAssetToDelete(asset); }}
+                className="p-0.5 text-gray-400 transition-colors hover:text-red-400"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -168,10 +200,12 @@ export default function AssetGrid({ onAssetClick, isPicker = false }: AssetGridP
   });
 
   const [visibleMediaIndex, setVisibleMediaIndex] = useState(0);
+  const currentProjectId = useProjectStore((s) => s.currentProject?.id);
 
+  // Reset loading progress ONLY on search, filter, or project scope changes
   useEffect(() => {
     setVisibleMediaIndex(0);
-  }, [assets]);
+  }, [filter, debouncedSearch, currentProjectId]);
 
   const handleMediaLoaded = useCallback((index: number) => {
     setVisibleMediaIndex((prev) => {
@@ -182,7 +216,7 @@ export default function AssetGrid({ onAssetClick, isPicker = false }: AssetGridP
     });
   }, []);
 
-  // Safety self-healing timeout to guarantee sequential loading never blocks
+  // Safety self-healing timeout to guarantee sequential loading never blocks (3.5s)
   useEffect(() => {
     if (visibleMediaIndex >= assets.length) return;
     const timer = setTimeout(() => {
@@ -192,7 +226,7 @@ export default function AssetGrid({ onAssetClick, isPicker = false }: AssetGridP
         }
         return prev;
       });
-    }, 1500);
+    }, 3500);
     return () => clearTimeout(timer);
   }, [visibleMediaIndex, assets.length]);
 
@@ -246,7 +280,7 @@ export default function AssetGrid({ onAssetClick, isPicker = false }: AssetGridP
             <input type="file" ref={fileInputRef} onChange={(e) => handleFiles(e.target.files)} className="hidden" multiple accept="image/*,video/*,audio/*" />
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#0097A7] text-[13px] font-medium text-white transition-[transform,background-color] duration-150 hover:bg-[#00a9bb] active:scale-[0.98]"
+              className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#0097A7] text-[13px] font-medium text-white transition-[transform,background-color] duration-150 hover:bg-[#00a9bb] active:scale-[0.96]"
             >
               <Upload className="h-4 w-4" />
               Upload asset
