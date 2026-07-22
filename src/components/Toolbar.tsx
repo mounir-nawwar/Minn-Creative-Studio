@@ -347,7 +347,11 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
         <ProfileMenu user={user} onLogout={onLogout} variant="avatar" />
       </div>
 
-      <LibraryDialog open={isLibraryOpen} onOpenChange={setIsLibraryOpen} />
+      <LibraryDialog
+        open={isLibraryOpen}
+        onOpenChange={setIsLibraryOpen}
+        initialFilters={currentProject ? { projectId: currentProject.id } : undefined}
+      />
 
       {/* Save workflow modal */}
       <Dialog.Root open={showSaveModal} onOpenChange={setShowSaveModal}>

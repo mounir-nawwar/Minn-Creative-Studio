@@ -31,6 +31,108 @@ function typeIcon(type: string) {
   }
 }
 
+interface LibraryAssetCardProps {
+  asset: LibraryAsset;
+  index: number;
+  visibleMediaIndex: number;
+  handleClick: (asset: LibraryAsset) => void;
+  renderCardActions?: (asset: LibraryAsset, refresh: () => void) => React.ReactNode;
+  refresh: () => void;
+  onMediaLoaded: (index: number) => void;
+}
+
+function LibraryAssetCard({
+  asset,
+  index,
+  visibleMediaIndex,
+  handleClick,
+  renderCardActions,
+  refresh,
+  onMediaLoaded,
+}: LibraryAssetCardProps) {
+  const Icon = typeIcon(asset.type);
+  const isPlaygroundAsset = asset.project_id === PLAYGROUND_PROJECT_ID;
+  const shouldLoad = index <= visibleMediaIndex;
+
+  useEffect(() => {
+    if (shouldLoad && asset.type !== 'image' && asset.type !== 'video') {
+      onMediaLoaded(index);
+    }
+  }, [shouldLoad, asset.type, index, onMediaLoaded]);
+
+  if (!shouldLoad) {
+    return (
+      <div className="group relative aspect-square overflow-hidden rounded-xl bg-[#111111] ring-1 ring-white/10">
+        <div className="flex h-full w-full animate-pulse items-center justify-center bg-[#151515]">
+          <Icon className="h-6 w-6 text-gray-800" />
+        </div>
+        <div className="absolute left-2 top-2 flex items-center gap-1 rounded-md bg-black/60 px-1.5 py-0.5 backdrop-blur-sm">
+          {isPlaygroundAsset && <FlaskConical className="h-2.5 w-2.5 text-[#0097A7]" />}
+          <span className={`max-w-[110px] truncate text-[10px] font-medium ${isPlaygroundAsset ? 'text-[#0097A7]' : 'text-gray-300'}`}>
+            {isPlaygroundAsset ? 'Playground' : asset.project_name || 'Unknown project'}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      onClick={() => handleClick(asset)}
+      className="group relative aspect-square cursor-pointer overflow-hidden rounded-xl bg-[#111111] ring-1 ring-white/10 transition-[transform,box-shadow] duration-150 hover:ring-[#0097A7]/40 active:scale-[0.98]"
+    >
+      {asset.type === 'video' ? (
+        <div className="relative h-full w-full">
+          <video
+            src={asset.url + '#t=0.1'}
+            className="h-full w-full object-cover opacity-70 transition-opacity duration-150 group-hover:opacity-100"
+            preload="metadata"
+            onLoadedData={() => onMediaLoaded(index)}
+            onError={() => onMediaLoaded(index)}
+          />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 ring-1 ring-white/20 backdrop-blur-md transition-colors duration-150 group-hover:bg-[#0097A7]/50">
+              <Play className="h-3 w-3 fill-white text-white" />
+            </div>
+          </div>
+        </div>
+      ) : asset.type === 'image' ? (
+        <img
+          src={asset.url}
+          alt={asset.filename}
+          className="h-full w-full object-cover opacity-80 transition-opacity duration-150 group-hover:opacity-100"
+          loading="lazy"
+          onLoad={() => onMediaLoaded(index)}
+          onError={() => onMediaLoaded(index)}
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center">
+          <Icon className="h-8 w-8 text-gray-700 transition-colors group-hover:text-[#0097A7]" />
+        </div>
+      )}
+
+      <span className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/[0.06]" />
+
+      <div className="absolute left-2 top-2 flex items-center gap-1 rounded-md bg-black/60 px-1.5 py-0.5 backdrop-blur-sm">
+        {isPlaygroundAsset && <FlaskConical className="h-2.5 w-2.5 text-[#0097A7]" />}
+        <span className={`max-w-[110px] truncate text-[10px] font-medium ${isPlaygroundAsset ? 'text-[#0097A7]' : 'text-gray-300'}`}>
+          {isPlaygroundAsset ? 'Playground' : asset.project_name || 'Unknown project'}
+        </span>
+      </div>
+
+      <div className="absolute inset-0 flex flex-col justify-between bg-gradient-to-t from-black/80 via-transparent to-transparent p-2.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+        <div className="flex justify-end gap-1.5">
+          {renderCardActions?.(asset, refresh)}
+        </div>
+        <div className="space-y-0.5">
+          <p className="truncate text-[12px] font-medium text-white">{asset.filename}</p>
+          <span className="text-[11px] capitalize text-gray-400">{asset.type}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Global asset library: everything generated/uploaded across all projects
  * (playground included), filterable by type/project with server-side search.
@@ -48,6 +150,8 @@ export default function LibraryGrid({ isPicker = false, onSelect, initialFilters
   const [search, setSearch] = useState('');
   const [projectOptions, setProjectOptions] = useState<{ id: string; name: string }[]>([]);
   const [refreshTick, setRefreshTick] = useState(0);
+
+  const [visibleMediaIndex, setVisibleMediaIndex] = useState(0);
 
   const nextBatchRef = useRef<LibraryAsset[] | null>(null);
   const isLastBatchRef = useRef(false);
@@ -72,6 +176,33 @@ export default function LibraryGrid({ isPicker = false, onSelect, initialFilters
       .then((list) => setProjectOptions(list.map((p) => ({ id: p.id, name: p.name }))))
       .catch((err) => console.error('Failed to load projects for library filter:', err));
   }, []);
+
+  useEffect(() => {
+    setVisibleMediaIndex(0);
+  }, [assets]);
+
+  const handleMediaLoaded = useCallback((index: number) => {
+    setVisibleMediaIndex((prev) => {
+      if (index === prev) {
+        return prev + 1;
+      }
+      return prev;
+    });
+  }, []);
+
+  // Safety self-healing timeout to guarantee sequential loading never blocks
+  useEffect(() => {
+    if (visibleMediaIndex >= assets.length) return;
+    const timer = setTimeout(() => {
+      setVisibleMediaIndex((prev) => {
+        if (prev < assets.length) {
+          return prev + 1;
+        }
+        return prev;
+      });
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [visibleMediaIndex, assets.length]);
 
   const prefetchNextBatchRef = useRef<(offset: number) => void>(() => {});
 
@@ -247,54 +378,18 @@ export default function LibraryGrid({ isPicker = false, onSelect, initialFilters
         ) : (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-              {assets.map((asset) => {
-                const Icon = typeIcon(asset.type);
-                const isPlaygroundAsset = asset.project_id === PLAYGROUND_PROJECT_ID;
-                return (
-                  <div
-                    key={asset.id}
-                    onClick={() => handleClick(asset)}
-                    className="group relative aspect-square cursor-pointer overflow-hidden rounded-xl bg-[#111111] ring-1 ring-white/10 transition-[transform,box-shadow] duration-150 hover:ring-[#0097A7]/40 active:scale-[0.98]"
-                  >
-                    {asset.type === 'video' ? (
-                      <div className="relative h-full w-full">
-                        <video src={asset.url + '#t=0.1'} className="h-full w-full object-cover opacity-70 transition-opacity duration-150 group-hover:opacity-100" preload="metadata" />
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 ring-1 ring-white/20 backdrop-blur-md transition-colors duration-150 group-hover:bg-[#0097A7]/50">
-                            <Play className="h-3 w-3 fill-white text-white" />
-                          </div>
-                        </div>
-                      </div>
-                    ) : asset.type === 'image' ? (
-                      <img src={asset.url} alt={asset.filename} className="h-full w-full object-cover opacity-80 transition-opacity duration-150 group-hover:opacity-100" loading="lazy" />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center">
-                        <Icon className="h-8 w-8 text-gray-700 transition-colors group-hover:text-[#0097A7]" />
-                      </div>
-                    )}
-
-                    <span className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/[0.06]" />
-
-                    {/* Project label — always visible so the library reads at a glance */}
-                    <div className="absolute left-2 top-2 flex items-center gap-1 rounded-md bg-black/60 px-1.5 py-0.5 backdrop-blur-sm">
-                      {isPlaygroundAsset && <FlaskConical className="h-2.5 w-2.5 text-[#0097A7]" />}
-                      <span className={`max-w-[110px] truncate text-[10px] font-medium ${isPlaygroundAsset ? 'text-[#0097A7]' : 'text-gray-300'}`}>
-                        {isPlaygroundAsset ? 'Playground' : asset.project_name || 'Unknown project'}
-                      </span>
-                    </div>
-
-                    <div className="absolute inset-0 flex flex-col justify-between bg-gradient-to-t from-black/80 via-transparent to-transparent p-2.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                      <div className="flex justify-end gap-1.5">
-                        {renderCardActions?.(asset, refresh)}
-                      </div>
-                      <div className="space-y-0.5">
-                        <p className="truncate text-[12px] font-medium text-white">{asset.filename}</p>
-                        <span className="text-[11px] capitalize text-gray-400">{asset.type}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+              {assets.map((asset, i) => (
+                <LibraryAssetCard
+                  key={asset.id}
+                  asset={asset}
+                  index={i}
+                  visibleMediaIndex={visibleMediaIndex}
+                  handleClick={handleClick}
+                  renderCardActions={renderCardActions}
+                  refresh={refresh}
+                  onMediaLoaded={handleMediaLoaded}
+                />
+              ))}
             </div>
 
             {hasMore && (

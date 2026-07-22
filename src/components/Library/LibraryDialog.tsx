@@ -5,16 +5,17 @@ import { Library, X, FolderInput, Trash2 } from 'lucide-react';
 import LibraryGrid from './LibraryGrid';
 import type { LibraryAsset } from './LibraryGrid';
 import MoveToProjectDialog from './MoveToProjectDialog';
-import { assetsApi } from '../../lib/api';
+import { assetsApi, LibraryFilters } from '../../lib/api';
 import { toast } from '../../store/useToastStore';
 
 interface LibraryDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialFilters?: LibraryFilters;
 }
 
 /** Full-screen global asset library, opened from the picker header or the toolbar */
-export default function LibraryDialog({ open, onOpenChange }: LibraryDialogProps) {
+export default function LibraryDialog({ open, onOpenChange, initialFilters }: LibraryDialogProps) {
   const [moveTarget, setMoveTarget] = useState<{ asset: LibraryAsset; refresh: () => void } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ asset: LibraryAsset; refresh: () => void } | null>(null);
 
@@ -43,26 +44,29 @@ export default function LibraryDialog({ open, onOpenChange }: LibraryDialogProps
                 </button>
               </Dialog.Close>
             </div>
-            <LibraryGrid
-              renderCardActions={(asset, refresh) => (
-                <>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setMoveTarget({ asset, refresh }); }}
-                    title="Move to project"
-                    className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-black/40 text-gray-300 ring-1 ring-white/10 backdrop-blur-md transition-[transform,color,background-color] duration-150 hover:bg-[#0097A7]/50 hover:text-white active:scale-[0.96]"
-                  >
-                    <FolderInput className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setDeleteTarget({ asset, refresh }); }}
-                    title="Delete permanently"
-                    className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-black/40 text-gray-300 ring-1 ring-white/10 backdrop-blur-md transition-[transform,color,background-color] duration-150 hover:bg-red-500/70 hover:text-white active:scale-[0.96]"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </>
-              )}
-            />
+            {open && (
+              <LibraryGrid
+                initialFilters={initialFilters}
+                renderCardActions={(asset, refresh) => (
+                  <>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setMoveTarget({ asset, refresh }); }}
+                      title="Move to project"
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-black/40 text-gray-300 ring-1 ring-white/10 backdrop-blur-md transition-[transform,color,background-color] duration-150 hover:bg-[#0097A7]/50 hover:text-white active:scale-[0.96]"
+                    >
+                      <FolderInput className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setDeleteTarget({ asset, refresh }); }}
+                      title="Delete permanently"
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-black/40 text-gray-300 ring-1 ring-white/10 backdrop-blur-md transition-[transform,color,background-color] duration-150 hover:bg-red-500/70 hover:text-white active:scale-[0.96]"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </>
+                )}
+              />
+            )}
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAssets } from '../hooks/useAssets';
 import {
   Image as ImageIcon, Video as VideoIcon, Music as AudioIcon, FileText as DocIcon,
@@ -17,6 +17,130 @@ interface AssetGridProps {
 
 const FILTERS: (AssetType | 'all')[] = ['all', 'image', 'video', 'audio', 'reference'];
 const SEARCH_DEBOUNCE_MS = 300;
+
+function getIcon(type: AssetType) {
+  switch (type) {
+    case 'image': return ImageIcon;
+    case 'video': return VideoIcon;
+    case 'audio': return AudioIcon;
+    case 'document': return DocIcon;
+    default: return ExternalLink;
+  }
+}
+
+interface ProjectAssetCardProps {
+  asset: Asset;
+  index: number;
+  visibleMediaIndex: number;
+  isPicker: boolean;
+  onAssetClick?: (asset: Asset) => void;
+  toggleFavorite: (assetId: string, isFavorited: boolean) => Promise<void>;
+  handleAddToCanvas: (asset: Asset) => void;
+  setAssetToDelete: (asset: Asset | null) => void;
+  onMediaLoaded: (index: number) => void;
+}
+
+function ProjectAssetCard({
+  asset,
+  index,
+  visibleMediaIndex,
+  isPicker,
+  onAssetClick,
+  toggleFavorite,
+  handleAddToCanvas,
+  setAssetToDelete,
+  onMediaLoaded,
+}: ProjectAssetCardProps) {
+  const Icon = getIcon(asset.type);
+  const shouldLoad = index <= visibleMediaIndex;
+
+  useEffect(() => {
+    if (shouldLoad && asset.type !== 'image' && asset.type !== 'video') {
+      onMediaLoaded(index);
+    }
+  }, [shouldLoad, asset.type, index, onMediaLoaded]);
+
+  if (!shouldLoad) {
+    return (
+      <div className="group relative aspect-square overflow-hidden rounded-xl bg-[#111111] ring-1 ring-white/10">
+        <div className="flex h-full w-full animate-pulse items-center justify-center bg-[#151515]">
+          <Icon className="h-6 w-6 text-gray-800" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      onClick={() => onAssetClick?.(asset)}
+      className="group relative aspect-square cursor-pointer overflow-hidden rounded-xl bg-[#111111] ring-1 ring-white/10 transition-[transform,box-shadow] duration-150 hover:ring-[#0097A7]/40 active:scale-[0.98]"
+    >
+      {asset.type === 'video' ? (
+        <div className="relative h-full w-full">
+          <video
+            src={asset.url + '#t=0.1'}
+            className="h-full w-full object-cover opacity-70 transition-opacity duration-150 group-hover:opacity-100"
+            preload="metadata"
+            onLoadedData={() => onMediaLoaded(index)}
+            onError={() => onMediaLoaded(index)}
+          />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 ring-1 ring-white/20 backdrop-blur-md transition-colors duration-150 group-hover:bg-[#0097A7]/50">
+              <Play className="h-3 w-3 fill-white text-white" />
+            </div>
+          </div>
+        </div>
+      ) : asset.type === 'image' ? (
+        <img
+          src={asset.thumbnailUrl || asset.url}
+          alt={asset.name}
+          className="h-full w-full object-cover opacity-80 transition-opacity duration-150 group-hover:opacity-100"
+          onLoad={() => onMediaLoaded(index)}
+          onError={() => onMediaLoaded(index)}
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center">
+          <Icon className="h-8 w-8 text-gray-700 transition-colors group-hover:text-[#0097A7]" />
+        </div>
+      )}
+
+      <span className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/[0.06]" />
+
+      <div className="absolute inset-0 flex flex-col justify-between bg-gradient-to-t from-black/80 via-transparent to-transparent p-2.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+        <div className="flex justify-end gap-1.5">
+          <button
+            onClick={(e) => { e.stopPropagation(); toggleFavorite(asset.id, asset.isFavorited); }}
+            className={`inline-flex h-7 w-7 items-center justify-center rounded-lg ring-1 ring-white/10 backdrop-blur-md transition-[transform,color,background-color] duration-150 active:scale-[0.96] ${asset.isFavorited ? 'bg-red-500 text-white' : 'bg-black/40 text-gray-300 hover:text-white'}`}
+          >
+            <Heart className={`h-3.5 w-3.5 ${asset.isFavorited ? 'fill-current' : ''}`} />
+          </button>
+          {!isPicker && (
+            <button
+              onClick={(e) => { e.stopPropagation(); handleAddToCanvas(asset); }}
+              className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-black/40 text-gray-300 ring-1 ring-white/10 backdrop-blur-md transition-[transform,color] duration-150 hover:text-white active:scale-[0.96]"
+              title="Add to canvas"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+
+        <div className="space-y-1">
+          <p className="truncate text-[12px] font-medium text-white">{asset.name}</p>
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] capitalize text-gray-400">{asset.type}</span>
+            <button
+              onClick={(e) => { e.stopPropagation(); setAssetToDelete(asset); }}
+              className="p-0.5 text-gray-400 transition-colors hover:text-red-400"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function AssetGrid({ onAssetClick, isPicker = false }: AssetGridProps) {
   const [filter, setFilter] = useState<AssetType | 'all'>('all');
@@ -43,6 +167,35 @@ export default function AssetGrid({ onAssetClick, isPicker = false }: AssetGridP
     search: debouncedSearch,
   });
 
+  const [visibleMediaIndex, setVisibleMediaIndex] = useState(0);
+
+  useEffect(() => {
+    setVisibleMediaIndex(0);
+  }, [assets]);
+
+  const handleMediaLoaded = useCallback((index: number) => {
+    setVisibleMediaIndex((prev) => {
+      if (index === prev) {
+        return prev + 1;
+      }
+      return prev;
+    });
+  }, []);
+
+  // Safety self-healing timeout to guarantee sequential loading never blocks
+  useEffect(() => {
+    if (visibleMediaIndex >= assets.length) return;
+    const timer = setTimeout(() => {
+      setVisibleMediaIndex((prev) => {
+        if (prev < assets.length) {
+          return prev + 1;
+        }
+        return prev;
+      });
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [visibleMediaIndex, assets.length]);
+
   const setPendingNodeType = useStore((state) => state.setPendingNodeType);
   const [assetToDelete, setAssetToDelete] = useState<Asset | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -64,16 +217,6 @@ export default function AssetGrid({ onAssetClick, isPicker = false }: AssetGridP
     e.preventDefault();
     setIsDragging(false);
     await handleFiles(e.dataTransfer.files);
-  };
-
-  const getIcon = (type: AssetType) => {
-    switch (type) {
-      case 'image': return ImageIcon;
-      case 'video': return VideoIcon;
-      case 'audio': return AudioIcon;
-      case 'document': return DocIcon;
-      default: return ExternalLink;
-    }
   };
 
   const handleAddToCanvas = (asset: Asset) => {
@@ -170,68 +313,20 @@ export default function AssetGrid({ onAssetClick, isPicker = false }: AssetGridP
         ) : (
           <div className="space-y-4">
             <div className={`grid grid-cols-2 ${isPicker ? 'gap-2' : 'gap-3'}`}>
-              {assets.map((asset) => {
-                const Icon = getIcon(asset.type);
-                return (
-                  <div
-                    key={asset.id}
-                    onClick={() => onAssetClick?.(asset)}
-                    className="group relative aspect-square cursor-pointer overflow-hidden rounded-xl bg-[#111111] ring-1 ring-white/10 transition-[transform,box-shadow] duration-150 hover:ring-[#0097A7]/40 active:scale-[0.98]"
-                  >
-                    {asset.type === 'video' ? (
-                      <div className="relative h-full w-full">
-                        <video src={asset.url + '#t=0.1'} className="h-full w-full object-cover opacity-70 transition-opacity duration-150 group-hover:opacity-100" preload="metadata" />
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 ring-1 ring-white/20 backdrop-blur-md transition-colors duration-150 group-hover:bg-[#0097A7]/50">
-                            <Play className="h-3 w-3 fill-white text-white" />
-                          </div>
-                        </div>
-                      </div>
-                    ) : asset.type === 'image' ? (
-                      <img src={asset.thumbnailUrl || asset.url} alt={asset.name} className="h-full w-full object-cover opacity-80 transition-opacity duration-150 group-hover:opacity-100" />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center">
-                        <Icon className="h-8 w-8 text-gray-700 transition-colors group-hover:text-[#0097A7]" />
-                      </div>
-                    )}
-
-                    <span className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/[0.06]" />
-
-                    <div className="absolute inset-0 flex flex-col justify-between bg-gradient-to-t from-black/80 via-transparent to-transparent p-2.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                      <div className="flex justify-end gap-1.5">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); toggleFavorite(asset.id, asset.isFavorited); }}
-                          className={`inline-flex h-7 w-7 items-center justify-center rounded-lg ring-1 ring-white/10 backdrop-blur-md transition-[transform,color,background-color] duration-150 active:scale-[0.96] ${asset.isFavorited ? 'bg-red-500 text-white' : 'bg-black/40 text-gray-300 hover:text-white'}`}
-                        >
-                          <Heart className={`h-3.5 w-3.5 ${asset.isFavorited ? 'fill-current' : ''}`} />
-                        </button>
-                        {!isPicker && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleAddToCanvas(asset); }}
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-black/40 text-gray-300 ring-1 ring-white/10 backdrop-blur-md transition-[transform,color] duration-150 hover:text-white active:scale-[0.96]"
-                            title="Add to canvas"
-                          >
-                            <Plus className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                      </div>
-
-                      <div className="space-y-1">
-                        <p className="truncate text-[12px] font-medium text-white">{asset.name}</p>
-                        <div className="flex items-center justify-between">
-                          <span className="text-[11px] capitalize text-gray-400">{asset.type}</span>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setAssetToDelete(asset); }}
-                            className="p-0.5 text-gray-400 transition-colors hover:text-red-400"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+              {assets.map((asset, i) => (
+                <ProjectAssetCard
+                  key={asset.id}
+                  asset={asset}
+                  index={i}
+                  visibleMediaIndex={visibleMediaIndex}
+                  isPicker={isPicker}
+                  onAssetClick={onAssetClick}
+                  toggleFavorite={toggleFavorite}
+                  handleAddToCanvas={handleAddToCanvas}
+                  setAssetToDelete={setAssetToDelete}
+                  onMediaLoaded={handleMediaLoaded}
+                />
+              ))}
             </div>
 
             {hasMore && (

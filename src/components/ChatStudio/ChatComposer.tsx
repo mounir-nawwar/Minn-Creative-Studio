@@ -192,11 +192,13 @@ export default function ChatComposer({ mode, disabled, onSend }: ChatComposerPro
               </Dialog.Close>
             </div>
             <div className="flex flex-1 flex-col overflow-hidden">
-              <LibraryGrid
-                isPicker
-                onSelect={handleAssetSelect}
-                initialFilters={currentProject ? { projectId: currentProject.id } : undefined}
-              />
+              {showPicker && (
+                <LibraryGrid
+                  isPicker
+                  onSelect={handleAssetSelect}
+                  initialFilters={currentProject ? { projectId: currentProject.id } : undefined}
+                />
+              )}
             </div>
           </Dialog.Content>
         </Dialog.Portal>
