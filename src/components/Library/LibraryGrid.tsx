@@ -90,7 +90,7 @@ function LibraryAssetCard({
         <div className="relative h-full w-full bg-[#111111]">
           <video
             src={asset.url + '#t=0.1'}
-            className={`h-full w-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-70 group-hover:opacity-100' : 'opacity-0'}`}
+            className="h-full w-full object-cover opacity-70 group-hover:opacity-100"
             preload="metadata"
             onLoadedData={() => {
               setLoaded(true);
@@ -101,20 +101,18 @@ function LibraryAssetCard({
               onMediaLoaded(index);
             }}
           />
-          {loaded && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 ring-1 ring-white/20 backdrop-blur-md transition-colors duration-150 group-hover:bg-[#0097A7]/50">
-                <Play className="h-3 w-3 fill-white text-white" />
-              </div>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 ring-1 ring-white/20 backdrop-blur-md transition-colors duration-150 group-hover:bg-[#0097A7]/50">
+              <Play className="h-3 w-3 fill-white text-white" />
             </div>
-          )}
+          </div>
         </div>
       ) : asset.type === 'image' ? (
         <div className="relative h-full w-full bg-[#111111]">
           <img
             src={asset.url}
             alt={asset.filename}
-            className={`h-full w-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-80 group-hover:opacity-100' : 'opacity-0'}`}
+            className="h-full w-full object-cover opacity-80 group-hover:opacity-100"
             loading="lazy"
             onLoad={() => {
               setLoaded(true);
@@ -129,13 +127,6 @@ function LibraryAssetCard({
       ) : (
         <div className="flex h-full w-full items-center justify-center">
           <Icon className="h-8 w-8 text-gray-700 transition-colors group-hover:text-[#0097A7]" />
-        </div>
-      )}
-
-      {/* Skeleton overlay shown until 100% loaded */}
-      {!loaded && (asset.type === 'image' || asset.type === 'video') && (
-        <div className="absolute inset-0 flex h-full w-full animate-pulse items-center justify-center bg-[#151515]">
-          <Icon className="h-6 w-6 text-gray-800" />
         </div>
       )}
 
