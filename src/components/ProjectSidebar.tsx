@@ -3,8 +3,6 @@ import { Layout, MessageSquare, Image as ImageIcon, Box, PanelLeftClose } from '
 import { motion, AnimatePresence } from 'motion/react';
 import { useProjectStore } from '../store/useProjectStore';
 import AssetGrid from './AssetGrid';
-import AssetPreviewModal from './AssetPreviewModal';
-import { Asset } from '../types/project.types';
 import NodesTab from './Sidebar/NodesTab';
 import WorkflowsTab from './Sidebar/WorkflowsTab';
 import ChatsTab from './Sidebar/ChatsTab';
@@ -21,7 +19,6 @@ const TABS: { id: Tab; icon: typeof Box }[] = [
 export default function ProjectSidebar() {
   const { currentProject, toggleSidebar, isSidebarOpen } = useProjectStore();
   const [activeTab, setActiveTab] = useState<Tab>('nodes');
-  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
 
   if (!currentProject) return null;
 
@@ -72,18 +69,11 @@ export default function ProjectSidebar() {
               transition={{ duration: 0.15 }}
               className="flex flex-1 flex-col overflow-hidden"
             >
-              <AssetGrid onAssetClick={setSelectedAsset} />
+              <AssetGrid />
             </motion.div>
           )}
         </AnimatePresence>
       </div>
-
-      <AssetPreviewModal
-        asset={selectedAsset}
-        onClose={() => setSelectedAsset(null)}
-        onDelete={() => {}}
-        onToggleFavorite={() => {}}
-      />
 
       {/* Footer */}
       <div className="flex items-center justify-between border-t border-white/5 bg-[#0d0d0d] px-4 py-3">
