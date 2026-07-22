@@ -272,8 +272,12 @@ export const workflowsApi = {
   
   get: (id: string): Promise<Workflow> => apiRequest(`/workflows/${id}`),
 
-  /** Cheap revision probe for canvas live sync (timestamp only, no graph payload) */
-  getVersion: (id: string): Promise<{ id: string; updatedAt: string }> =>
+  /**
+   * Cheap revision probe for canvas live sync (no graph payload). `token` is the
+   * clientToken of whoever last saved via PUT, echoed so the poller can ignore
+   * its own writes; null when the last write came from elsewhere (MCP/runner).
+   */
+  getVersion: (id: string): Promise<{ id: string; updatedAt: string; token: string | null }> =>
     apiRequest(`/workflows/${id}/version`),
 
   create: (data: { projectId: string; name?: string; nodes?: any[]; edges?: any[] }): Promise<Workflow> =>
@@ -282,7 +286,7 @@ export const workflowsApi = {
       body: JSON.stringify(data)
     }),
   
-  update: (id: string, data: Partial<Workflow>): Promise<Workflow> =>
+  update: (id: string, data: Partial<Workflow> & { clientToken?: string }): Promise<Workflow> =>
     apiRequest(`/workflows/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data)

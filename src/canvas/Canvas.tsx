@@ -56,11 +56,17 @@ const CanvasContent = () => {
   // in doesn't immediately bounce back out as a "local" auto-save.
   const applyingRemoteRef = useRef(false);
 
+  // Stable per-mount token identifying this canvas's own writes, so live sync
+  // never mistakes our own auto-save for a foreign change.
+  const clientTokenRef = useRef<string>(
+    (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `c-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  );
+
   const isDirty = useCallback(() => dirtyRef.current, []);
   const onBeforeApply = useCallback(() => {
     applyingRemoteRef.current = true;
   }, []);
-  const { markSaved } = useWorkflowSync({ workflowId: activeWorkflowId, isDirty, onBeforeApply });
+  const { markSaved } = useWorkflowSync({ workflowId: activeWorkflowId, clientToken: clientTokenRef.current, isDirty, onBeforeApply });
 
   useEffect(() => {
     pendingRef.current = pendingNodeType;
@@ -107,7 +113,8 @@ const CanvasContent = () => {
             type: e.type ?? null,
             animated: e.animated ?? false,
             data: e.data ? stripUndefined(e.data) : null,
-          }))
+          })),
+          clientToken: clientTokenRef.current,
         });
         // Our own write defines the new server revision — record it so live
         // sync doesn't mistake the echo for someone else's change.

@@ -104,10 +104,22 @@ router.post('/', (req: any, res: any) => {
 });
 
 /**
+ * Last writer per workflow, for the canvas live-sync's self-echo suppression.
+ * The canvas tags each auto-save with a random clientToken; the /version probe
+ * echoes it back so the poller recognizes its own writes regardless of when the
+ * PUT response arrives (fixes false "someone changed this" toasts).
+ *
+ * In-memory is safe: the app is a single pm2 process. A restart just empties it,
+ * and the token is only trusted when it still matches the current updated_at, so
+ * a stale/absent entry degrades to "treat as foreign" — never a false self-match.
+ */
+const lastWriter = new Map<string, { updatedAt: string; token: string | null }>();
+
+/**
  * GET /api/workflows/:id/version
- * Cheap revision probe for the canvas's live sync: returns only the timestamp,
- * so an open canvas can poll without pulling the whole graph (node data can
- * carry large outputs). Registered before /:id so "version" isn't eaten by it.
+ * Cheap revision probe for the canvas's live sync: returns only the timestamp
+ * (+ the last-writer token), so an open canvas can poll without pulling the whole
+ * graph. Registered before /:id so "version" isn't eaten by it.
  */
 router.get('/:id/version', (req: any, res: any) => {
   try {
@@ -115,7 +127,12 @@ router.get('/:id/version', (req: any, res: any) => {
     if (!row) {
       return res.status(404).json({ error: 'Workflow not found' });
     }
-    res.json({ id: row.id, updatedAt: row.updated_at });
+    // Only surface the token when it still corresponds to the current revision.
+    // Writes that bypass this route (MCP graph tools, the headless runner) bump
+    // updated_at without touching the map, so their changes read as foreign.
+    const last = lastWriter.get(row.id);
+    const token = last && last.updatedAt === row.updated_at ? last.token : null;
+    res.json({ id: row.id, updatedAt: row.updated_at, token });
   } catch (error: any) {
     console.error('Error fetching workflow version:', error);
     res.status(500).json({ error: 'Failed to fetch workflow version' });
@@ -129,7 +146,7 @@ router.get('/:id/version', (req: any, res: any) => {
 router.put('/:id', (req: any, res: any) => {
   try {
     const { id } = req.params;
-    const { name, nodes, edges } = req.body;
+    const { name, nodes, edges, clientToken } = req.body;
 
     const workflow = workflows.findById(id);
 
@@ -146,10 +163,13 @@ router.put('/:id', (req: any, res: any) => {
     if (edges !== undefined && !Array.isArray(edges)) {
       return res.status(400).json({ error: 'Edges must be an array' });
     }
-    
+
     workflows.update(id, { name, nodes, edges });
     const updated = workflows.findById(id);
-    
+    // Record who wrote this revision, synchronously with the write, so a poll
+    // that observes the new updated_at also sees the writer's token.
+    lastWriter.set(id, { updatedAt: updated.updated_at, token: typeof clientToken === 'string' ? clientToken : null });
+
     res.json(updated);
   } catch (error: any) {
     console.error('Error updating workflow:', error);

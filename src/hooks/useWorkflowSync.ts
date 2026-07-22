@@ -31,13 +31,15 @@ const POLL_INTERVAL_MS = 3000;
 
 interface UseWorkflowSyncOptions {
   workflowId: string | null;
+  /** This canvas's save token — the version probe echoes it so we can ignore our own writes. */
+  clientToken: string;
   /** True while local edits are waiting for the debounced auto-save. */
   isDirty: () => boolean;
   /** Called before the hook writes to the store, so the canvas can skip the resulting auto-save. */
   onBeforeApply: () => void;
 }
 
-export function useWorkflowSync({ workflowId, isDirty, onBeforeApply }: UseWorkflowSyncOptions) {
+export function useWorkflowSync({ workflowId, clientToken, isDirty, onBeforeApply }: UseWorkflowSyncOptions) {
   const setNodes = useStore((s) => s.setNodes);
   const setEdges = useStore((s) => s.setEdges);
 
@@ -75,6 +77,13 @@ export function useWorkflowSync({ workflowId, isDirty, onBeforeApply }: UseWorkf
         }
         if (version.updatedAt === syncedAtRef.current) return;
 
+        // Our own save — recognized by the echoed token regardless of when the
+        // PUT response landed. Advance the baseline silently; never toast.
+        if (version.token && version.token === clientToken) {
+          syncedAtRef.current = version.updatedAt;
+          return;
+        }
+
         const remote = await workflowsApi.get(workflowId);
         if (cancelled) return;
 
@@ -85,6 +94,8 @@ export function useWorkflowSync({ workflowId, isDirty, onBeforeApply }: UseWorkf
           edges: (remote.edges ?? []) as Edge[],
         };
 
+        // Genuine foreign change. Advance the baseline in BOTH branches so a
+        // single external revision toasts once, not every poll tick.
         if (!isDirty()) {
           onBeforeApply();
           setNodes(remoteGraph.nodes);
@@ -102,7 +113,7 @@ export function useWorkflowSync({ workflowId, isDirty, onBeforeApply }: UseWorkf
             setEdges(merged.edges);
             toast.info('Workflow updated', 'Merged changes from Claude or your teammate — your edits were kept');
           }
-          // Our pending save will define the next revision; don't adopt theirs.
+          syncedAtRef.current = remote.updated_at;
         }
       } catch (err) {
         // Offline/refresh races are expected — the next tick retries.
@@ -117,7 +128,7 @@ export function useWorkflowSync({ workflowId, isDirty, onBeforeApply }: UseWorkf
       cancelled = true;
       clearInterval(interval);
     };
-  }, [workflowId, isDirty, onBeforeApply, setNodes, setEdges]);
+  }, [workflowId, clientToken, isDirty, onBeforeApply, setNodes, setEdges]);
 
   return { markSaved, markLoaded };
 }
