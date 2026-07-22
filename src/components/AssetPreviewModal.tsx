@@ -1,5 +1,6 @@
+import { useEffect } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { X, Download, Heart, Trash2, Info, Calendar, Box, Sparkles } from 'lucide-react';
+import { X, Download, Heart, Trash2, Info, Calendar, Box, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Asset } from '../types/project.types';
 import { downloadFile } from '../lib/utils';
 
@@ -8,6 +9,10 @@ interface AssetPreviewModalProps {
   onClose: () => void;
   onDelete: (id: string) => void;
   onToggleFavorite: (id: string, isFavorited: boolean) => void;
+  onPrev?: () => void;
+  onNext?: () => void;
+  currentIndex?: number;
+  totalCount?: number;
 }
 
 function formatDate(timestamp: unknown): string {
@@ -29,7 +34,36 @@ function MetaRow({ icon: Icon, label, value, accent }: { icon: typeof Box; label
   );
 }
 
-export default function AssetPreviewModal({ asset, onClose, onDelete, onToggleFavorite }: AssetPreviewModalProps) {
+export default function AssetPreviewModal({
+  asset,
+  onClose,
+  onDelete,
+  onToggleFavorite,
+  onPrev,
+  onNext,
+  currentIndex,
+  totalCount,
+}: AssetPreviewModalProps) {
+  useEffect(() => {
+    if (!asset) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const active = document.activeElement;
+      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || (active as HTMLElement).isContentEditable)) {
+        return;
+      }
+      if (e.key === 'ArrowLeft' && onPrev) {
+        e.preventDefault();
+        onPrev();
+      } else if (e.key === 'ArrowRight' && onNext) {
+        e.preventDefault();
+        onNext();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [asset, onPrev, onNext]);
+
   return (
     <Dialog.Root open={!!asset} onOpenChange={(open) => { if (!open) onClose(); }}>
       <Dialog.Portal>
@@ -40,8 +74,8 @@ export default function AssetPreviewModal({ asset, onClose, onDelete, onToggleFa
         >
           {asset && (
             <>
-              {/* Preview */}
-              <div className="relative flex flex-1 items-center justify-center overflow-hidden bg-black p-10">
+              {/* Preview Container */}
+              <div className="relative flex flex-1 items-center justify-center overflow-hidden bg-black p-10 select-none">
                 {asset.type === 'image' ? (
                   <img src={asset.url} alt={asset.name} className="max-h-full max-w-full rounded-xl object-contain ring-1 ring-inset ring-white/10" />
                 ) : asset.type === 'video' ? (
@@ -60,6 +94,35 @@ export default function AssetPreviewModal({ asset, onClose, onDelete, onToggleFa
                     >
                       Open in new tab
                     </a>
+                  </div>
+                )}
+
+                {/* Floating Previous Button */}
+                {onPrev && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onPrev(); }}
+                    title="Previous asset (Left Arrow)"
+                    className="absolute left-6 top-1/2 -translate-y-1/2 z-10 inline-flex h-11 w-11 items-center justify-center rounded-full bg-black/60 text-gray-300 ring-1 ring-white/15 backdrop-blur-md transition-[transform,background-color,color] duration-150 hover:bg-[#0097A7] hover:text-white active:scale-[0.94]"
+                  >
+                    <ChevronLeft className="h-6 w-6" />
+                  </button>
+                )}
+
+                {/* Floating Next Button */}
+                {onNext && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onNext(); }}
+                    title="Next asset (Right Arrow)"
+                    className="absolute right-6 top-1/2 -translate-y-1/2 z-10 inline-flex h-11 w-11 items-center justify-center rounded-full bg-black/60 text-gray-300 ring-1 ring-white/15 backdrop-blur-md transition-[transform,background-color,color] duration-150 hover:bg-[#0097A7] hover:text-white active:scale-[0.94]"
+                  >
+                    <ChevronRight className="h-6 w-6" />
+                  </button>
+                )}
+
+                {/* Counter Pill */}
+                {currentIndex !== undefined && totalCount !== undefined && totalCount > 1 && (
+                  <div className="absolute top-6 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-3.5 py-1 text-[11px] font-medium text-gray-300 ring-1 ring-white/15 backdrop-blur-md pointer-events-none">
+                    {currentIndex + 1} / {totalCount}
                   </div>
                 )}
 
@@ -113,13 +176,13 @@ export default function AssetPreviewModal({ asset, onClose, onDelete, onToggleFa
                       <h3 className="text-[11px] font-medium uppercase tracking-wide">Metadata</h3>
                     </div>
                     <MetaRow icon={Calendar} label="Created" value={formatDate(asset.createdAt)} />
-                    {asset.metadata.model && <MetaRow icon={Sparkles} label="Model" value={String(asset.metadata.model)} accent />}
-                    {asset.metadata.width && asset.metadata.height && (
+                    {asset.metadata?.model && <MetaRow icon={Sparkles} label="Model" value={String(asset.metadata.model)} accent />}
+                    {asset.metadata?.width && asset.metadata?.height && (
                       <MetaRow icon={Box} label="Resolution" value={`${asset.metadata.width} × ${asset.metadata.height}`} />
                     )}
                   </div>
 
-                  {asset.metadata.prompt && (
+                  {asset.metadata?.prompt && (
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 text-gray-400">
                         <Sparkles className="h-3.5 w-3.5 text-[#0097A7]" />
@@ -131,7 +194,7 @@ export default function AssetPreviewModal({ asset, onClose, onDelete, onToggleFa
                     </div>
                   )}
 
-                  {asset.tags.length > 0 && (
+                  {asset.tags && asset.tags.length > 0 && (
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 text-gray-400">
                         <Box className="h-3.5 w-3.5 text-[#0097A7]" />

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Image as ImageIcon, Video as VideoIcon, Music as AudioIcon, FileText as DocIcon,
-  Search, Filter, Play, FlaskConical,
+  Search, Filter, Play, FlaskConical, Square, RectangleVertical, Maximize2,
 } from 'lucide-react';
 import { assetsApi, projectsApi, Asset } from '../../lib/api';
 import type { LibraryFilters } from '../../lib/api';
@@ -9,6 +9,7 @@ import { useStore } from '../../store/useStore';
 import { PLAYGROUND_PROJECT_ID } from '../../constants';
 
 export type LibraryAsset = Asset & { project_name?: string };
+export type AspectMode = 'square' | 'portrait' | 'fit';
 
 interface LibraryGridProps {
   isPicker?: boolean;
@@ -35,6 +36,7 @@ interface LibraryAssetCardProps {
   asset: LibraryAsset;
   index: number;
   visibleMediaIndex: number;
+  aspectMode: AspectMode;
   handleClick: (asset: LibraryAsset) => void;
   renderCardActions?: (asset: LibraryAsset, refresh: () => void) => React.ReactNode;
   refresh: () => void;
@@ -45,6 +47,7 @@ function LibraryAssetCard({
   asset,
   index,
   visibleMediaIndex,
+  aspectMode,
   handleClick,
   renderCardActions,
   refresh,
@@ -54,6 +57,9 @@ function LibraryAssetCard({
   const isPlaygroundAsset = asset.project_id === PLAYGROUND_PROJECT_ID;
   const shouldLoad = index <= visibleMediaIndex;
   const [loaded, setLoaded] = useState(false);
+
+  const aspectClass = aspectMode === 'portrait' ? 'aspect-[3/4]' : 'aspect-square';
+  const objectFitClass = aspectMode === 'fit' ? 'object-contain bg-black/60' : 'object-cover';
 
   useEffect(() => {
     setLoaded(false);
@@ -67,7 +73,7 @@ function LibraryAssetCard({
 
   if (!shouldLoad) {
     return (
-      <div className="group relative aspect-square overflow-hidden rounded-xl bg-[#111111] ring-1 ring-white/10">
+      <div className={`group relative overflow-hidden rounded-xl bg-[#111111] ring-1 ring-white/10 ${aspectClass}`}>
         <div className="flex h-full w-full animate-pulse items-center justify-center bg-[#151515]">
           <Icon className="h-6 w-6 text-gray-800" />
         </div>
@@ -84,13 +90,13 @@ function LibraryAssetCard({
   return (
     <div
       onClick={() => handleClick(asset)}
-      className="group relative aspect-square cursor-pointer overflow-hidden rounded-xl bg-[#111111] ring-1 ring-white/10 transition-[transform,box-shadow] duration-150 hover:ring-[#0097A7]/40 active:scale-[0.98]"
+      className={`group relative cursor-pointer overflow-hidden rounded-xl bg-[#111111] ring-1 ring-white/10 transition-[transform,box-shadow] duration-150 hover:ring-[#0097A7]/40 active:scale-[0.98] ${aspectClass}`}
     >
       {asset.type === 'video' ? (
         <div className="relative h-full w-full bg-[#111111]">
           <video
             src={asset.url + '#t=0.1'}
-            className="h-full w-full object-cover opacity-70 group-hover:opacity-100"
+            className={`h-full w-full opacity-70 group-hover:opacity-100 ${objectFitClass}`}
             preload="metadata"
             onLoadedData={() => {
               setLoaded(true);
@@ -112,7 +118,7 @@ function LibraryAssetCard({
           <img
             src={asset.url}
             alt={asset.filename}
-            className="h-full w-full object-cover opacity-80 group-hover:opacity-100"
+            className={`h-full w-full opacity-80 group-hover:opacity-100 ${objectFitClass}`}
             loading="lazy"
             onLoad={() => {
               setLoaded(true);
@@ -140,7 +146,7 @@ function LibraryAssetCard({
       </div>
 
       {/* Grid overlay shown on hover */}
-      {(!loaded || asset.type !== 'image' && asset.type !== 'video' ? true : loaded) && (
+      {(!loaded || (asset.type !== 'image' && asset.type !== 'video') ? true : loaded) && (
         <div className="absolute inset-0 flex flex-col justify-between bg-gradient-to-t from-black/80 via-transparent to-transparent p-2.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
           <div className="flex justify-end gap-1.5">
             {renderCardActions?.(asset, refresh)}
@@ -168,6 +174,7 @@ export default function LibraryGrid({ isPicker = false, onSelect, initialFilters
   const [hasMore, setHasMore] = useState(false);
   const [typeFilter, setTypeFilter] = useState<string>(initialFilters?.type ?? 'all');
   const [projectFilter, setProjectFilter] = useState<string>(initialFilters?.projectId ?? '');
+  const [aspectMode, setAspectMode] = useState<AspectMode>('square');
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [projectOptions, setProjectOptions] = useState<{ id: string; name: string }[]>([]);
@@ -339,7 +346,8 @@ export default function LibraryGrid({ isPicker = false, onSelect, initialFilters
       return;
     }
     if (asset.type === 'image' || asset.type === 'video' || asset.type === 'audio') {
-      setExpandedAsset(asset.url, asset.type);
+      const playlist = assets.map((a) => ({ url: a.url, type: a.type, name: a.filename }));
+      setExpandedAsset(asset.url, asset.type, playlist);
     }
   };
 
@@ -347,7 +355,7 @@ export default function LibraryGrid({ isPicker = false, onSelect, initialFilters
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Controls */}
       <div className="flex flex-wrap items-center gap-2 border-b border-white/5 p-3">
-        <div className="relative min-w-[200px] flex-1">
+        <div className="relative min-w-[180px] flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-500" />
           <input
             type="text"
@@ -370,6 +378,40 @@ export default function LibraryGrid({ isPicker = false, onSelect, initialFilters
               {f}
             </button>
           ))}
+        </div>
+
+        {/* Aspect Ratio View Toggle */}
+        <div className="flex items-center rounded-lg bg-white/[0.04] p-0.5 ring-1 ring-white/10">
+          <button
+            onClick={() => setAspectMode('square')}
+            title="Square Grid (1:1)"
+            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-[background-color,color] ${
+              aspectMode === 'square' ? 'bg-[#0097A7] text-white' : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <Square className="h-3 w-3" />
+            <span>1:1</span>
+          </button>
+          <button
+            onClick={() => setAspectMode('portrait')}
+            title="Portrait Grid (3:4 - fashion/models)"
+            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-[background-color,color] ${
+              aspectMode === 'portrait' ? 'bg-[#0097A7] text-white' : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <RectangleVertical className="h-3 w-3" />
+            <span>3:4</span>
+          </button>
+          <button
+            onClick={() => setAspectMode('fit')}
+            title="Fit / Contain (Uncropped)"
+            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-[background-color,color] ${
+              aspectMode === 'fit' ? 'bg-[#0097A7] text-white' : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <Maximize2 className="h-3 w-3" />
+            <span>Fit</span>
+          </button>
         </div>
 
         <select
@@ -407,6 +449,7 @@ export default function LibraryGrid({ isPicker = false, onSelect, initialFilters
                   asset={asset}
                   index={i}
                   visibleMediaIndex={visibleMediaIndex}
+                  aspectMode={aspectMode}
                   handleClick={handleClick}
                   renderCardActions={renderCardActions}
                   refresh={refresh}

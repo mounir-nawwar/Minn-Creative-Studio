@@ -29,6 +29,12 @@ interface HistoryState {
   edges: Edge[];
 }
 
+export interface PlaylistItem {
+  url: string;
+  type: string;
+  name?: string;
+}
+
 interface WorkflowState {
   nodes: Node<WorkflowNodeData>[];
   edges: Edge[];
@@ -36,7 +42,7 @@ interface WorkflowState {
   pendingNodeData: NodeData | null;
   isChatOpen: boolean;
   activeChatId: string | null;
-  expandedAsset: { url: string; type: 'image' | 'video' | 'audio' } | null;
+  expandedAsset: { url: string; type: string; playlist?: PlaylistItem[] } | null;
   history: HistoryState[];
   historyIndex: number;
   onNodesChange: OnNodesChange;
@@ -51,7 +57,7 @@ interface WorkflowState {
   setPendingNodeType: (type: string | null, data?: NodeData | null) => void;
   setChatOpen: (open: boolean) => void;
   setActiveChatId: (id: string | null) => void;
-  setExpandedAsset: (url: string | null, type?: 'image' | 'video' | 'audio') => void;
+  setExpandedAsset: (url: string | null, type?: string, playlist?: PlaylistItem[]) => void;
   undo: () => void;
   redo: () => void;
   canUndo: () => boolean;
@@ -178,9 +184,9 @@ export const useStore = create<WorkflowState>((set, get) => ({
   setPendingNodeType: (type, data = null) => set({ pendingNodeType: type, pendingNodeData: data }),
   setChatOpen: (open) => set({ isChatOpen: open }),
   setActiveChatId: (id) => set({ activeChatId: id }),
-  setExpandedAsset: (url, type = 'image') => {
+  setExpandedAsset: (url, type = 'image', playlist) => {
     if (url) {
-      set({ expandedAsset: { url, type } });
+      set({ expandedAsset: { url, type, playlist } });
     } else {
       set({ expandedAsset: null });
     }
