@@ -1,4 +1,5 @@
 import express from 'express';
+import compression from 'compression';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
@@ -53,6 +54,9 @@ export async function createApp({ serveFrontend = true }: { serveFrontend?: bool
   if (IS_PRODUCTION) {
     app.set('trust proxy', 1);
   }
+
+  // Compression middleware for all responses
+  app.use(compression());
 
   // Security headers — CSP and COOP disabled for simple internal tool
   app.use(helmet({
@@ -109,9 +113,13 @@ export async function createApp({ serveFrontend = true }: { serveFrontend?: bool
   // `app.get('*')` would swallow /mcp and every OAuth endpoint.
   mountMcp(app);
 
-  // Serve static storage files
+  // Serve static storage files with 7-day browser caching
   const STORAGE_PATH = process.env.STORAGE_PATH || path.join(process.cwd(), 'storage');
-  app.use('/storage', express.static(STORAGE_PATH));
+  app.use('/storage', express.static(STORAGE_PATH, {
+    maxAge: '7d',
+    immutable: true,
+    etag: true,
+  }));
 
   // Serve frontend
   if (serveFrontend) {

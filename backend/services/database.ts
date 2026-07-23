@@ -173,6 +173,9 @@ function initializeSchema(): void {
     CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id);
     CREATE INDEX IF NOT EXISTS idx_assets_project_id ON assets(project_id);
     CREATE INDEX IF NOT EXISTS idx_assets_user_id ON assets(user_id);
+    CREATE INDEX IF NOT EXISTS idx_assets_project_created ON assets(project_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_assets_url ON assets(url);
+    CREATE INDEX IF NOT EXISTS idx_assets_type_created ON assets(type, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_usage_logs_project_id ON usage_logs(project_id);
     CREATE INDEX IF NOT EXISTS idx_prompts_user_id ON prompts(user_id);
   `);
