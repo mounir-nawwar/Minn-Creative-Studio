@@ -272,10 +272,11 @@ const CanvasContent = () => {
       e.stopPropagation();
       const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
       const nodeType = pendingRef.current;
-      const nodeData: WorkflowNodeData = pendingNodeData || {
-        label: nodeType,
+      const nodeData: WorkflowNodeData = {
+        label: pendingNodeData?.label || nodeType,
         type: nodeType as any,
-        config: {},
+        config: pendingNodeData?.config || {},
+        ...(pendingNodeData || {}),
       };
       if (nodeType === 'imageUpload' || nodeType === 'videoUpload') {
         nodeData.uploadEnabled = uploadEnabled;
@@ -301,16 +302,29 @@ const CanvasContent = () => {
       e.preventDefault();
 
       let nodeType = e.dataTransfer.getData('application/reactflow') || pendingRef.current;
+      let label = pendingNodeData?.label || nodeType;
+
+      try {
+        const jsonStr = e.dataTransfer.getData('application/json');
+        if (jsonStr) {
+          const parsed = JSON.parse(jsonStr);
+          if (parsed.type) nodeType = parsed.type;
+          if (parsed.label) label = parsed.label;
+        }
+      } catch {
+        // use fallback
+      }
+
       if (!nodeType || nodeType === 'text/plain') {
         const plain = e.dataTransfer.getData('text/plain');
         if (plain) {
           const lower = plain.toLowerCase();
-          if (lower.includes('prompt library')) nodeType = 'promptLibrary';
-          else if (lower.includes('inpainting') || lower.includes('try-on')) nodeType = 'inpainting';
-          else if (lower.includes('batch') || lower.includes('sizer')) nodeType = 'batchOutputSizer';
-          else if (lower.includes('variation')) nodeType = 'variation';
-          else if (lower.includes('style transfer')) nodeType = 'styleTransfer';
-          else if (lower.includes('brand context')) nodeType = 'brandContext';
+          if (lower.includes('prompt library')) { nodeType = 'promptLibrary'; label = 'Prompt Library'; }
+          else if (lower.includes('inpainting') || lower.includes('try-on')) { nodeType = 'inpainting'; label = 'Inpainting (Virtual Try-On)'; }
+          else if (lower.includes('batch') || lower.includes('sizer')) { nodeType = 'batchOutputSizer'; label = 'Batch Sizer (Social Ratios)'; }
+          else if (lower.includes('variation')) { nodeType = 'variation'; label = 'Image Variations'; }
+          else if (lower.includes('style transfer')) { nodeType = 'styleTransfer'; label = 'Style Transfer'; }
+          else if (lower.includes('brand context')) { nodeType = 'brandContext'; label = 'Brand Context'; }
         }
       }
 
@@ -318,25 +332,11 @@ const CanvasContent = () => {
 
       const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
 
-      let nodeData: WorkflowNodeData = pendingNodeData || {
-        label: nodeType,
+      const nodeData: WorkflowNodeData = {
+        label: label || nodeType,
         type: nodeType as any,
         config: {},
       };
-
-      try {
-        const jsonStr = e.dataTransfer.getData('application/json');
-        if (jsonStr) {
-          const parsed = JSON.parse(jsonStr);
-          nodeData = {
-            label: parsed.label || nodeType,
-            type: parsed.type || nodeType,
-            config: {},
-          };
-        }
-      } catch {
-        // use default nodeData
-      }
 
       if (nodeType === 'imageUpload' || nodeType === 'videoUpload') {
         nodeData.uploadEnabled = uploadEnabled;
@@ -417,8 +417,16 @@ const CanvasContent = () => {
         else if (labelLower.includes('brand context')) type = 'brandContext';
       }
       const finalType = type || 'prompt';
-      if (node.type !== finalType) {
-        return { ...node, type: finalType };
+      if (node.type !== finalType || node.data?.type !== finalType) {
+        return {
+          ...node,
+          type: finalType,
+          data: {
+            ...node.data,
+            type: finalType as any,
+            label: node.data?.label || (finalType === 'promptLibrary' ? 'Prompt Library' : finalType),
+          },
+        };
       }
       return node;
     });
