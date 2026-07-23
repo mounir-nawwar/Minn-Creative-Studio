@@ -215,4 +215,25 @@ const BaseNode: React.FC<BaseNodeProps> = ({
   );
 };
 
-export default BaseNode;
+// Memoized for 60 FPS Canvas performance on large graphs
+export const MemoizedBaseNode = React.memo(BaseNode, (prev, next) => {
+  if (prev.id !== next.id) return false;
+  if (prev.className !== next.className) return false;
+  if (prev.inputs !== next.inputs) return false;
+  if (prev.outputs !== next.outputs) return false;
+  if (prev.color !== next.color) return false;
+  if (prev.data.isRunning !== next.data.isRunning) return false;
+  if (prev.data.error !== next.data.error) return false;
+  if (prev.data.progress !== next.data.progress) return false;
+  if (prev.data.triggerRun !== next.data.triggerRun) return false;
+  if (prev.data.label !== next.data.label) return false;
+  if (prev.data.type !== next.data.type) return false;
+
+  if (prev.data !== next.data) {
+    if (JSON.stringify(prev.data) !== JSON.stringify(next.data)) return false;
+  }
+
+  return true;
+});
+
+export default MemoizedBaseNode;
