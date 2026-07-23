@@ -44,11 +44,32 @@ function parseNode(node: unknown): ValidatedNode | null {
   const id = n.id != null ? String(n.id) : null;
   if (!id) return null;
   
+  const data = typeof n.data === 'object' && n.data !== null ? n.data as Record<string, unknown> : {};
+
+  // Auto-heal missing or 'default' node type using data.type, id prefix, or label
+  let type = typeof n.type === 'string' && n.type !== 'default' ? n.type : undefined;
+  if (!type && typeof data.type === 'string' && data.type !== 'default') {
+    type = data.type;
+  }
+  if (!type && id.includes('-')) {
+    const prefix = id.split('-')[0];
+    if (prefix && prefix !== 'default' && prefix !== 'node') type = prefix;
+  }
+  if (!type && typeof data.label === 'string') {
+    const labelLower = data.label.toLowerCase();
+    if (labelLower.includes('prompt library')) type = 'promptLibrary';
+    else if (labelLower.includes('inpainting') || labelLower.includes('try-on')) type = 'inpainting';
+    else if (labelLower.includes('batch') || labelLower.includes('sizer')) type = 'batchOutputSizer';
+    else if (labelLower.includes('variation')) type = 'variation';
+    else if (labelLower.includes('style transfer')) type = 'styleTransfer';
+    else if (labelLower.includes('brand context')) type = 'brandContext';
+  }
+  
   return {
     id,
-    type: typeof n.type === 'string' ? n.type : undefined,
+    type: type || 'prompt',
     position: parsePosition(n.position),
-    data: typeof n.data === 'object' && n.data !== null ? n.data as Record<string, unknown> : {},
+    data,
   };
 }
 

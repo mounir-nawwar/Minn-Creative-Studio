@@ -291,6 +291,69 @@ const CanvasContent = () => {
     [screenToFlowPosition, pendingNodeData, addNode, setPendingNodeType, uploadEnabled]
   );
 
+  const onDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  const onDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+
+      let nodeType = e.dataTransfer.getData('application/reactflow') || pendingRef.current;
+      if (!nodeType || nodeType === 'text/plain') {
+        const plain = e.dataTransfer.getData('text/plain');
+        if (plain) {
+          const lower = plain.toLowerCase();
+          if (lower.includes('prompt library')) nodeType = 'promptLibrary';
+          else if (lower.includes('inpainting') || lower.includes('try-on')) nodeType = 'inpainting';
+          else if (lower.includes('batch') || lower.includes('sizer')) nodeType = 'batchOutputSizer';
+          else if (lower.includes('variation')) nodeType = 'variation';
+          else if (lower.includes('style transfer')) nodeType = 'styleTransfer';
+          else if (lower.includes('brand context')) nodeType = 'brandContext';
+        }
+      }
+
+      if (!nodeType || nodeType === 'text/plain') return;
+
+      const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+
+      let nodeData: WorkflowNodeData = pendingNodeData || {
+        label: nodeType,
+        type: nodeType as any,
+        config: {},
+      };
+
+      try {
+        const jsonStr = e.dataTransfer.getData('application/json');
+        if (jsonStr) {
+          const parsed = JSON.parse(jsonStr);
+          nodeData = {
+            label: parsed.label || nodeType,
+            type: parsed.type || nodeType,
+            config: {},
+          };
+        }
+      } catch {
+        // use default nodeData
+      }
+
+      if (nodeType === 'imageUpload' || nodeType === 'videoUpload') {
+        nodeData.uploadEnabled = uploadEnabled;
+      }
+
+      addNode({
+        id: `${nodeType}-${Date.now()}`,
+        type: nodeType,
+        position,
+        data: nodeData,
+      });
+
+      setPendingNodeType(null);
+    },
+    [screenToFlowPosition, pendingNodeData, addNode, setPendingNodeType, uploadEnabled]
+  );
+
   const handleConnectStart = useCallback<OnConnectStart>((event, params) => {
     if (params.nodeId && params.handleId && params.handleType) {
       if (process.env.NODE_ENV === 'development') {
@@ -333,6 +396,34 @@ const CanvasContent = () => {
     return { stroke: '#0097A7', strokeWidth: 2 };
   }, [isConnecting, connectionValidation]);
 
+  // Auto-heal nodes that lack a valid non-default type so ReactFlow never renders built-in DefaultNode
+  const healedNodes = useMemo(() => {
+    return nodes.map((node) => {
+      let type = node.type && node.type !== 'default' ? node.type : undefined;
+      if (!type && typeof node.data?.type === 'string' && (node.data.type as string) !== 'default') {
+        type = node.data.type;
+      }
+      if (!type && node.id.includes('-')) {
+        const prefix = node.id.split('-')[0];
+        if (prefix && prefix !== 'default' && prefix !== 'node') type = prefix;
+      }
+      if (!type && typeof node.data?.label === 'string') {
+        const labelLower = node.data.label.toLowerCase();
+        if (labelLower.includes('prompt library')) type = 'promptLibrary';
+        else if (labelLower.includes('inpainting') || labelLower.includes('try-on')) type = 'inpainting';
+        else if (labelLower.includes('batch') || labelLower.includes('sizer')) type = 'batchOutputSizer';
+        else if (labelLower.includes('variation')) type = 'variation';
+        else if (labelLower.includes('style transfer')) type = 'styleTransfer';
+        else if (labelLower.includes('brand context')) type = 'brandContext';
+      }
+      const finalType = type || 'prompt';
+      if (node.type !== finalType) {
+        return { ...node, type: finalType };
+      }
+      return node;
+    });
+  }, [nodes]);
+
   return (
     <div
       ref={wrapperRef}
@@ -342,13 +433,15 @@ const CanvasContent = () => {
       }`}
     >
         <ReactFlow
-          nodes={nodes}
+          nodes={healedNodes}
           edges={edges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           onConnectStart={handleConnectStart}
           onConnectEnd={handleConnectEnd}
+          onDragOver={onDragOver}
+          onDrop={onDrop}
           nodeTypes={nodeTypes}
           fitView
           snapToGrid

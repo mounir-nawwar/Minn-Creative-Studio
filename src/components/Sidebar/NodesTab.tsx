@@ -154,8 +154,18 @@ export default function NodesTab() {
                 {category.nodes.map((item) => (
                   <button
                     key={item.type}
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('application/reactflow', item.type);
+                      e.dataTransfer.setData('application/json', JSON.stringify({
+                        type: item.type,
+                        label: item.label,
+                      }));
+                      e.dataTransfer.effectAllowed = 'move';
+                      setPendingNodeType(item.type, { label: item.label, type: item.type as any, config: {} });
+                    }}
                     onClick={() => setPendingNodeType(item.type, { label: item.label, type: item.type as any, config: {} })}
-                    className="group flex w-full items-center gap-3 rounded-lg bg-white/[0.03] p-2 ring-1 ring-white/10 transition-[transform,background-color,box-shadow] duration-150 hover:bg-white/[0.05] hover:ring-white/20 active:scale-[0.98]"
+                    className="group flex w-full cursor-grab items-center gap-3 rounded-lg bg-white/[0.03] p-2 ring-1 ring-white/10 transition-[transform,background-color,box-shadow] duration-150 hover:bg-white/[0.05] hover:ring-white/20 active:cursor-grabbing active:scale-[0.98]"
                   >
                     <span className={`flex h-7 w-7 items-center justify-center rounded-md bg-black/40 ${item.color}`}>
                       <item.icon className="h-3.5 w-3.5" />
