@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef } from 'react';
 import type { Edge } from 'reactflow';
 import { workflowsApi } from '../lib/api';
 import { useStore } from '../store/useStore';
-import { toast } from '../store/useToastStore';
 import { mergeGraphs, type CanvasNode } from '../lib/graphMerge';
 
 /**
@@ -94,14 +93,12 @@ export function useWorkflowSync({ workflowId, clientToken, isDirty, onBeforeAppl
           edges: (remote.edges ?? []) as Edge[],
         };
 
-        // Genuine foreign change. Advance the baseline in BOTH branches so a
-        // single external revision toasts once, not every poll tick.
+        // Genuine foreign change. Advance the baseline in BOTH branches silently.
         if (!isDirty()) {
           onBeforeApply();
           setNodes(remoteGraph.nodes);
           setEdges(remoteGraph.edges);
           syncedAtRef.current = remote.updated_at;
-          toast.info('Workflow updated', 'Changes from Claude or your teammate are now on the canvas');
         } else {
           const merged = mergeGraphs(
             { nodes: state.nodes as CanvasNode[], edges: state.edges },
@@ -111,7 +108,6 @@ export function useWorkflowSync({ workflowId, clientToken, isDirty, onBeforeAppl
             onBeforeApply();
             setNodes(merged.nodes);
             setEdges(merged.edges);
-            toast.info('Workflow updated', 'Merged changes from Claude or your teammate — your edits were kept');
           }
           syncedAtRef.current = remote.updated_at;
         }
