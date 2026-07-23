@@ -168,8 +168,8 @@ A separate **legacy** `auth.ts` exists (cookie/session based, `loginLimiter` + `
 ### Assets — `assets.ts`
 | Method · Path | Purpose |
 |---|---|
-| `GET /assets/all?type=&projectId=&q=&limit=&offset=` | **Global library**: every asset across all projects (playground included) with `project_name` joined in; `q` searches filename + `metadata.$.prompt`. Registered before `/:id`. |
-| `GET /assets?projectId=X&type=image` | List assets (optional type filter) |
+| `GET /assets/all?type=&projectId=&q=&limit=&offset=` | **Global library**: every asset across all projects (playground included) with `project_name` joined in; `q` searches filename + `metadata.$.prompt`. Batch 10 pagination + prefetching. |
+| `GET /assets?projectId=X&type=image&q=&limit=&offset=` | List project assets with search, type filter, limit, and offset pagination |
 | `GET /assets/:id` | Single asset |
 | `POST /assets/upload` | `multipart/form-data`: `file`, `projectId`, `workflowId?`, `nodeId?`, `metadata?` (≤100MB) |
 | `POST /assets/base64` | `{ base64, mimeType, filename?, projectId, … }` |

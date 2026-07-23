@@ -115,11 +115,11 @@ A Google-AI-Studio-style conversational creation workspace (per project **and** 
 
 | File | Responsibility |
 |---|---|
-| `LibraryGrid.tsx` | Global asset gallery over `GET /api/assets/all`: debounced search (filename + prompt), type chips, project dropdown (incl. Playground), per-card project label; `isPicker` mode reused as the Chat Studio attach-picker |
-| `LibraryDialog.tsx` | Full-screen Radix Dialog hosting the grid; opened from the **picker header** and the **canvas toolbar**; cards get a move-to-project action |
+| `LibraryGrid.tsx` | Global asset gallery over `GET /api/assets/all`: batch-10 pagination with background prefetching, `1:1`/`3:4`/`Fit` aspect-ratio view toggles, debounced search (filename + prompt), type chips, project dropdown (incl. Playground), per-card project label; `isPicker` mode reused as the Chat Studio attach-picker |
+| `LibraryDialog.tsx` | Full-screen Radix Dialog hosting the grid; gated by `{open && ...}` to ensure clean unmount and prevent hanging spinners; opened from the **picker header** and the **canvas toolbar**; cards get a move-to-project action |
 | `MoveToProjectDialog.tsx` | Pick a target project to re-home an asset (`PATCH /api/assets/:id/move`) or a chat session (`PUT /api/chats/:id` with `moveAssets:true`) |
 
-The picker page also mounts `AssetExpandModal` so Library previews work outside the main app.
+The picker page also mounts `AssetExpandModal` (with Left/Right arrow key gallery navigation, playlist support, and position counter) so Library previews work outside the main app.
 
 ---
 
@@ -129,7 +129,7 @@ The picker page also mounts `AssetExpandModal` so Library previews work outside 
 |------|----------------|---------------------|
 | `useProject.ts` | Projects list + current project. Converts API↔local `Project` shape (lifts nested `settings.*`), splits active vs archived, soft-delete (status `archived` + `deletedAt`), `cleanupExpiredProjects` past `RETENTION_DAYS`, **`enterPlayground(mode)`** (ensures the sentinel → selects it → sets `studioMode`). | `projectsApi.*`; **polls every 5s** + on mount (only while authenticated) |
 | `useChat.ts` | Chat sessions + AI replies. `sendMessage` ensures a chat exists, posts the user message, titles the chat on the first message, calls `generateText(...)` (model `gemini-3-flash-preview`, creative-director system prompt, project context, image attachments), posts the assistant reply. | `chatsApi.*` + `generateText`; **polls every 4s** |
-| `useAssets.ts` | Upload & list assets. `uploadAsset(file)` (FormData), `uploadBase64(...)` (generated images), `uploadFromUrl(...)`. | `assetsApi.*`; **polls every 5s** |
+| `useAssets.ts` | Upload & list assets with batch-10 pagination, background prefetching, and `loadMore()` support. `uploadAsset(file)` (FormData), `uploadBase64(...)` (generated images), `uploadFromUrl(...)`. | `assetsApi.*`; **polls every 5s** |
 | `useAssetExpand.tsx` | Thin wrapper exposing `setExpandedAsset` so output nodes can open the global full-screen preview. | — |
 
 ---
