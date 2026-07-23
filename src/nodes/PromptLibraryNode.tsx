@@ -95,7 +95,7 @@ const PromptLibraryNode = ({ data, id }: any) => {
 
   return (
     <BaseNode id={id} data={data} inputs={false} outputs={true}>
-      <div className="space-y-3.5">
+      <div className="nodrag nowheel space-y-3.5">
         {/* Category Pills */}
         <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-none">
           {CATEGORIES.map((cat) => (

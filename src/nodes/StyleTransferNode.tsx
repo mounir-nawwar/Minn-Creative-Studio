@@ -73,7 +73,7 @@ const StyleTransferNode = ({ data, id }: any) => {
 
   return (
     <BaseNode id={id} data={data} inputs={true} outputs={true} onRun={handleRun}>
-      <div className="space-y-4">
+      <div className="nodrag nowheel space-y-4">
         <div className="grid grid-cols-2 gap-2">
           <div className="space-y-1">
             <label className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Content Image</label>

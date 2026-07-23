@@ -34,7 +34,7 @@ const BrandContextNode = ({ data, id }: any) => {
 
   return (
     <BaseNode id={id} data={data} inputs={false} outputs={true}>
-      <div className="space-y-3.5">
+      <div className="nodrag nowheel space-y-3.5">
         <div className="space-y-3">
           <div className="space-y-1">
             <label className="text-[10px] text-gray-400 uppercase font-bold tracking-wider flex items-center gap-1">

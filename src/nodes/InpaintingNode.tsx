@@ -135,7 +135,7 @@ const InpaintingNode = ({ data, id }: any) => {
   return (
     <BaseNode id={id} data={data} inputs={true} onRun={handleRun} className="border-pink-500">
       <div className="space-y-4">
-        <div className="relative aspect-video bg-black rounded-lg overflow-hidden cursor-crosshair group border border-white/10">
+        <div className="nodrag nowheel relative aspect-video bg-black rounded-lg overflow-hidden cursor-crosshair group border border-white/10">
           <canvas
             ref={canvasRef}
             width={320}
@@ -144,7 +144,7 @@ const InpaintingNode = ({ data, id }: any) => {
             onMouseMove={draw}
             onMouseUp={stopDrawing}
             onMouseLeave={stopDrawing}
-            className="w-full h-full object-cover"
+            className="nodrag w-full h-full object-cover"
           />
           <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <button onClick={clearMask} className="p-1.5 bg-black/60 hover:bg-black/80 rounded text-white border border-white/10">

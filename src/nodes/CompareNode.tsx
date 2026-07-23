@@ -65,7 +65,7 @@ const CompareNode = ({ id, data }: any) => {
       <div className="space-y-4">
         <div 
           ref={containerRef}
-          className="relative aspect-video bg-black rounded-lg overflow-hidden cursor-col-resize select-none border border-white/10"
+          className="nodrag nowheel relative aspect-video bg-black rounded-lg overflow-hidden cursor-col-resize select-none border border-white/10"
           onMouseMove={handleMouseMove}
           onTouchMove={handleMouseMove}
           onMouseDown={handleMouseDown}

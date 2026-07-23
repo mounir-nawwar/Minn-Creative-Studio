@@ -80,7 +80,7 @@ const BatchOutputSizerNode = ({ data, id }: any) => {
 
   return (
     <BaseNode id={id} data={data} inputs={true} outputs={true} onRun={handleProcess}>
-      <div className="space-y-4">
+      <div className="nodrag nowheel space-y-4">
         {/* Input Image Preview */}
         {inputImage ? (
           <div className="space-y-1">
