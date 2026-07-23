@@ -12,7 +12,13 @@ import {
   Sun,
   Clapperboard,
   Move,
-  Film
+  Film,
+  Scissors,
+  Wand2,
+  Grid,
+  BookOpen,
+  Shield,
+  Layout
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import MinnLogo from '../assets/Minn.svg';
@@ -25,6 +31,7 @@ const Sidebar = () => {
       label: 'Text / Prompt',
       nodes: [
         { type: 'prompt', label: 'Prompt Node', icon: Type, color: 'text-blue-400' },
+        { type: 'promptLibrary', label: 'Prompt Library', icon: BookOpen, color: 'text-blue-300' },
         { type: 'directorPrompt', label: "Director's Prompt", icon: Clapperboard, color: 'text-purple-400' },
         { type: 'cameraControl', label: 'Camera Control', icon: Move, color: 'text-blue-400' },
         { type: 'promptConcatenator', label: 'Concatenator', icon: Plus, color: 'text-blue-500' },
@@ -35,19 +42,23 @@ const Sidebar = () => {
       ]
     },
     {
-      label: 'Generation',
+      label: 'Generation & Try-On',
       nodes: [
         { type: 'imageUpload', label: 'Image Upload', icon: ImageIcon, color: 'text-blue-400' },
         { type: 'videoUpload', label: 'Video Upload', icon: Video, color: 'text-blue-500' },
         { type: 'imagen', label: 'Image Generator', icon: ImageIcon, color: 'text-purple-400' },
+        { type: 'inpainting', label: 'Inpainting (Virtual Try-On)', icon: Scissors, color: 'text-pink-400' },
+        { type: 'styleTransfer', label: 'Style Transfer', icon: Wand2, color: 'text-purple-300' },
+        { type: 'variation', label: 'Image Variations', icon: Grid, color: 'text-emerald-400' },
         { type: 'veo', label: 'Veo Video', icon: Video, color: 'text-red-400' },
         { type: 'imageToVideo', label: 'Image to Video', icon: Video, color: 'text-orange-400' },
         { type: 'lyria', label: 'Lyria Audio', icon: Zap, color: 'text-pink-400' },
       ]
     },
     {
-      label: 'Editing Tools',
+      label: 'Editing & Sizing',
       nodes: [
+        { type: 'batchOutputSizer', label: 'Batch Sizer (Social Ratios)', icon: Layout, color: 'text-cyan-400' },
         { type: 'levels', label: 'Levels', icon: ImageIcon, color: 'text-green-400' },
         { type: 'compositor', label: 'Compositor', icon: ImageIcon, color: 'text-green-600' },
         { type: 'painter', icon: Pencil, label: 'Painter', color: 'text-green-200' },
@@ -87,8 +98,9 @@ const Sidebar = () => {
       ]
     },
     {
-      label: 'Data / Control',
+      label: 'Data & Brand Control',
       nodes: [
+        { type: 'brandContext', label: 'Brand Context', icon: Shield, color: 'text-yellow-400' },
         { type: 'number', label: 'Number', icon: Plus, color: 'text-blue-400' },
         { type: 'text', label: 'Text', icon: Type, color: 'text-blue-400' },
         { type: 'toggle', label: 'Toggle', icon: Zap, color: 'text-blue-400' },
