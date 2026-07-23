@@ -102,8 +102,9 @@ const BaseNode: React.FC<BaseNodeProps> = ({
             type={type}
             position={position}
             id={handleId}
+            title={type === 'target' ? 'Input' : 'Output'}
             className={cn(
-              "w-3 h-3 bg-[#0097A7] border-2 border-[#111111] hover:scale-110 transition-all duration-100 z-10",
+              "w-3 h-3 bg-[#0097A7] border-2 border-[#111111] hover:scale-125 transition-all duration-100 z-10 cursor-pointer",
               position === Position.Left ? "-left-[6px]" : "-right-[6px]",
               getHandleHoverClass(handleId)
             )}
@@ -117,6 +118,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
     return handles.map((handle, index) => {
       const position = handle.position || (type === 'target' ? Position.Left : Position.Right);
       const topPercent = calcHandlePosition(index, handles.length);
+      const tooltip = `${handle.label || handle.id} (${handle.type})`;
 
       return (
         <Handle
@@ -124,8 +126,9 @@ const BaseNode: React.FC<BaseNodeProps> = ({
           type={type}
           position={position}
           id={handle.id}
+          title={tooltip}
           className={cn(
-            "w-3 h-3 bg-[#0097A7] border-2 border-[#111111] hover:scale-110 transition-all duration-100 z-10",
+            "w-3 h-3 bg-[#0097A7] border-2 border-[#111111] hover:scale-125 transition-all duration-100 z-10 cursor-pointer",
             position === Position.Left ? "-left-[6px]" : "-right-[6px]",
             getHandleHoverClass(handle.id)
           )}
