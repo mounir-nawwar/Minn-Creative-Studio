@@ -1,8 +1,10 @@
 import { useEffect } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { X, Download, Heart, Trash2, Info, Calendar, Box, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Download, Heart, Trash2, Info, Calendar, Box, Sparkles, ChevronLeft, ChevronRight, MessageSquare } from 'lucide-react';
 import { Asset } from '../types/project.types';
 import { downloadFile } from '../lib/utils';
+import { useProjectStore } from '../store/useProjectStore';
+import { toast } from '../store/useToastStore';
 
 interface AssetPreviewModalProps {
   asset: Asset | null;
@@ -44,6 +46,13 @@ export default function AssetPreviewModal({
   currentIndex,
   totalCount,
 }: AssetPreviewModalProps) {
+  const setStudioMode = useProjectStore((s) => s.setStudioMode);
+
+  const handleDiscussInChat = () => {
+    setStudioMode('chat');
+    onClose();
+    toast.success('Opened Chat Studio', 'Switching to Chat Studio');
+  };
   useEffect(() => {
     if (!asset) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -169,6 +178,14 @@ export default function AssetPreviewModal({
                       Download
                     </button>
                   </div>
+
+                  <button
+                    onClick={handleDiscussInChat}
+                    className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#0097A7]/20 text-sm font-medium text-[#0097A7] ring-1 ring-[#0097A7]/40 transition-[transform,background-color] duration-150 hover:bg-[#0097A7]/30 hover:text-white active:scale-[0.98]"
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                    Discuss in Chat Studio
+                  </button>
 
                   <div className="space-y-1">
                     <div className="mb-2 flex items-center gap-2 text-gray-400">

@@ -46,6 +46,8 @@ import CameraControlNode from '../nodes/CameraControlNode';
 import SequenceNode from '../nodes/SequenceNode';
 import ImageUploadNode from '../nodes/ImageUploadNode';
 import VideoUploadNode from '../nodes/VideoUploadNode';
+import InpaintingNode from '../nodes/InpaintingNode';
+import BatchOutputSizerNode from '../nodes/BatchOutputSizerNode';
 
 export const nodeTypes = {
   prompt: PromptNode,
@@ -97,4 +99,6 @@ export const nodeTypes = {
   cfgScale: CFGScaleNode,
   imageUpload: ImageUploadNode,
   videoUpload: VideoUploadNode,
+  inpainting: InpaintingNode,
+  batchOutputSizer: BatchOutputSizerNode,
 };

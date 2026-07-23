@@ -1,5 +1,7 @@
-import { Loader2, ImageIcon, Film, Music, Trash2 } from 'lucide-react';
+import { Loader2, ImageIcon, Film, Music, Trash2, LayoutGrid } from 'lucide-react';
 import { useStore } from '../../store/useStore';
+import { useProjectStore } from '../../store/useProjectStore';
+import { toast } from '../../store/useToastStore';
 import VideoPreview from '../VideoPreview';
 import AudioPreview from '../AudioPreview';
 import type { MessageAttachment as Attachment } from '../../lib/api';
@@ -11,18 +13,44 @@ interface MediaAttachmentProps {
   onDelete?: () => void;
 }
 
-/** Hover-reveal delete overlay, positioned directly on the media so it's always reachable */
-function DeleteOverlay({ onDelete }: { onDelete: () => void }) {
+/** Hover-reveal action overlay, positioned directly on the media */
+function MediaOverlay({ onDelete, att }: { onDelete?: () => void; att: Attachment }) {
+  const setPendingNodeType = useStore((s) => s.setPendingNodeType);
+  const setStudioMode = useProjectStore((s) => s.setStudioMode);
+
+  const handleSendToCanvas = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const type = att.type === 'video' ? 'videoUpload' : 'imageUpload';
+    setPendingNodeType(type, { type, label: att.name || 'From Chat Studio', output: att.url, config: { url: att.url } });
+    setStudioMode('canvas');
+    toast.success('Sent to Canvas', 'Click anywhere on the canvas grid to place the node');
+  };
+
   return (
-    <button
-      type="button"
-      onClick={(e) => { e.stopPropagation(); onDelete(); }}
-      aria-label="Delete"
-      title="Delete — frees this out of the conversation's context"
-      className="absolute right-1.5 top-1.5 z-10 inline-flex h-6 w-6 items-center justify-center rounded-md bg-black/60 text-gray-300 opacity-0 backdrop-blur-sm transition-[opacity,color,background-color] duration-150 hover:bg-red-500/80 hover:text-white group-hover:opacity-100"
-    >
-      <Trash2 className="h-3 w-3" />
-    </button>
+    <div className="absolute right-1.5 top-1.5 z-10 flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+      <button
+        type="button"
+        onClick={handleSendToCanvas}
+        aria-label="Send to Canvas"
+        title="Send to Canvas — place this node on your React Flow workspace"
+        className="inline-flex h-6 items-center gap-1 rounded-md bg-black/70 px-2 text-[10px] font-medium text-white backdrop-blur-sm transition-[transform,background-color] duration-150 hover:bg-[#0097A7] active:scale-[0.96]"
+      >
+        <LayoutGrid className="h-3 w-3" />
+        <span>Canvas</span>
+      </button>
+
+      {onDelete && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          aria-label="Delete"
+          title="Delete — frees this out of the conversation's context"
+          className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-black/70 text-gray-300 backdrop-blur-sm transition-[transform,color,background-color] duration-150 hover:bg-red-500/80 hover:text-white active:scale-[0.96]"
+        >
+          <Trash2 className="h-3 w-3" />
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -40,7 +68,7 @@ export function MediaAttachment({ att, onDelete }: MediaAttachmentProps) {
         >
           <img src={att.url} alt={att.name || 'Generated image'} className="block max-h-[360px] w-auto max-w-full object-contain" loading="lazy" />
         </button>
-        {onDelete && <DeleteOverlay onDelete={onDelete} />}
+        <MediaOverlay onDelete={onDelete} att={att} />
       </div>
     );
   }
@@ -49,7 +77,7 @@ export function MediaAttachment({ att, onDelete }: MediaAttachmentProps) {
     return (
       <div className="group relative w-full max-w-[480px] cursor-pointer" onClick={() => setExpandedAsset(att.url, 'video')}>
         <VideoPreview url={att.url} />
-        {onDelete && <DeleteOverlay onDelete={onDelete} />}
+        <MediaOverlay onDelete={onDelete} att={att} />
       </div>
     );
   }
@@ -57,7 +85,7 @@ export function MediaAttachment({ att, onDelete }: MediaAttachmentProps) {
   return (
     <div className="group relative w-full max-w-[380px]">
       <AudioPreview url={att.url} />
-      {onDelete && <DeleteOverlay onDelete={onDelete} />}
+      <MediaOverlay onDelete={onDelete} att={att} />
     </div>
   );
 }

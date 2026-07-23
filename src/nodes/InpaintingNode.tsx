@@ -20,10 +20,14 @@ const InpaintingNode = ({ data, id }: any) => {
   const { addAsset } = useAssets();
   const { setExpandedAsset } = useAssetExpand();
 
-  useEffect(() => {
-    const edge = useStore.getState().edges.find(e => e.target === id && e.targetHandle === 'imageUrl');
+  const findInputImage = (): string | undefined => {
+    const edge = useStore.getState().edges.find(e => e.target === id);
     const sourceNode = useStore.getState().nodes.find(n => n.id === edge?.source);
-    const imageUrl = sourceNode?.data?.output;
+    return sourceNode?.data?.output || sourceNode?.data?.outputs?.[0] || data.config?.imageUrl;
+  };
+
+  useEffect(() => {
+    const imageUrl = findInputImage();
 
     if (canvasRef.current && imageUrl) {
       const ctx = canvasRef.current.getContext('2d');
@@ -36,7 +40,7 @@ const InpaintingNode = ({ data, id }: any) => {
         };
       }
     }
-  }, [id]);
+  }, [id, data.config?.imageUrl]);
 
   const startDrawing = (e: React.MouseEvent) => {
     setIsDrawing(true);
@@ -71,9 +75,7 @@ const InpaintingNode = ({ data, id }: any) => {
   };
 
   const clearMask = () => {
-    const edge = useStore.getState().edges.find(e => e.target === id && e.targetHandle === 'imageUrl');
-    const sourceNode = useStore.getState().nodes.find(n => n.id === edge?.source);
-    const imageUrl = sourceNode?.data?.output;
+    const imageUrl = findInputImage();
 
     if (canvasRef.current && imageUrl) {
       const ctx = canvasRef.current.getContext('2d');
@@ -90,9 +92,7 @@ const InpaintingNode = ({ data, id }: any) => {
   };
 
   const handleRun = async () => {
-    const edge = useStore.getState().edges.find(e => e.target === id && e.targetHandle === 'imageUrl');
-    const sourceNode = useStore.getState().nodes.find(n => n.id === edge?.source);
-    const imageUrl = sourceNode?.data?.output;
+    const imageUrl = findInputImage();
 
     if (!imageUrl || !canvasRef.current) {
       updateNodeData(id, { error: "No image input connected" });

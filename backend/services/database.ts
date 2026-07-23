@@ -479,15 +479,19 @@ function parseAttachments(raw: unknown): MessageAttachment[] {
 // Message operations
 export const messages = {
   create: (id: string, chatId: string, role: 'user' | 'assistant', content: string, attachments: MessageAttachment[] = []) => {
-    const stmt = db.prepare(`
-      INSERT INTO messages (id, chat_id, role, content, attachments)
-      VALUES (?, ?, ?, ?, ?)
-    `);
-    stmt.run(id, chatId, role, content, JSON.stringify(attachments));
+    const createTx = db.transaction(() => {
+      const stmt = db.prepare(`
+        INSERT INTO messages (id, chat_id, role, content, attachments)
+        VALUES (?, ?, ?, ?, ?)
+      `);
+      stmt.run(id, chatId, role, content, JSON.stringify(attachments));
 
-    // Update chat's last_message and updated_at
-    const updateChat = db.prepare('UPDATE chats SET last_message = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
-    updateChat.run(content.substring(0, 200), chatId);
+      // Update chat's last_message and updated_at
+      const updateChat = db.prepare('UPDATE chats SET last_message = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
+      updateChat.run(content.substring(0, 200), chatId);
+    });
+
+    createTx();
 
     return { id, chatId, role, content, attachments };
   },
@@ -661,24 +665,28 @@ export const assets = {
 // Usage tracking operations
 export const usageLogs = {
   log: (projectId: string, userId: string, type: 'image' | 'video' | 'audio' | 'text', cost: number, tokenCount?: number, metadata?: any) => {
-    const stmt = db.prepare(`
-      INSERT INTO usage_logs (project_id, user_id, type, cost, token_count, metadata)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `);
-    stmt.run(projectId, userId, type, cost, tokenCount || 0, JSON.stringify(metadata || {}));
+    const logTx = db.transaction(() => {
+      const stmt = db.prepare(`
+        INSERT INTO usage_logs (project_id, user_id, type, cost, token_count, metadata)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `);
+      stmt.run(projectId, userId, type, cost, tokenCount || 0, JSON.stringify(metadata || {}));
 
-    // Update project usage summary
-    const updateProject = db.prepare(`
-      UPDATE projects SET usage = json_set(
-        COALESCE(usage, '{}'),
-        '$.totalCost', COALESCE(json_extract(usage, '$.totalCost'), 0) + ?,
-        '$.total${type.charAt(0).toUpperCase() + type.slice(1)}s', COALESCE(json_extract(usage, '$.total${type.charAt(0).toUpperCase() + type.slice(1)}s'), 0) + 1,
-        '$.totalTokens', COALESCE(json_extract(usage, '$.totalTokens'), 0) + ?,
-        '$.lastUpdated', datetime('now')
-      )
-      WHERE id = ?
-    `);
-    updateProject.run(cost, tokenCount || 0, projectId);
+      // Update project usage summary
+      const updateProject = db.prepare(`
+        UPDATE projects SET usage = json_set(
+          COALESCE(usage, '{}'),
+          '$.totalCost', COALESCE(json_extract(usage, '$.totalCost'), 0) + ?,
+          '$.total${type.charAt(0).toUpperCase() + type.slice(1)}s', COALESCE(json_extract(usage, '$.total${type.charAt(0).toUpperCase() + type.slice(1)}s'), 0) + 1,
+          '$.totalTokens', COALESCE(json_extract(usage, '$.totalTokens'), 0) + ?,
+          '$.lastUpdated', datetime('now')
+        )
+        WHERE id = ?
+      `);
+      updateProject.run(cost, tokenCount || 0, projectId);
+    });
+
+    logTx();
   },
 
   getByProjectId: (projectId: string, startDate?: Date, endDate?: Date) => {

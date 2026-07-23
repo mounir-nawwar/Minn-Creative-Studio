@@ -38,8 +38,83 @@ import * as path from 'path';
 // Always use Vertex AI for all AI calls
 const USE_VERTEX_AI = true;
 
-/** Dedup guard so an LRO's cost is tracked once across repeated polls. */
+/** Dedup guard so an LRO's cost is tracked once across repeated polls (max 1000 items). */
+const MAX_TRACKED_OPERATIONS = 1000;
 const trackedOperations = new Set<string>();
+
+function markOperationTracked(opName: string): boolean {
+  if (!opName) return false;
+  if (trackedOperations.has(opName)) return false;
+  if (trackedOperations.size >= MAX_TRACKED_OPERATIONS) {
+    const oldest = trackedOperations.keys().next().value;
+    if (oldest) trackedOperations.delete(oldest);
+  }
+  trackedOperations.add(opName);
+  return true;
+}
+
+/**
+ * Server-side background worker: polls active Veo/Lyria LRO operations to completion.
+ * Guarantees that cost tracking and asset records complete even if the browser tab closes mid-generation.
+ */
+function registerBackgroundLroTracker(opName: string, params: any, via: GenerationVia = 'app') {
+  if (!opName || trackedOperations.has(opName)) return;
+
+  const POLL_INTERVAL = 5000;
+  const MAX_POLLS = 120; // 10 minutes max
+  let polls = 0;
+
+  const interval = setInterval(async () => {
+    polls++;
+    if (polls > MAX_POLLS || trackedOperations.has(opName)) {
+      clearInterval(interval);
+      return;
+    }
+
+    try {
+      const result = await vertexGetOperation(opName);
+      if (result?.done) {
+        clearInterval(interval);
+        if (markOperationTracked(opName)) {
+          const effectiveProjectId = params.projectId || params._projectId;
+          const isAudioOp = params._audioModel?.includes('lyria');
+          const isVideoOp = !isAudioOp && (params._audioModel?.includes('veo') || !params.model?.includes('lyria'));
+
+          if (effectiveProjectId && isVideoOp) {
+            const videoModel = params.model || 'veo-3.1-generate-001';
+            const videoCount = result?.response?.generatedVideos?.length || params.config?.numberOfVideos || 1;
+            const costPerVideo = calculateCost(videoModel, {}, {
+              duration: params.config?.duration,
+              resolution: params.config?.resolution,
+              audio: params.config?.audio,
+            });
+            const videoCost = costPerVideo * videoCount;
+            if (videoCost > 0) {
+              await trackProjectCost(effectiveProjectId, videoCost, {
+                type: 'video',
+                videoCount,
+                via,
+              });
+            }
+          }
+
+          if (effectiveProjectId && isAudioOp && params._audioModel) {
+            const audioCost = calculateCost(params._audioModel, {});
+            if (audioCost > 0) {
+              await trackProjectCost(effectiveProjectId, audioCost, {
+                type: 'audio',
+                audioCount: 1,
+                via,
+              });
+            }
+          }
+        }
+      }
+    } catch (err) {
+      // quiet retry on background poll
+    }
+  }, POLL_INTERVAL);
+}
 
 export type GenerationMethod =
   | 'generateContent'
@@ -132,13 +207,16 @@ export async function runGeneration({ method, params: incomingParams, userId, si
         if (config.scale) instance.scale = config.scale;
         const url = `https://us-central1-aiplatform.googleapis.com/v1/projects/${VERTEX_PROJECT}/locations/us-central1/publishers/google/models/${model}:predictLongRunning`;
         const op = await vertexRest(url, 'POST', { instances: [instance], parameters: { sampleCount: 1 } });
+        if (op?.name) {
+          registerBackgroundLroTracker(op.name, { ...params, _audioModel: sdkParams.model, _projectId: projectId }, via);
+        }
 
         // Context for cost tracking when the operation completes (getOperation)
         return {
           operation: op.name,
           isLro: true,
-          _audioModel: model,
-          _projectId: projectId
+          _audioModel: sdkParams.model,
+          _projectId: projectId,
         };
       } else {
         response = await vertexPredict(sdkParams);
@@ -275,6 +353,12 @@ export async function runGeneration({ method, params: incomingParams, userId, si
     const result = USE_VERTEX_AI
       ? await vertexGenerateVideos(params)
       : await devAi!.models.generateVideos(params);
+    
+    const opName = typeof result === 'string' ? result : (result?.name || result?.operation?.name);
+    if (opName) {
+      registerBackgroundLroTracker(opName, params, via);
+    }
+
     // Cost is tracked in getOperation when done — avoids double-counting the LRO
     return result;
   }
@@ -290,9 +374,7 @@ export async function runGeneration({ method, params: incomingParams, userId, si
     const isAudioOp = _audioModel?.includes('lyria');
     const isVideoOp = !isAudioOp && (_audioModel?.includes('veo') || !model?.includes('lyria'));
 
-    if (result?.done && effectiveProjectId && opName && !trackedOperations.has(opName)) {
-      trackedOperations.add(opName);
-
+    if (result?.done && effectiveProjectId && opName && markOperationTracked(opName)) {
       // Video cost tracking
       if (isVideoOp) {
         const videoModel = model || 'veo-3.1-generate-001';

@@ -5,13 +5,14 @@ import { isValidImageUrl } from '../utils/imageValidation.ts';
 const router = express.Router();
 
 interface ProxyCacheEntry {
-  data: string;
+  buffer: Buffer;
   mimeType: string;
   timestamp: number;
 }
 
 const TTL_MS = 15 * 60 * 1000; // 15 minutes
 const MAX_CACHE_ENTRIES = 100;
+const MAX_IMAGE_SIZE_BYTES = 15 * 1024 * 1024; // 15MB size guard
 const imageCache = new Map<string, ProxyCacheEntry>();
 
 function getCachedImage(url: string): ProxyCacheEntry | null {
@@ -46,7 +47,7 @@ router.post('/', requireAuth, async (req, res) => {
   const cached = getCachedImage(url);
   if (cached) {
     return res.json({
-      data: cached.data,
+      data: cached.buffer.toString('base64'),
       mimeType: cached.mimeType,
       cached: true,
     });
@@ -55,18 +56,29 @@ router.post('/', requireAuth, async (req, res) => {
   try {
     const response = await fetch(url);
     if (!response.ok) return res.status(502).json({ error: `Failed to fetch image: ${response.status}` });
-    const buffer = await response.arrayBuffer();
-    const data = Buffer.from(buffer).toString('base64');
+
+    // Check Content-Length header guard
+    const contentLength = response.headers.get('content-length');
+    if (contentLength && parseInt(contentLength, 10) > MAX_IMAGE_SIZE_BYTES) {
+      return res.status(413).json({ error: 'Image size exceeds maximum allowed limit (15MB)' });
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    if (arrayBuffer.byteLength > MAX_IMAGE_SIZE_BYTES) {
+      return res.status(413).json({ error: 'Image size exceeds maximum allowed limit (15MB)' });
+    }
+
+    const buffer = Buffer.from(arrayBuffer);
     const mimeType = response.headers.get('content-type') || 'image/jpeg';
 
     setCachedImage(url, {
-      data,
+      buffer,
       mimeType,
       timestamp: Date.now(),
     });
 
     res.json({
-      data,
+      data: buffer.toString('base64'),
       mimeType,
     });
   } catch (err: unknown) {
