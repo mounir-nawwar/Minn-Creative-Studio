@@ -134,15 +134,7 @@ export function useProject() {
     const newUsage = JSON.stringify(updated.usage);
     const currentUsage = JSON.stringify(storeCurrentProject.usage);
     
-    console.log('[useProject] Sync check:', {
-      projectId: storeCurrentProject.id,
-      updatedUsage: updated.usage,
-      currentUsage: storeCurrentProject.usage,
-      isDifferent: newUsage !== currentUsage
-    });
-    
     if (newUsage !== currentUsage) {
-      console.log('[useProject] Updating currentProject');
       useProjectStore.getState().setCurrentProject(updated);
     }
   }, [projects]);
