@@ -220,6 +220,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
 
 // Memoized for 60 FPS Canvas performance on large graphs
 export const MemoizedBaseNode = React.memo(BaseNode, (prev, next) => {
+  if (prev.children !== next.children) return false;
   if (prev.id !== next.id) return false;
   if (prev.className !== next.className) return false;
   if (prev.inputs !== next.inputs) return false;

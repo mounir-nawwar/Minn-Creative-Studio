@@ -5,6 +5,7 @@ import { authHeader } from '../lib/api';
 import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
 import { NodeOutput, RunButton } from './ui';
+import AskAIButton from '../components/AskAIButton';
 
 const PRESET_TEMPLATES = [
   {
@@ -67,8 +68,8 @@ const PromptLibraryNode = ({ data, id }: any) => {
           const userPrompts = result.map((p: any) => ({
             id: p.id || `saved-${Date.now()}`,
             category: 'Saved',
-            text: p.text || p.content,
-            tags: p.tags || ['saved']
+            text: p.text || p.content || p.prompt,
+            tags: Array.isArray(p.tags) ? p.tags : ['saved']
           }));
           setPrompts([...PRESET_TEMPLATES, ...userPrompts]);
         }
@@ -86,18 +87,41 @@ const PromptLibraryNode = ({ data, id }: any) => {
     });
   };
 
+  const handleAISuggestion = (suggestion: any) => {
+    if (suggestion.prompt || suggestion.text) {
+      const newPromptText = suggestion.prompt || suggestion.text;
+      const newTemplate = {
+        id: `ai-${Date.now()}`,
+        category: 'Saved',
+        text: newPromptText,
+        tags: ['ai-generated', 'custom']
+      };
+      setPrompts((prev) => [newTemplate, ...prev]);
+      handleSelectPrompt(newPromptText);
+    }
+  };
+
   const filteredPrompts = prompts.filter(p => {
     const matchesCategory = category === 'All' || p.category === category;
     const q = search.toLowerCase();
-    const matchesSearch = !q || p.text.toLowerCase().includes(q) || p.tags.some((t: string) => t.toLowerCase().includes(q));
+    const tags = Array.isArray(p.tags) ? p.tags : [];
+    const matchesSearch = !q || p.text?.toLowerCase().includes(q) || tags.some((t: string) => t.toLowerCase().includes(q));
     return matchesCategory && matchesSearch;
   });
 
   return (
-    <BaseNode id={id} data={data} inputs={false} outputs={true}>
-      <div className="nodrag nowheel space-y-3.5">
+    <BaseNode id={id} data={data} inputs={false} outputs={true} icon={BookOpen}>
+      <div className="nodrag nowheel space-y-3">
+        {/* Ask AI to generate custom prompt */}
+        <AskAIButton
+          nodeType="Prompt Library"
+          currentConfig={{ prompt: selectedText }}
+          onSuggestion={handleAISuggestion}
+          label="Ask AI for Custom Prompt Template"
+        />
+
         {/* Category Pills */}
-        <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-none">
+        <div className="flex gap-1 overflow-x-auto pb-0.5 scrollbar-none">
           {CATEGORIES.map((cat) => (
             <button
               key={cat}
@@ -105,7 +129,7 @@ const PromptLibraryNode = ({ data, id }: any) => {
               onClick={() => setCategory(cat)}
               className={`shrink-0 rounded-md px-2 py-1 text-[10px] font-medium transition-colors ${
                 category === cat
-                  ? 'bg-[#0097A7] text-white'
+                  ? 'bg-[#0097A7] text-white font-semibold'
                   : 'bg-white/[0.04] text-gray-400 hover:bg-white/[0.08] hover:text-white'
               }`}
             >
@@ -121,7 +145,7 @@ const PromptLibraryNode = ({ data, id }: any) => {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search prompt templates..."
+            placeholder="Search templates & tags..."
             className="w-full bg-black/50 border border-white/10 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder:text-gray-600 focus:outline-none focus:border-[#0097A7]/60"
           />
         </div>
@@ -131,6 +155,7 @@ const PromptLibraryNode = ({ data, id }: any) => {
           {filteredPrompts.length > 0 ? (
             filteredPrompts.map((p) => {
               const isSelected = selectedText === p.text;
+              const tags = Array.isArray(p.tags) ? p.tags : [];
               return (
                 <button
                   key={p.id}
@@ -146,18 +171,20 @@ const PromptLibraryNode = ({ data, id }: any) => {
                     <p className="text-[11px] leading-relaxed line-clamp-2 flex-1">{p.text}</p>
                     {isSelected && <Check className="w-3.5 h-3.5 text-[#0097A7] shrink-0 mt-0.5" />}
                   </div>
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {p.tags.map((tag: string, idx: number) => (
-                      <span key={idx} className="px-1.5 py-0.5 bg-black/40 rounded text-[9px] text-gray-500 flex items-center gap-1 border border-white/5">
-                        <Tag className="w-2 h-2 text-[#0097A7]" /> {tag}
-                      </span>
-                    ))}
-                  </div>
+                  {tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {tags.map((tag: string, idx: number) => (
+                        <span key={idx} className="px-1.5 py-0.5 bg-black/40 rounded text-[9px] text-gray-400 flex items-center gap-1 border border-white/5">
+                          <Tag className="w-2 h-2 text-[#0097A7]" /> {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </button>
               );
             })
           ) : (
-            <div className="text-center py-6 text-gray-600 text-xs italic">No matching templates</div>
+            <div className="text-center py-6 text-gray-600 text-xs italic">No matching templates found</div>
           )}
         </div>
 
