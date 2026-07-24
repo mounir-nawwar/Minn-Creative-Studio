@@ -5,7 +5,7 @@ import { AUTH_CONFIG } from './auth.ts';
 const IS_PRODUCTION = AUTH_CONFIG.isProduction;
 
 export const allowedOrigins = IS_PRODUCTION
-  ? ['https://studio.minnagency.com', 'http://150.230.52.15:3000', 'https://150.230.52.15:3000']
+  ? [process.env.PUBLIC_BASE_URL || 'https://studio.yourdomain.com']
   : ['http://localhost:5173', 'http://localhost:3000'];
 
 // The frontend is served by this same Express app (same-origin), and all auth is

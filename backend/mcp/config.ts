@@ -5,7 +5,7 @@
 
 /**
  * Public origin used as the OAuth issuer and in token/resource metadata URLs.
- * Must be set in production (https://studio.minnagency.com); falls back to
+ * Must be set in production (e.g. https://studio.yourdomain.com); falls back to
  * localhost for dev so the inspector/Claude Code can connect locally.
  */
 export function getPublicBaseUrl(): string {

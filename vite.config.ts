@@ -40,8 +40,7 @@ export default defineConfig(({mode}) => {
       // Do not modify—file watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
       allowedHosts: [
-        'studio.minnagency.com',
-        'minn-creative-studio-491780181711.europe-west1.run.app',
+        'studio.yourdomain.com',
         'localhost'
       ]
     },

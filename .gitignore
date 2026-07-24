@@ -28,5 +28,7 @@ cors.json
 # Local file storage
 storage/
 
-# Personal local notes (never committed)
+# Personal local notes & internal docs (never committed)
 *.local.md
+docs/
+src/AGENTS*.md

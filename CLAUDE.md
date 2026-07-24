@@ -16,7 +16,7 @@ tool, not a public SaaS. One Node process (`server.ts`) serves both the React SP
 Older docs (and any lingering comments) describe **Firebase + Google OAuth + a Gemini API key**. **All of that
 is gone.** The current architecture is:
 
-- **Auth:** local **JWT** (access 1h / refresh 30d), 2 hardcoded users (`mounir.nawwar`, `rana.tadmori`), PBKDF2 hashing.
+- **Auth:** local **JWT** (access 1h / refresh 30d), 2 hardcoded users (`user_1`, `user_2`), PBKDF2 hashing.
 - **Database:** **SQLite** via `better-sqlite3` (`data/minn-studio.db`, WAL).
 - **Storage:** **local filesystem** under `STORAGE_PATH`, served at `/storage`.
 - **AI:** **Google Vertex AI only** (Gemini, Imagen 4, Veo 3.1, Lyria 3) behind one proxy route.
