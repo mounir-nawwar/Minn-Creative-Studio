@@ -65,6 +65,9 @@ export function useWorkflowSync({ workflowId, clientToken, isDirty, onBeforeAppl
 
     const pull = async () => {
       if (cancelled || applyingRef.current) return;
+      // Pause the version probe while the tab is backgrounded; the next tick
+      // catches up once it's visible again.
+      if (document.hidden) return;
       try {
         const version = await workflowsApi.getVersion(workflowId);
         if (cancelled) return;

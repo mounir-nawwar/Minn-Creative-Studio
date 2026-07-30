@@ -1,16 +1,18 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useProjectStore, isPlaygroundProject } from '../../store/useProjectStore';
 import { useStore } from '../../store/useStore';
 import { buildProjectContext } from '../../lib/projectContext';
 import { toast } from '../../store/useToastStore';
 import { chatsApi, Chat, ChatMessage, MessageAttachment } from '../../lib/api';
+import { useChatsQuery } from '../../hooks/queries/useChatsQuery';
+import { useChatMessagesQuery } from '../../hooks/queries/useChatMessagesQuery';
+import { queryKeys } from '../../hooks/queries/keys';
 import { generateText, generateImage, generateVideo, generateAudio } from '../../services/geminiService';
 import { DEFAULT_MODEL_FOR_MODE, findModel } from '../../lib/models';
 import type { GenerationMode } from '../../lib/models';
 
 export type { Chat, ChatMessage, MessageAttachment };
-
-const POLL_INTERVAL = 4000;
 
 export const CREATIVE_DIRECTOR_INSTRUCTION =
   'You are a creative director assistant for AI video/image generation. You specialize in writing detailed generative prompts for Midjourney, Stable Diffusion, Sora, Runway, Kling, and similar tools. When asked for prompts, write complete, rich, detailed prompts with specific visual descriptions. Help with visual ideas, camera directions, lighting setups, style references, color palettes, and technical advice. Wrap any prompt in a fenced code block (triple backticks) so it renders as a copyable block.\n\nIMPORTANT: Match your response length to what was asked. Casual messages get short natural replies. Only go detailed when the user explicitly asks for prompts, ideas, or guidance. Never volunteer unsolicited project analysis or example prompts.';
@@ -49,7 +51,9 @@ function mergeMessages(server: ChatMessage[], local: ChatMessage[]): ChatMessage
 export function useChatStudio() {
   const { currentProject } = useProjectStore();
   const { activeChatId, setActiveChatId } = useStore();
-  const [chats, setChats] = useState<Chat[]>([]);
+  const queryClient = useQueryClient();
+  const { data: chatsData } = useChatsQuery(currentProject?.id);
+  const chats = chatsData ?? [];
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [pending, setPending] = useState<PendingGeneration | null>(null);
   const [settings, setSettingsState] = useState<GenerationSettings>(defaultSettings);
@@ -78,48 +82,28 @@ export function useChatStudio() {
     });
   }, []);
 
-  const fetchChats = useCallback(async () => {
-    if (!currentProject) return;
-    try {
-      const allChats = await chatsApi.list();
-      setChats(allChats.filter((c) => c.project_id === currentProject.id));
-    } catch (error) {
-      console.error('Failed to fetch chats:', error);
-    }
-  }, [currentProject?.id]);
+  const invalidateChats = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: queryKeys.chats(currentProject?.id) }),
+    [queryClient, currentProject?.id],
+  );
 
-  const fetchMessages = useCallback(async () => {
-    if (!activeChatId) {
-      setMessages([]);
-      return;
-    }
-    // Skip reconcile mid-generation so in-flight bubbles never flicker away
-    if (generatingRef.current) return;
-    try {
-      const chat = await chatsApi.get(activeChatId);
-      setMessages((prev) => mergeMessages(chat.messages || [], prev));
-    } catch (error) {
-      console.error('Failed to fetch messages:', error);
-    }
+  // Server message snapshot comes from the shared, visibility-gated query. We
+  // reconcile it into local state (which also carries optimistic bubbles)
+  // rather than reading it directly — see the generatingRef guard below.
+  const messagesQuery = useChatMessagesQuery(activeChatId);
+
+  // Clear immediately on chat switch; the query for the new chat refills below.
+  useEffect(() => {
+    setMessages([]);
   }, [activeChatId]);
 
   useEffect(() => {
-    if (!currentProject) {
-      setChats([]);
-      return;
-    }
-    fetchChats();
-    const interval = setInterval(fetchChats, POLL_INTERVAL);
-    return () => clearInterval(interval);
-  }, [fetchChats, currentProject]);
-
-  useEffect(() => {
-    setMessages([]);
-    if (!activeChatId) return;
-    fetchMessages();
-    const interval = setInterval(fetchMessages, POLL_INTERVAL);
-    return () => clearInterval(interval);
-  }, [fetchMessages, activeChatId]);
+    // Skip reconcile mid-generation so in-flight bubbles never flicker away.
+    if (generatingRef.current) return;
+    const server = messagesQuery.data?.messages;
+    if (!server) return;
+    setMessages((prev) => mergeMessages(server, prev));
+  }, [messagesQuery.data]);
 
   const appendMessage = useCallback((message: ChatMessage) => {
     setMessages((prev) => (prev.some((m) => m.id === message.id) ? prev : [...prev, message]));
@@ -144,23 +128,23 @@ export function useChatStudio() {
     try {
       const newChat = await chatsApi.create({ title: 'New session', projectId: currentProject.id });
       setActiveChatId(newChat.id);
-      await fetchChats();
+      await invalidateChats();
     } catch (error) {
       console.error('Failed to create chat:', error);
       toast.error('Chat Error', 'Failed to create new chat');
     }
-  }, [currentProject, setActiveChatId, fetchChats]);
+  }, [currentProject, setActiveChatId, invalidateChats]);
 
   const deleteChat = useCallback(async (chatId: string) => {
     if (activeChatId === chatId) setActiveChatId(null);
     try {
       await chatsApi.delete(chatId);
-      await fetchChats();
+      await invalidateChats();
     } catch (error) {
       console.error('Failed to delete chat:', error);
       toast.error('Chat Error', 'Failed to delete chat');
     }
-  }, [activeChatId, setActiveChatId, fetchChats]);
+  }, [activeChatId, setActiveChatId, invalidateChats]);
 
   /** Ensure a chat exists, post the user message, and retitle new chats */
   const prepareUserMessage = useCallback(async (text: string, attachments: MessageAttachment[]) => {
@@ -170,7 +154,7 @@ export function useChatStudio() {
       const newChat = await chatsApi.create({ title, projectId: currentProject!.id });
       chatId = newChat.id;
       setActiveChatId(chatId);
-      void fetchChats();
+      void invalidateChats();
     } else if (messagesRef.current.length === 0) {
       const title = text.slice(0, 40) + (text.length > 40 ? '…' : '');
       void chatsApi.update(chatId, { title });
@@ -178,7 +162,7 @@ export function useChatStudio() {
     const userMessage = await chatsApi.addMessage(chatId, 'user', text, attachments);
     appendMessage(userMessage);
     return chatId;
-  }, [activeChatId, currentProject, setActiveChatId, fetchChats, appendMessage]);
+  }, [activeChatId, currentProject, setActiveChatId, invalidateChats, appendMessage]);
 
   // The playground sentinel carries no real brand identity — don't inject it
   const projectContext = useCallback(

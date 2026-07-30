@@ -167,6 +167,8 @@ export function useAssets(options?: UseAssetsOptions) {
     if (!currentProject || options?.autoFetch === false) return;
 
     pollingRef.current = setInterval(async () => {
+      // Don't poll a backgrounded tab — resumes on the next tick when visible again.
+      if (document.hidden) return;
       if (!currentProject?.id || loadingMore || isPrefetchingRef.current) return;
       try {
         const countToFetch = Math.max(currentOffsetRef.current, pageSize);

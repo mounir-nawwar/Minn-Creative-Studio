@@ -1,45 +1,30 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'motion/react';
 import { Plus, Layout, Clock, Copy, Trash2 } from 'lucide-react';
 import { Node, Edge } from 'reactflow';
+import { useQueryClient } from '@tanstack/react-query';
 import { useProjectStore } from '../../store/useProjectStore';
 import { useStore } from '../../store/useStore';
 import { workflowsApi, auth } from '../../lib/api';
+import { useWorkflowsQuery } from '../../hooks/queries/useWorkflowsQuery';
+import { queryKeys } from '../../hooks/queries/keys';
 import { validateWorkflow } from '../../lib/workflowValidation';
 import { Skeleton } from '../Skeleton';
 
 export default function WorkflowsTab() {
   const { currentProject, setActiveWorkflowId, activeWorkflowId: currentWfId } = useProjectStore();
   const { setNodes, setEdges } = useStore();
-  const [workflows, setWorkflows] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const queryClient = useQueryClient();
+  const { data, isLoading } = useWorkflowsQuery(currentProject?.id);
+  const workflows = (data ?? []) as any[];
 
-  const fetchWorkflows = useCallback(async () => {
-    if (!currentProject) { setWorkflows([]); setIsLoading(false); return; }
-    const user = auth.getCurrentUser();
-    if (!user) { setWorkflows([]); setIsLoading(false); return; }
-    try {
-      const data = await workflowsApi.list(currentProject.id);
-      setWorkflows(data);
-    } catch (err) {
-      console.error('Error fetching workflows:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [currentProject?.id]);
-
-  useEffect(() => {
-    fetchWorkflows();
-    pollingRef.current = setInterval(fetchWorkflows, 5000);
-    return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
-  }, [fetchWorkflows]);
+  const invalidateWorkflows = () =>
+    queryClient.invalidateQueries({ queryKey: queryKeys.workflows(currentProject?.id) });
 
   const createNewWorkflow = async () => {
     if (!currentProject || !auth.getCurrentUser()) return;
     try {
       await workflowsApi.create({ projectId: currentProject.id, name: `Workflow ${new Date().toLocaleTimeString()}`, nodes: [], edges: [] });
-      fetchWorkflows();
+      invalidateWorkflows();
     } catch (err) {
       console.error('Error creating workflow:', err);
     }
@@ -50,7 +35,7 @@ export default function WorkflowsTab() {
     if (!currentProject || !auth.getCurrentUser()) return;
     try {
       await workflowsApi.create({ projectId: currentProject.id, name: `${workflow.name} (Copy)`, nodes: workflow.nodes || [], edges: workflow.edges || [] });
-      fetchWorkflows();
+      invalidateWorkflows();
     } catch (err) {
       console.error('Error duplicating workflow:', err);
     }
@@ -62,7 +47,7 @@ export default function WorkflowsTab() {
     try {
       await workflowsApi.delete(id);
       if (currentWfId === id) { setActiveWorkflowId(null); setNodes([]); setEdges([]); }
-      fetchWorkflows();
+      invalidateWorkflows();
     } catch (err) {
       console.error('Error deleting workflow:', err);
     }

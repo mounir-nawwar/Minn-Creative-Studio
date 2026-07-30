@@ -1,7 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import * as Dialog from '@radix-ui/react-dialog';
+import { useQueryClient } from '@tanstack/react-query';
 import { User, workflowsApi } from '../lib/api';
+import { useWorkflowsQuery } from '../hooks/queries/useWorkflowsQuery';
+import { queryKeys } from '../hooks/queries/keys';
 import { Play, Save, Trash2, X, Clock, Loader2, ChevronDown, Zap, Pencil, Library } from 'lucide-react';
 import ToggleSwitch from './ToggleSwitch';
 import ProfileMenu from './ProfileMenu';
@@ -24,10 +27,13 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
   const updateNodeData = useStore((state) => state.updateNodeData);
   const { currentProject, activeWorkflowId, setActiveWorkflowId, uploadEnabled, setUploadEnabled } = useProjectStore();
 
+  const queryClient = useQueryClient();
+  const { data: workflowsData } = useWorkflowsQuery(currentProject?.id);
+  const workflows = (workflowsData ?? []) as any[];
+
   const [isSaving, setIsSaving] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [workflowName, setWorkflowName] = useState('');
-  const [workflows, setWorkflows] = useState<any[]>([]);
   const [isEditingName, setIsEditingName] = useState(false);
   const [tempName, setTempName] = useState('');
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
@@ -45,21 +51,8 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
   useEffect(() => { hasUnsavedChangesRef.current = hasUnsavedChanges; }, [hasUnsavedChanges]);
   useEffect(() => { activeWorkflowIdRef.current = activeWorkflowId; }, [activeWorkflowId]);
 
-  const fetchWorkflows = useCallback(async () => {
-    if (!currentProject || !user) return;
-    try {
-      const data = await workflowsApi.list(currentProject.id);
-      setWorkflows(data);
-    } catch (err) {
-      console.error('Failed to fetch workflows:', err);
-    }
-  }, [currentProject, user]);
-
-  useEffect(() => {
-    fetchWorkflows();
-    const interval = setInterval(fetchWorkflows, 5000);
-    return () => clearInterval(interval);
-  }, [fetchWorkflows]);
+  const invalidateWorkflows = () =>
+    queryClient.invalidateQueries({ queryKey: queryKeys.workflows(currentProject?.id) });
 
   useEffect(() => { setHasUnsavedChanges(true); }, [nodes, edges]);
 
@@ -172,7 +165,7 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
   const deleteWorkflow = async (id: string) => {
     if (activeWorkflowId === id) setActiveWorkflowId(null);
     await workflowsApi.delete(id);
-    fetchWorkflows();
+    invalidateWorkflows();
   };
 
   const loadWorkflow = (workflow: unknown) => {

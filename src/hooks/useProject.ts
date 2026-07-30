@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { projectsApi, getAccessToken, Project as ApiProject } from '../lib/api';
+import { useEffect, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { projectsApi, Project as ApiProject } from '../lib/api';
 import { Project } from '../types/project.types';
 import { useProjectStore } from '../store/useProjectStore';
+import { useProjectsQuery } from './queries/useProjectsQuery';
+import { queryKeys } from './queries/keys';
 import { RETENTION_DAYS } from '../constants';
-
-// Polling interval in milliseconds
-const POLL_INTERVAL = 5000; // 5 seconds
 
 // Convert API project to local Project type
 function toProject(apiProject: ApiProject): Project {
@@ -81,47 +81,20 @@ function toApiProject(project: Partial<Project>): any {
 
 export function useProject() {
   const { currentProject, setCurrentProject, updateProject, clearProject } = useProjectStore();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [archivedProjects, setArchivedProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const queryClient = useQueryClient();
 
-  // Fetch projects
-  const fetchProjects = useCallback(async () => {
-    // Never hit the API when logged out — avoids 401 spam in the console
-    // (this hook also runs at the app root, before/after authentication).
-    if (!getAccessToken()) {
-      setLoading(false);
-      return;
-    }
-    try {
-      const apiProjects = await projectsApi.list();
-      const allProjects = apiProjects.map(toProject);
-      
-      const activeProjects = allProjects.filter(p => p.status !== 'archived');
-      const archived = allProjects.filter(p => p.status === 'archived');
+  // Shared, visibility-gated projects query (dedup + auto-pause when hidden).
+  // Gating on the access token lives inside the query hook, so this stays quiet
+  // while logged out even though useProject also mounts at the app root.
+  const { data, isLoading } = useProjectsQuery();
 
-      setProjects(activeProjects);
-      setArchivedProjects(archived);
-      setLoading(false);
-    } catch (error) {
-      console.error('Failed to fetch projects:', error);
-      setLoading(false);
-    }
-  }, []);
+  const allProjects = useMemo(() => (data ?? []).map(toProject), [data]);
+  const projects = useMemo(() => allProjects.filter(p => p.status !== 'archived'), [allProjects]);
+  const archivedProjects = useMemo(() => allProjects.filter(p => p.status === 'archived'), [allProjects]);
+  const loading = isLoading;
 
-  // Initial fetch and polling
-  useEffect(() => {
-    fetchProjects();
-    pollingRef.current = setInterval(fetchProjects, POLL_INTERVAL);
-
-    return () => {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-        pollingRef.current = null;
-      }
-    };
-  }, [fetchProjects]);
+  const refreshProjects = () =>
+    queryClient.invalidateQueries({ queryKey: queryKeys.projects });
 
   // Sync currentProject with updates from projects list
   useEffect(() => {
@@ -168,7 +141,7 @@ export function useProject() {
     const project = toProject(apiProject);
     
     // Refresh projects list
-    await fetchProjects();
+    await refreshProjects();
     
     return project;
   };
@@ -203,7 +176,7 @@ export function useProject() {
     }
     
     // Refresh projects list
-    await fetchProjects();
+    await refreshProjects();
   };
 
   const deleteProject = async (projectId: string): Promise<void> => {
@@ -219,7 +192,7 @@ export function useProject() {
     }
     
     // Refresh projects list
-    await fetchProjects();
+    await refreshProjects();
   };
 
   const restoreProject = async (projectId: string): Promise<void> => {
@@ -231,17 +204,18 @@ export function useProject() {
     });
     
     // Refresh projects list
-    await fetchProjects();
+    await refreshProjects();
   };
 
   const permanentDeleteProject = async (projectId: string): Promise<void> => {
     await projectsApi.delete(projectId);
-    
-    setArchivedProjects(prev => prev.filter(p => p.id !== projectId));
-    
+
     if (currentProject?.id === projectId) {
       clearProject();
     }
+
+    // Refresh projects list
+    await refreshProjects();
   };
 
   // Cleanup expired items (older than RETENTION_DAYS)

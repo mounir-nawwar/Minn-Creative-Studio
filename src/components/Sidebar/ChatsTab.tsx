@@ -1,41 +1,26 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useMemo } from 'react';
 import { motion } from 'motion/react';
 import { Plus, MessageSquare, History, Trash2 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useProjectStore } from '../../store/useProjectStore';
 import { useStore } from '../../store/useStore';
-import { chatsApi, auth, Chat } from '../../lib/api';
+import { chatsApi, auth } from '../../lib/api';
+import { useChatsQuery } from '../../hooks/queries/useChatsQuery';
+import { queryKeys } from '../../hooks/queries/keys';
 import { Skeleton } from '../Skeleton';
 
 export default function ChatsTab() {
   const { currentProject } = useProjectStore();
   const { setChatOpen, setActiveChatId, activeChatId } = useStore();
-  const [chats, setChats] = useState<Chat[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const queryClient = useQueryClient();
+  const { data, isLoading } = useChatsQuery(currentProject?.id);
+  const chats = useMemo(
+    () => [...(data ?? [])].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
+    [data],
+  );
 
-  const fetchChats = useCallback(async () => {
-    const user = auth.getCurrentUser();
-    if (!currentProject || !user) { setChats([]); setIsLoading(false); return; }
-    try {
-      const allChats = await chatsApi.list();
-      const projectChats = allChats.filter((chat) => chat.project_id === currentProject.id);
-      projectChats.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      setChats(projectChats);
-    } catch (err) {
-      console.error('Error fetching chats:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [currentProject?.id]);
-
-  useEffect(() => {
-    const user = auth.getCurrentUser();
-    if (!currentProject || !user) { setChats([]); setIsLoading(false); return; }
-    setIsLoading(true);
-    fetchChats();
-    pollingRef.current = setInterval(fetchChats, 5000);
-    return () => { if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; } };
-  }, [fetchChats]);
+  const invalidateChats = () =>
+    queryClient.invalidateQueries({ queryKey: queryKeys.chats(currentProject?.id) });
 
   const createNewChat = async () => {
     if (!currentProject || !auth.getCurrentUser()) return;
@@ -43,7 +28,7 @@ export default function ChatsTab() {
       const newChat = await chatsApi.create({ title: 'New Creative Session', projectId: currentProject.id });
       setActiveChatId(newChat.id);
       setChatOpen(true);
-      fetchChats();
+      invalidateChats();
     } catch (err) {
       console.error('Error creating chat:', err);
     }
@@ -54,7 +39,7 @@ export default function ChatsTab() {
     if (!window.confirm('Delete this chat?')) return;
     try {
       await chatsApi.delete(id);
-      fetchChats();
+      invalidateChats();
     } catch (err) {
       console.error('Error deleting chat:', err);
     }

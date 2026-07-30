@@ -1,9 +1,13 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useProjectStore } from '../store/useProjectStore';
 import { useStore } from '../store/useStore';
 import { buildProjectContext } from '../lib/projectContext';
 import { toast } from '../store/useToastStore';
 import { chatsApi, Chat, ChatMessage } from '../lib/api';
+import { useChatsQuery } from './queries/useChatsQuery';
+import { useChatMessagesQuery } from './queries/useChatMessagesQuery';
+import { queryKeys } from './queries/keys';
 import { generateText } from '../services/geminiService';
 
 export type { Chat, ChatMessage };
@@ -15,80 +19,22 @@ export interface SendAsset {
   type: string;
 }
 
-// Polling interval in milliseconds
-const POLL_INTERVAL = 4000; // 4 seconds
-
 export function useChat() {
   const { currentProject } = useProjectStore();
   const { activeChatId, setActiveChatId } = useStore();
-  const [chats, setChats] = useState<Chat[]>([]);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const queryClient = useQueryClient();
   const [isTyping, setIsTyping] = useState(false);
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
-  const messagesPollingRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Poll chats for current project
-  const fetchChats = useCallback(async () => {
-    if (!currentProject) return;
-    try {
-      const allChats = await chatsApi.list();
-      // Filter chats by current project
-      const projectChats = allChats.filter(c => c.project_id === currentProject.id);
-      setChats(projectChats);
-    } catch (error) {
-      console.error('Failed to fetch chats:', error);
-    }
-  }, [currentProject?.id]);
+  // Shared, visibility-gated queries (dedup with ChatsTab / ChatStudio).
+  const { data: chatsData } = useChatsQuery(currentProject?.id);
+  const chats = chatsData ?? [];
+  const messagesQuery = useChatMessagesQuery(activeChatId);
+  const messages: ChatMessage[] = messagesQuery.data?.messages ?? [];
 
-  // Poll messages for active chat
-  const fetchMessages = useCallback(async () => {
-    if (!activeChatId) {
-      setMessages([]);
-      return;
-    }
-    try {
-      const chat = await chatsApi.get(activeChatId);
-      setMessages(chat.messages || []);
-    } catch (error) {
-      console.error('Failed to fetch messages:', error);
-    }
-  }, [activeChatId]);
-
-  // Start polling for chats
-  useEffect(() => {
-    if (!currentProject) {
-      setChats([]);
-      return;
-    }
-
-    fetchChats();
-    pollingRef.current = setInterval(fetchChats, POLL_INTERVAL);
-
-    return () => {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-        pollingRef.current = null;
-      }
-    };
-  }, [fetchChats]);
-
-  // Start polling for messages
-  useEffect(() => {
-    if (!activeChatId) {
-      setMessages([]);
-      return;
-    }
-
-    fetchMessages();
-    messagesPollingRef.current = setInterval(fetchMessages, POLL_INTERVAL);
-
-    return () => {
-      if (messagesPollingRef.current) {
-        clearInterval(messagesPollingRef.current);
-        messagesPollingRef.current = null;
-      }
-    };
-  }, [fetchMessages]);
+  const invalidateChats = () =>
+    queryClient.invalidateQueries({ queryKey: queryKeys.chats(currentProject?.id) });
+  const invalidateMessages = (chatId: string | null) =>
+    queryClient.invalidateQueries({ queryKey: queryKeys.chat(chatId) });
 
   const createNewChat = async () => {
     if (!currentProject) return;
@@ -98,8 +44,7 @@ export function useChat() {
         projectId: currentProject.id
       });
       setActiveChatId(newChat.id);
-      // Refresh chats list
-      await fetchChats();
+      await invalidateChats();
     } catch (error) {
       console.error('Failed to create chat:', error);
       toast.error('Chat Error', 'Failed to create new chat');
@@ -111,8 +56,7 @@ export function useChat() {
     if (activeChatId === chatId) setActiveChatId(null);
     try {
       await chatsApi.delete(chatId);
-      // Refresh chats list
-      await fetchChats();
+      await invalidateChats();
     } catch (error) {
       console.error('Failed to delete chat:', error);
       toast.error('Chat Error', 'Failed to delete chat');
@@ -137,7 +81,7 @@ export function useChat() {
         });
         chatId = newChat.id;
         setActiveChatId(chatId);
-        await fetchChats();
+        await invalidateChats();
       }
 
       // Add user message
@@ -150,7 +94,7 @@ export function useChat() {
       }
 
       // Refresh messages immediately
-      await fetchMessages();
+      await invalidateMessages(chatId);
 
       // Generate AI response
       setIsTyping(true);
@@ -174,7 +118,7 @@ export function useChat() {
         await chatsApi.addMessage(chatId, 'assistant', modelText);
 
         // Refresh messages
-        await fetchMessages();
+        await invalidateMessages(chatId);
 
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to get response';
