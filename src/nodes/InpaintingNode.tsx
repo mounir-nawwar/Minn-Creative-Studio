@@ -17,7 +17,7 @@ const InpaintingNode = ({ data, id }: any) => {
   
   const updateNodeData = useStore((state) => state.updateNodeData);
   const { currentProject, uploadEnabled } = useProjectStore();
-  const { addAsset } = useAssets();
+  const { addAsset } = useAssets({ autoFetch: false });
   const { setExpandedAsset } = useAssetExpand();
 
   const findInputImage = (): string | undefined => {

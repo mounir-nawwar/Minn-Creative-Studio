@@ -18,7 +18,7 @@ const ImageUploadNode = ({ id, data }: any) => {
   const localBlobUrlRef = useRef<string | null>(null);
   const updateNodeData = useStore((state) => state.updateNodeData);
   const { currentProject } = useProjectStore();
-  const { uploadAsset } = useAssets();
+  const { uploadAsset } = useAssets({ autoFetch: false });
   const { setExpandedAsset } = useAssetExpand();
 
   // Cleanup blob URL on unmount

@@ -69,7 +69,7 @@ const LyriaNode = ({ id, data }: NodeProps<LyriaNodeData>) => {
   
   const updateNodeData = useStore((state) => state.updateNodeData);
   const { currentProject, uploadEnabled } = useProjectStore();
-  const { addAsset } = useAssets();
+  const { addAsset } = useAssets({ autoFetch: false });
   const edges = useStore((state) => state.edges);
   const nodes = useStore((state) => state.nodes);
   const { setExpandedAsset } = useAssetExpand();

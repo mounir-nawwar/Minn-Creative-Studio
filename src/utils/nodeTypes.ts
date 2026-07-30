@@ -48,6 +48,10 @@ import ImageUploadNode from '../nodes/ImageUploadNode';
 import VideoUploadNode from '../nodes/VideoUploadNode';
 import InpaintingNode from '../nodes/InpaintingNode';
 import BatchOutputSizerNode from '../nodes/BatchOutputSizerNode';
+import VariationNode from '../nodes/VariationNode';
+import StyleTransferNode from '../nodes/StyleTransferNode';
+import PromptLibraryNode from '../nodes/PromptLibraryNode';
+import BrandContextNode from '../nodes/BrandContextNode';
 
 export const nodeTypes = {
   prompt: PromptNode,
@@ -101,4 +105,8 @@ export const nodeTypes = {
   videoUpload: VideoUploadNode,
   inpainting: InpaintingNode,
   batchOutputSizer: BatchOutputSizerNode,
+  variation: VariationNode,
+  styleTransfer: StyleTransferNode,
+  promptLibrary: PromptLibraryNode,
+  brandContext: BrandContextNode,
 };

@@ -12,7 +12,7 @@ const VideoUploadNode = ({ id, data }: any) => {
   const [isUploading, setIsUploading] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const updateNodeData = useStore((state) => state.updateNodeData);
-  const { uploadAsset } = useAssets();
+  const { uploadAsset } = useAssets({ autoFetch: false });
   const { setExpandedAsset } = useAssetExpand();
 
   const handleCancelUpload = () => {

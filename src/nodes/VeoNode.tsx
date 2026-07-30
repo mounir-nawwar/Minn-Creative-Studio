@@ -56,7 +56,7 @@ const VeoNode = ({ id, data }: NodeProps<VeoNodeData>) => {
   const edges = useStore((state) => state.edges);
   const nodes = useStore((state) => state.nodes);
   const { currentProject, uploadEnabled } = useProjectStore();
-  const { addAsset } = useAssets();
+  const { addAsset } = useAssets({ autoFetch: false });
   const abortControllerRef = useRef<AbortController | null>(null);
   const startTimeRef = useRef<number | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);

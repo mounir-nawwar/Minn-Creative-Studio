@@ -22,7 +22,7 @@ const ImageUpscalerNode = ({ id, data }: any) => {
   const [preserveStyle, setPreserveStyle] = useState(data.config?.preserveStyle ?? true);
   const updateNodeData = useStore((state) => state.updateNodeData);
   const { currentProject, uploadEnabled } = useProjectStore();
-  const { addAsset } = useAssets();
+  const { addAsset } = useAssets({ autoFetch: false });
   const { setExpandedAsset } = useAssetExpand();
 
   const updateConfig = (key: string, value: any) => updateNodeData(id, { config: { ...data.config, [key]: value } });

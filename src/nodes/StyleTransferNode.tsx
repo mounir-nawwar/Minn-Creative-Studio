@@ -18,7 +18,7 @@ const StyleTransferNode = ({ data, id }: any) => {
   const updateNodeData = useStore((state) => state.updateNodeData);
   const { setExpandedAsset } = useAssetExpand();
   const { currentProject, uploadEnabled } = useProjectStore();
-  const { addAsset } = useAssets();
+  const { addAsset } = useAssets({ autoFetch: false });
 
   const contentUrl = useMemo(() => {
     const edge = useStore.getState().edges.find(e => e.target === id && (e.targetHandle === 'contentUrl' || e.targetHandle === 'content' || e.targetHandle === 'image'));

@@ -26,7 +26,7 @@ const PLACEHOLDER: Record<GenerationMode, string> = {
 /** Composer bar: attachments + prompt textarea + send */
 export default function ChatComposer({ mode, disabled, onSend }: ChatComposerProps) {
   const currentProject = useProjectStore((s) => s.currentProject);
-  const { uploadAsset } = useAssets();
+  const { uploadAsset } = useAssets({ autoFetch: false });
   const [text, setText] = useState('');
   const [attachments, setAttachments] = useState<MessageAttachment[]>([]);
   const [showPicker, setShowPicker] = useState(false);

@@ -35,6 +35,7 @@ export interface UseAssetsOptions {
   type?: string;
   search?: string;
   pageSize?: number;
+  autoFetch?: boolean;
 }
 
 export function useAssets(options?: UseAssetsOptions) {
@@ -154,12 +155,16 @@ export function useAssets(options?: UseAssetsOptions) {
   }, [currentProject?.id, typeFilter, searchFilter, pageSize, prefetchNextBatch]);
 
   useEffect(() => {
+    if (options?.autoFetch === false) {
+      setLoading(false);
+      return;
+    }
     fetchAssets();
-  }, [fetchAssets]);
+  }, [fetchAssets, options?.autoFetch]);
 
   // Polling to keep visible assets fresh
   useEffect(() => {
-    if (!currentProject) return;
+    if (!currentProject || options?.autoFetch === false) return;
 
     pollingRef.current = setInterval(async () => {
       if (!currentProject?.id || loadingMore || isPrefetchingRef.current) return;
@@ -184,7 +189,7 @@ export function useAssets(options?: UseAssetsOptions) {
         pollingRef.current = null;
       }
     };
-  }, [currentProject?.id, typeFilter, searchFilter, pageSize, loadingMore]);
+  }, [currentProject?.id, typeFilter, searchFilter, pageSize, loadingMore, options?.autoFetch]);
 
   const loadMore = useCallback(() => {
     if (!hasMore || loading || loadingMore) return;

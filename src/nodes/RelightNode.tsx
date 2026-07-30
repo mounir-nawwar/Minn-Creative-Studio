@@ -20,7 +20,7 @@ const RelightNode = ({ id, data }: any) => {
   const updateNodeData = useStore((state) => state.updateNodeData);
   const { setExpandedAsset } = useAssetExpand();
   const { currentProject, uploadEnabled } = useProjectStore();
-  const { addAsset } = useAssets();
+  const { addAsset } = useAssets({ autoFetch: false });
 
   const directions = [
     { id: 'top-left', label: '↖' }, { id: 'top', label: '↑' }, { id: 'top-right', label: '↗' },
