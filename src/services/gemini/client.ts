@@ -85,6 +85,27 @@ export async function callBackend(method: string, params: any, signal?: AbortSig
 }
 
 export async function urlToBase64(url: string): Promise<{ data: string; mimeType: string }> {
+  // Check for expired or revoked browser blob URLs
+  if (url.startsWith('blob:')) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Blob fetch failed: ${res.status}`);
+      const blob = await res.blob();
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64 = (reader.result as string).split(',')[1];
+          resolve({ data: base64, mimeType: blob.type });
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (err) {
+      console.warn('[urlToBase64] Expired or invalid blob URL:', url);
+      throw new Error('Local preview image session expired. Please re-select or re-upload the image in the node.');
+    }
+  }
+
   // Google Cloud Storage (Vertex GCS) URLs can't be fetched directly from the browser due to CORS — proxy through backend
   if (url.includes('storage.googleapis.com')) {
     const res = await fetch(`${API_BASE}/proxy-image`, {
