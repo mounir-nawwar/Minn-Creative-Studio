@@ -1,5 +1,6 @@
 import { Type, Image as ImageIcon, Film, Music } from 'lucide-react';
 import { NodeField, NodeInput, NodeSelect, NodeTextArea, NodeToggle, NodeLabel } from '../../nodes/ui';
+import { getAspectRatioLabel } from '../../nodes/imagenModels';
 import { modelsForMode, findModel, MAX_CHAT_SAMPLES } from '../../lib/models';
 import type { GenerationMode } from '../../lib/models';
 import { MUSICAL_KEYS } from '../../nodes/lyriaConstants';
@@ -102,7 +103,7 @@ export default function GenerationSettingsPanel({ settings, onChange, disabled }
               value={(settings.params.aspectRatio as string) ?? supports.aspectRatio[0]}
               onChange={(e) => setParam('aspectRatio', e.target.value)}
             >
-              {supports.aspectRatio.map((ar) => <option key={ar} value={ar}>{ar}</option>)}
+              {supports.aspectRatio.map((ar) => <option key={ar} value={ar}>{getAspectRatioLabel(ar)}</option>)}
             </NodeSelect>
           </NodeField>
         )}

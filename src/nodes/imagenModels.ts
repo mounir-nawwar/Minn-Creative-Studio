@@ -1,3 +1,25 @@
+export const ASPECT_RATIO_DESCRIPTIONS: Record<string, string> = {
+  '1:1': '1:1 (Square)',
+  '4:3': '4:3 (Standard)',
+  '3:4': '3:4 (Vertical)',
+  '3:2': '3:2 (Photo Landscape)',
+  '2:3': '2:3 (Photo Portrait)',
+  '5:4': '5:4 (Art Print)',
+  '4:5': '4:5 (Instagram Grid)',
+  '16:9': '16:9 (Widescreen)',
+  '9:16': '9:16 (Stories / Reels)',
+  '21:9': '21:9 (Cinematic)',
+  '4:1': '4:1 (LinkedIn Banner)',
+  '1:4': '1:4 (Tall Portrait)',
+  '8:1': '8:1 (Panorama)',
+  '1:8': '1:8 (Skyscraper)',
+  '9:21': '9:21 (Mobile Ultrawide)',
+};
+
+export function getAspectRatioLabel(ar: string): string {
+  return ASPECT_RATIO_DESCRIPTIONS[ar] || ar;
+}
+
 export interface ImageModelSupports {
   aspectRatio: string[] | false;
   resolution?: string[] | false;
@@ -110,7 +132,7 @@ export const IMAGE_MODELS: ImageModel[] = [
     price: null,
     family: 'nanoBanana2',
     supports: {
-      aspectRatio: ['1:1', '3:2', '2:3', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9', '1:8', '8:1'],
+      aspectRatio: ['1:1', '4:3', '3:4', '3:2', '2:3', '5:4', '4:5', '16:9', '9:16', '21:9', '4:1', '1:4', '8:1', '1:8', '9:21'],
       resolution: ['512', '768', '1K', '2K', '4K'],
       candidateCount: true,
       temperature: true,
@@ -136,7 +158,7 @@ export const IMAGE_MODELS: ImageModel[] = [
     price: null,
     family: 'nanoBanana',
     supports: {
-      aspectRatio: ['1:1', '3:2', '2:3', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'],
+      aspectRatio: ['1:1', '4:3', '3:4', '3:2', '2:3', '5:4', '4:5', '16:9', '9:16', '21:9', '4:1', '1:4', '8:1', '1:8', '9:21'],
       resolution: ['512', '768', '1K', '2K'],
       candidateCount: true,
       temperature: true,
@@ -162,7 +184,7 @@ export const IMAGE_MODELS: ImageModel[] = [
     price: null,
     family: 'nanoBananaPro',
     supports: {
-      aspectRatio: ['1:1', '3:2', '2:3', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'],
+      aspectRatio: ['1:1', '4:3', '3:4', '3:2', '2:3', '5:4', '4:5', '16:9', '9:16', '21:9', '4:1', '1:4', '8:1', '1:8', '9:21'],
       resolution: ['512', '768', '1K', '2K', '4K'],
       candidateCount: true,
       temperature: true,

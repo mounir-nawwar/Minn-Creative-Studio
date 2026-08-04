@@ -14,7 +14,7 @@ import { ExpandableAssetWrapper } from '../components/ExpandableAssetWrapper';
 import { toast } from '../store/useToastStore';
 import { AnimatePresence } from 'motion/react';
 import { NodeProps } from '../types/nodeProps';
-import { IMAGE_MODELS } from './imagenModels';
+import { IMAGE_MODELS, getAspectRatioLabel } from './imagenModels';
 import ImagenAdvancedPanel from './ImagenAdvancedPanel';
 import { NodeField, NodeSelect, NodeLabel } from './ui';
 
@@ -266,7 +266,7 @@ const ImagenNode = ({ id, data }: NodeProps<ImagenNodeData>) => {
         <div className="grid grid-cols-2 gap-2">
           <NodeField label="Aspect ratio">
             <NodeSelect value={aspectRatio} onChange={(e) => { setAspectRatio(e.target.value); updateConfig('aspectRatio', e.target.value); }}>
-              {aspectRatioOptions.map((ar) => <option key={ar} value={ar}>{ar}</option>)}
+              {aspectRatioOptions.map((ar) => <option key={ar} value={ar}>{getAspectRatioLabel(ar)}</option>)}
             </NodeSelect>
           </NodeField>
 
