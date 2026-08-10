@@ -11,4 +11,5 @@ export const queryKeys = {
   workflows: (projectId?: string | null) => ['workflows', projectId ?? null] as const,
   chats: (projectId?: string | null) => ['chats', projectId ?? null] as const,
   chat: (chatId?: string | null) => ['chat', chatId ?? null] as const,
+  usage: ['usage', 'summary'] as const,
 };

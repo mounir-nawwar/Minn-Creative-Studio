@@ -440,6 +440,31 @@ export const assetsApi = {
     apiRequest(`/assets/${id}`, { method: 'DELETE' })
 };
 
+// Usage / spend API — totals across every project, tracked against the credit
+export interface UsageSummary {
+  totalCost: number;
+  textCost: number;
+  imageCost: number;
+  videoCost: number;
+  audioCost: number;
+  totalImages: number;
+  totalVideos: number;
+  totalAudio: number;
+  totalTexts: number;
+  totalTokens: number;
+  creditLimit: number;
+  remaining: number;
+  usedFraction: number;
+}
+
+export const usageApi = {
+  summary: (): Promise<UsageSummary> => apiRequest('/usage/summary'),
+
+  /** Zeroes cost history everywhere. The server backs the DB up first. */
+  reset: (): Promise<UsageSummary & { clearedCost: number; backupPath: string }> =>
+    apiRequest('/usage/reset', { method: 'POST' }),
+};
+
 // Chat presets API (Chat Studio system-instruction templates)
 export interface ChatPreset {
   id: string;
