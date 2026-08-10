@@ -163,6 +163,7 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
   useEffect(() => { confirmSaveRef.current = confirmSave; });
 
   const deleteWorkflow = async (id: string) => {
+    if (!window.confirm('Delete this workflow?')) return;
     try {
       await workflowsApi.delete(id);
       if (activeWorkflowId === id) {
@@ -296,7 +297,14 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
                   workflows.map((w) => (
                     <DropdownMenu.Item
                       key={w.id}
-                      onSelect={() => loadWorkflow(w)}
+                      onSelect={(e) => {
+                        const target = e.target as HTMLElement;
+                        if (target?.closest('button[aria-label="Delete workflow"]')) {
+                          e.preventDefault();
+                          return;
+                        }
+                        loadWorkflow(w);
+                      }}
                       className={`group flex h-9 cursor-pointer select-none items-center justify-between gap-2 rounded-lg px-2.5 text-[13px] outline-none transition-colors duration-100 data-[highlighted]:bg-white/5 ${
                         activeWorkflowId === w.id ? 'text-[#0097A7]' : 'text-gray-300 data-[highlighted]:text-white'
                       }`}
@@ -306,10 +314,11 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
                         <span className="truncate">{w.name}</span>
                       </span>
                       <button
+                        type="button"
                         aria-label="Delete workflow"
                         onPointerDown={(e) => e.stopPropagation()}
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteWorkflow(w.id); }}
-                        className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-600 opacity-0 transition-[opacity,color] duration-150 hover:text-red-400 group-data-[highlighted]:opacity-100"
+                        className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-500 transition-colors hover:text-red-400 group-data-[highlighted]:opacity-100 opacity-60"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
