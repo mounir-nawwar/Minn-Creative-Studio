@@ -50,82 +50,17 @@ export interface ImageModel {
   supports: ImageModelSupports;
 }
 
+/**
+ * Image models offered in the studio.
+ *
+ * The Imagen 4 family was removed: every `imagen-*` id returns 404 NOT_FOUND on
+ * this Vertex project (verified across us-central1 / us-east4 / europe-west4 /
+ * global, 11 id variants) because the Gemini Enterprise Agent Platform tier
+ * ships a restricted catalogue without Imagen. Selecting one only produced
+ * errors. Re-add here (and in backend/config/pricing.ts) if Imagen is ever
+ * enabled on the project.
+ */
 export const IMAGE_MODELS: ImageModel[] = [
-  {
-    id: 'imagen-4.0-ultra-generate-001',
-    label: 'Imagen 4 Ultra',
-    price: 0.06,
-    family: 'imagen4',
-    supports: {
-      aspectRatio: ['1:1', '3:4', '4:3', '9:16', '16:9'],
-      sampleCount: true,
-      seed: true,
-      personGeneration: true,
-      enhancePrompt: true,
-      addWatermark: true,
-      safetySetting: true,
-      referenceImages: false,
-      style: false,
-      negativePrompt: false,
-      resolution: false,
-      temperature: false,
-      topP: false,
-      topK: false,
-      candidateCount: false,
-      mimeType: false,
-      grounding: false,
-    }
-  },
-  {
-    id: 'imagen-4.0-generate-001',
-    label: 'Imagen 4',
-    price: 0.04,
-    family: 'imagen4',
-    supports: {
-      aspectRatio: ['1:1', '3:4', '4:3', '9:16', '16:9'],
-      sampleCount: true,
-      seed: true,
-      personGeneration: true,
-      enhancePrompt: true,
-      addWatermark: true,
-      safetySetting: true,
-      referenceImages: false,
-      style: false,
-      negativePrompt: false,
-      resolution: false,
-      temperature: false,
-      topP: false,
-      topK: false,
-      candidateCount: false,
-      mimeType: false,
-      grounding: false,
-    }
-  },
-  {
-    id: 'imagen-4.0-fast-generate-001',
-    label: 'Imagen 4 Fast',
-    price: 0.02,
-    family: 'imagen4',
-    supports: {
-      aspectRatio: ['1:1', '3:4', '4:3', '9:16', '16:9'],
-      sampleCount: true,
-      seed: true,
-      personGeneration: true,
-      enhancePrompt: true,
-      addWatermark: true,
-      safetySetting: true,
-      referenceImages: false,
-      style: false,
-      negativePrompt: false,
-      resolution: false,
-      temperature: false,
-      topP: false,
-      topK: false,
-      candidateCount: false,
-      mimeType: false,
-      grounding: false,
-    }
-  },
   {
     id: 'gemini-3.1-flash-image',
     label: 'Nano Banana 2',
@@ -185,7 +120,8 @@ export const IMAGE_MODELS: ImageModel[] = [
     family: 'nanoBananaPro',
     supports: {
       aspectRatio: ['1:1', '4:3', '3:4', '3:2', '2:3', '5:4', '4:5', '16:9', '9:16', '21:9', '4:1', '1:4', '8:1', '1:8', '9:21'],
-      resolution: ['512', '768', '1K', '2K', '4K'],
+      // 512/768 are rejected by this model with 400 INVALID_ARGUMENT (verified live)
+      resolution: ['1K', '2K', '4K'],
       candidateCount: true,
       temperature: true,
       topP: true,

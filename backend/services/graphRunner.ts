@@ -328,28 +328,8 @@ async function generateImageNode(node: GraphNode, inputs: ResolvedInputs, ctx: R
     ? `Project Context: ${context}\n\nTask: Generate an image based on this prompt: ${prompt}`
     : prompt;
 
-  if (String(model).startsWith('imagen-4')) {
-    const data = await runGeneration({
-      method: 'generateImages',
-      params: {
-        model,
-        prompt: fullPrompt,
-        config: {
-          numberOfImages: Number(config.sampleCount ?? 1),
-          aspectRatio,
-          ...(seed !== undefined && { seed }),
-          ...(config.personGeneration && { personGeneration: config.personGeneration }),
-        },
-        projectId: ctx.projectId,
-      },
-      userId: ctx.userId,
-      via: 'mcp',
-    });
-    const urls = (data.generatedImages ?? []).map((img: any) => img.image?.storageUrl).filter(Boolean);
-    if (!urls.length) throw new Error('No image generated (the prompt may have been filtered)');
-    return { output: urls[0], outputs: urls };
-  }
-
+  // The imagen-4 branch was removed — Imagen 404s on this Vertex project, so
+  // every image node runs through the Gemini image path below.
   const parts: any[] = [];
   for (const ref of inputs.__references ?? []) parts.push(imagePartFromUrl(ref.url));
   parts.push({ text: fullPrompt });

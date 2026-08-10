@@ -59,18 +59,25 @@ describe('Integration Tests: Generate → Upload → Store Flow', () => {
   });
 
   describe('Image Generation with Upload', () => {
-    it('should upload to storage when projectId provided (Imagen)', async () => {
+    // Imagen was removed (404s on this Vertex project); Nano Banana Pro now
+    // covers the "high quality" slot this case used to exercise.
+    it('should upload to storage when projectId provided (Nano Banana Pro)', async () => {
       mockFetch.mockResolvedValueOnce(createMockResponse({
-        generatedImages: [{ 
-          image: { 
-            storageUrl: 'https://storage.googleapis.com/bucket/projects/test/assets/image.png' 
-          } 
+        candidates: [{
+          content: {
+            parts: [{
+              inlineData: {
+                data: 'x',
+                storageUrl: 'https://storage.googleapis.com/bucket/projects/test/assets/image.png',
+              },
+            }],
+          },
         }],
       }));
 
       const result = await generateImage({
         prompt: 'A sunset',
-        model: 'imagen-4.0-generate-001',
+        model: 'gemini-3-pro-image',
         aspectRatio: '16:9',
         projectId: 'test-project',
       });
@@ -319,12 +326,14 @@ describe('Integration Tests: Generate → Upload → Store Flow', () => {
 
     it('should send projectId when upload enabled', async () => {
       mockFetch.mockResolvedValueOnce(createMockResponse({
-        generatedImages: [{ image: { storageUrl: 'https://storage.url/img.png' } }],
+        candidates: [{
+          content: { parts: [{ inlineData: { data: 'x', storageUrl: 'https://storage.url/img.png' } }] },
+        }],
       }));
 
       await generateImage({
         prompt: 'Test',
-        model: 'imagen-4.0-generate-001',
+        model: 'gemini-3.1-flash-image',
         aspectRatio: '1:1',
         projectId: 'project-123',
       });

@@ -87,7 +87,9 @@ const ImagenNode = ({ id, data }: NodeProps<ImagenNodeData>) => {
     return IMAGE_MODELS.find(m => m.id === model) || IMAGE_MODELS[0];
   }, [model]);
 
-  const isImagen4 = currentModelConfig.family === 'imagen4';
+  // Imagen was removed (404s on this Vertex project) — every remaining model is
+  // a Gemini/Nano Banana multimodal image model.
+  const isImagen4 = false;
   const isNanoBanana = currentModelConfig.family.startsWith('nanoBanana');
 
   const referenceImages = useMemo(() => {
@@ -249,16 +251,9 @@ const ImagenNode = ({ id, data }: NodeProps<ImagenNodeData>) => {
         {/* Model */}
         <NodeField label="Model">
           <NodeSelect value={model} onChange={(e) => { setModel(e.target.value); updateConfig('model', e.target.value); }}>
-            <optgroup label="Imagen 4 (Text-to-Image)">
-              {IMAGE_MODELS.filter((m) => m.family === 'imagen4').map((m) => (
-                <option key={m.id} value={m.id}>{m.label} (${m.price}/img)</option>
-              ))}
-            </optgroup>
-            <optgroup label="Nano Banana (Multimodal)">
-              {IMAGE_MODELS.filter((m) => m.family.startsWith('nanoBanana')).map((m) => (
-                <option key={m.id} value={m.id}>{m.label}</option>
-              ))}
-            </optgroup>
+            {IMAGE_MODELS.map((m) => (
+              <option key={m.id} value={m.id}>{m.label}</option>
+            ))}
           </NodeSelect>
         </NodeField>
 

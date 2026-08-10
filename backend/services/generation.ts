@@ -29,6 +29,7 @@ import {
   vertexGenerateVideos,
   vertexGetOperation,
   vertexFetchGCS,
+  vertexLyriaGenerate,
   vertexPredict,
   vertexRest,
 } from './vertex.ts';
@@ -93,6 +94,7 @@ function registerBackgroundLroTracker(opName: string, params: any, via: Generati
               await trackProjectCost(effectiveProjectId, videoCost, {
                 type: 'video',
                 videoCount,
+                model: videoModel,
                 via,
               });
             }
@@ -104,6 +106,7 @@ function registerBackgroundLroTracker(opName: string, params: any, via: Generati
               await trackProjectCost(effectiveProjectId, audioCost, {
                 type: 'audio',
                 audioCount: 1,
+                model: params._audioModel,
                 via,
               });
             }
@@ -188,45 +191,15 @@ export async function runGeneration({ method, params: incomingParams, userId, si
 
     let response;
     if (USE_VERTEX_AI && sdkParams.model?.includes('lyria')) {
-      if (sdkParams.model.includes('pro')) {
-        // Lyria Pro requires Long-Running Prediction
-        const { model, contents, config = {} } = sdkParams;
-        const parts = Array.isArray(contents) ? contents[0]?.parts : contents?.parts;
-        const instance: any = { prompt: parts.find((p: any) => p.text)?.text };
-        const refs = parts
-          .filter((p: any) => p.inlineData)
-          .map((p: any) => ({ bytesBase64Encoded: p.inlineData.data, mimeType: p.inlineData.mimeType }));
-        if (refs.length > 0) instance.reference_images = refs;
-        if (config.negative_prompt) instance.negative_prompt = config.negative_prompt;
-        if (config.seed !== undefined) instance.seed = config.seed;
-        if (config.duration) instance.duration = config.duration;
-        if (config.guidance !== undefined) instance.guidance = config.guidance;
-        if (config.bpm !== undefined) instance.bpm = config.bpm;
-        if (config.density !== undefined) instance.density = config.density;
-        if (config.brightness !== undefined) instance.brightness = config.brightness;
-        if (config.scale) instance.scale = config.scale;
-        const url = `https://us-central1-aiplatform.googleapis.com/v1/projects/${VERTEX_PROJECT}/locations/us-central1/publishers/google/models/${model}:predictLongRunning`;
-        const op = await vertexRest(url, 'POST', { instances: [instance], parameters: { sampleCount: 1 } });
-        if (op?.name) {
-          registerBackgroundLroTracker(op.name, { ...params, _audioModel: sdkParams.model, _projectId: projectId }, via);
-        }
+      // Both Lyria Clip and Pro resolve synchronously through the global
+      // /interactions API — the old regional :predict / predictLongRunning
+      // paths 404. Billing is flat per generation (no usage metadata).
+      response = await vertexLyriaGenerate(sdkParams);
 
-        // Context for cost tracking when the operation completes (getOperation)
-        return {
-          operation: op.name,
-          isLro: true,
-          _audioModel: sdkParams.model,
-          _projectId: projectId,
-        };
-      } else {
-        response = await vertexPredict(sdkParams);
-
-        // Track cost for non-pro audio immediately
-        if (projectId) {
-          const cost = calculateCost(sdkParams.model, {});
-          if (cost > 0) {
-            await trackProjectCost(projectId, cost, { type: 'audio', audioCount: 1, via });
-          }
+      if (projectId) {
+        const cost = calculateCost(sdkParams.model, {});
+        if (cost > 0) {
+          await trackProjectCost(projectId, cost, { type: 'audio', audioCount: 1, model: sdkParams.model, via });
         }
       }
     } else {
@@ -240,58 +213,55 @@ export async function runGeneration({ method, params: incomingParams, userId, si
     const imageCount = generatedImages.length;
     const usageMetadata = (response as any).usageMetadata;
 
+    // Every field Vertex reports is forwarded verbatim — the cost calculator
+    // needs the modality split and the separately-reported reasoning tokens,
+    // not just the flat candidate count.
+    const usage = usageMetadata ? {
+      promptTokenCount: usageMetadata.promptTokenCount,
+      candidatesTokenCount: usageMetadata.candidatesTokenCount,
+      totalTokenCount: usageMetadata.totalTokenCount,
+      thoughtsTokenCount: usageMetadata.thoughtsTokenCount,
+      cachedContentTokenCount: usageMetadata.cachedContentTokenCount,
+      promptTokensDetails: usageMetadata.promptTokensDetails,
+      candidatesTokensDetails: usageMetadata.candidatesTokensDetails,
+      imageCount,
+    } : null;
+
     // Usage log
     if (usageMetadata) {
-      const thinking = (usageMetadata.totalTokenCount || 0) - (usageMetadata.promptTokenCount || 0) - (usageMetadata.candidatesTokenCount || 0);
-      console.log(`[Usage] model=${sdkParams.model} projectId=${projectId ?? 'none'} images=${imageCount} | in=${usageMetadata.promptTokenCount} out=${usageMetadata.candidatesTokenCount}${thinking > 0 ? ` thinking=${thinking}` : ''} total=${usageMetadata.totalTokenCount}`);
+      const detail = (usageMetadata.candidatesTokensDetails ?? [])
+        .map((d: any) => `${d.modality}:${d.tokenCount}`).join(' ');
+      console.log(`[Usage] model=${sdkParams.model} projectId=${projectId ?? 'none'} images=${imageCount} | in=${usageMetadata.promptTokenCount} out=${usageMetadata.candidatesTokenCount}${detail ? ` [${detail}]` : ''}${usageMetadata.thoughtsTokenCount ? ` thoughts=${usageMetadata.thoughtsTokenCount}` : ''} total=${usageMetadata.totalTokenCount}`);
     } else {
       console.log(`[Usage] model=${sdkParams.model} projectId=${projectId ?? 'none'} images=${imageCount} | no usageMetadata`);
     }
 
     // Track image generation costs
-    if (imageCount > 0 && projectId && usageMetadata) {
-      const cost = calculateCost(sdkParams.model, {
-        promptTokenCount: usageMetadata.promptTokenCount,
-        candidatesTokenCount: usageMetadata.candidatesTokenCount,
-        imageCount,
-      });
+    if (imageCount > 0 && projectId && usage) {
+      const cost = calculateCost(sdkParams.model, usage);
       if (cost > 0) {
         await trackProjectCost(projectId, cost, {
           type: 'image',
           imageCount,
           tokenCount: usageMetadata.totalTokenCount || 0,
+          model: sdkParams.model,
           via,
         });
       }
     }
 
-    // Track TTS and text costs
-    if (!imageCount && projectId) {
-      if (sdkParams.model?.includes('tts')) {
-        // TTS: billed per input character
-        const allParts = Array.isArray(sdkParams.contents)
-          ? sdkParams.contents.flatMap((c: any) => c?.parts ?? [])
-          : (sdkParams.contents?.parts ?? []);
-        const charCount = allParts
-          .filter((p: any) => typeof p.text === 'string')
-          .reduce((sum: number, p: any) => sum + p.text.length, 0);
-        if (charCount > 0) {
-          const cost = calculateCost(sdkParams.model, { characterCount: charCount });
-          if (cost > 0) await trackProjectCost(projectId, cost, { type: 'audio', audioCount: 1, via });
-        }
-      } else if (usageMetadata) {
-        // All other text/chat models: input + output tokens
-        const cost = calculateCost(sdkParams.model, {
-          promptTokenCount: usageMetadata.promptTokenCount,
-          candidatesTokenCount: usageMetadata.candidatesTokenCount,
+    // Track TTS and text costs — both are ordinary token billing.
+    if (!imageCount && projectId && usage) {
+      const isTts = !!sdkParams.model?.includes('tts');
+      const cost = calculateCost(sdkParams.model, usage);
+      if (cost > 0) {
+        await trackProjectCost(projectId, cost, {
+          type: isTts ? 'audio' : 'text',
+          ...(isTts ? { audioCount: 1 } : {}),
+          tokenCount: usageMetadata.totalTokenCount || 0,
+          model: sdkParams.model,
+          via,
         });
-        if (cost > 0) {
-          await trackProjectCost(projectId, cost, {
-            type: 'text',
-            tokenCount: usageMetadata.totalTokenCount || 0,
-            via,
-          });
-        }
       }
     }
 
@@ -315,38 +285,8 @@ export async function runGeneration({ method, params: incomingParams, userId, si
     return { candidates, text, promptFeedback: (response as any).promptFeedback || {} };
   }
 
-  if (method === 'generateImages') {
-    const { projectId, ...sdkParams } = params;
-    console.log('[generateImages] projectId:', projectId, 'model:', sdkParams.model);
-    const genData = await ai(sdkParams.model).models.generateImages(sdkParams);
-    const imageCount = genData.generatedImages?.length || 1;
-
-    const cost = calculateCost(sdkParams.model, {}, { numberOfImages: imageCount, sampleCount: sdkParams.config?.numberOfImages || 1 });
-    if (cost > 0 && projectId) {
-      await trackProjectCost(projectId, cost, { type: 'image', imageCount, via });
-    }
-
-    // Upload generated images to local storage
-    if (projectId) {
-      for (const img of (genData.generatedImages ?? [])) {
-        if (img.image?.imageBytes) {
-          try {
-            const result = await uploadBase64(projectId, userId, {
-              base64: img.image.imageBytes,
-              mimeType: 'image/png',
-              filename: `${Date.now()}-generated.png`
-            }, via === 'mcp' ? { metadata: { via: 'mcp' } } : undefined);
-            (img.image as any).storageUrl = result.url;
-            console.log(`[Upload] Imagen ${Math.round(Buffer.from(img.image.imageBytes, 'base64').byteLength / 1024)}KB → ${result.url}`);
-            delete img.image.imageBytes;
-          } catch (e) {
-            console.error('Storage upload failed:', e);
-          }
-        }
-      }
-    }
-    return genData;
-  }
+  // NOTE: the 'generateImages' method (the Imagen-only SDK call) was removed —
+  // Imagen 404s on this Vertex project and every caller now uses generateContent.
 
   // Video: @google/genai SDK hardcodes v1beta — use v1 REST directly via vertexGenerateVideos
   if (method === 'generateVideos') {
@@ -389,6 +329,7 @@ export async function runGeneration({ method, params: incomingParams, userId, si
           await trackProjectCost(effectiveProjectId, videoCost, {
             type: 'video',
             videoCount,
+            model: videoModel,
             via,
           });
         }
@@ -401,6 +342,7 @@ export async function runGeneration({ method, params: incomingParams, userId, si
           await trackProjectCost(effectiveProjectId, audioCost, {
             type: 'audio',
             audioCount: 1,
+            model: _audioModel,
             via,
           });
         }

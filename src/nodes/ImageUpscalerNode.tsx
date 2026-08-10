@@ -9,12 +9,18 @@ import { useAssetExpand } from '../hooks/useAssetExpand';
 import { ExpandableAssetWrapper } from '../components/ExpandableAssetWrapper';
 import { toast } from '../store/useToastStore';
 import { NodeField, NodeLabel, NodeSelect, NodeToggle, RunButton } from './ui';
+import { estimateImageCost } from '../lib/pricing';
 
+// Imagen upscale entries removed — the imagen-* family 404s on this Vertex
+// project, so those options only ever errored. Gemini image models upscale
+// through the normal generateContent path.
+// Prices are derived from the shared rate table (src/lib/pricing.ts) rather than
+// hardcoded here, so they can't drift from what the backend actually bills.
+// upscaleImage() always requests imageSize:"4K", so quote the 4K tier.
 const UPSCALE_MODELS = [
-  { id: 'gemini-3.1-flash-image', label: 'Nano Banana (Free)', price: 0 },
-  { id: 'imagen-4-upscale', label: 'Imagen 4 Upscale', price: 0.06 },
-  { id: 'imagen-1-upscale', label: 'Imagen 1 Upscale', price: 0.003 },
-];
+  { id: 'gemini-3.1-flash-image', label: 'Nano Banana 2' },
+  { id: 'gemini-3-pro-image', label: 'Nano Banana Pro' },
+].map((m) => ({ ...m, price: estimateImageCost(m.id, '4K') }));
 
 const ImageUpscalerNode = ({ id, data }: any) => {
   const [model, setModel] = useState(data.config?.model || 'gemini-3.1-flash-image');
@@ -53,7 +59,7 @@ const ImageUpscalerNode = ({ id, data }: any) => {
       <div className="space-y-3">
         <NodeField label="Model">
           <NodeSelect value={model} onChange={(e) => { setModel(e.target.value); updateConfig('model', e.target.value); }}>
-            {UPSCALE_MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}{m.price > 0 ? ` ($${m.price}/img)` : ''}</option>)}
+            {UPSCALE_MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}{m.price ? ` (~$${m.price.toFixed(2)}/img)` : ''}</option>)}
           </NodeSelect>
         </NodeField>
 

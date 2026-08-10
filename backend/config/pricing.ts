@@ -1,41 +1,57 @@
-export const MODEL_PRICING: Record<string, any> = {
-  // Imagen 4 (per image, flat rate)
-  'imagen-4.0-ultra-generate-001': { perImage: 0.06 },
-  'imagen-4.0-generate-001':       { perImage: 0.04 },
-  'imagen-4.0-fast-generate-001':  { perImage: 0.02 },
-  'imagen-4-upscale':              { perImage: 0.06 },
-  'imagen-1-upscale':              { perImage: 0.003 },
+/**
+ * Cost calculation for Vertex generations.
+ *
+ * Rate tables live in `src/lib/pricing.ts` so the frontend and backend share one
+ * source of truth; this module turns a Vertex usage payload into dollars.
+ *
+ * How Vertex actually reports usage (verified live 2026-08-10):
+ *   - `candidatesTokensDetails` splits output by modality, e.g. a Nano Banana 1
+ *     response is `[{TEXT: 8}, {IMAGE: 1290}]`. Those buckets bill at different
+ *     rates, so we must not apply one blended rate to `candidatesTokenCount`.
+ *   - `thoughtsTokenCount` is reported SEPARATELY and is excluded from
+ *     `candidatesTokenCount`, but Google bills it — their output SKU is
+ *     "response and reasoning". A trivial 3-flash call measured out=1,
+ *     thoughts=111, so ignoring it under-billed by ~100x.
+ *   - Veo returns no usage at all, so video is priced from request params.
+ */
 
-  // Gemini image-generating models — token-billed
-  // imageOutput is the per-1M-token rate for image output tokens (separate from text output)
-  'gemini-3.1-flash-image': { input: 0.50,  output: 3.00,  imageOutput: 60.00  },
-  'gemini-2.5-flash-image':         { input: 0.50,  output: 3.00,  imageOutput: 60.00  },
-  'gemini-3-pro-image':     { input: 2.00,  output: 12.00, imageOutput: 120.00 },
+import {
+  AUDIO_MODEL_RATES,
+  LONG_CONTEXT_THRESHOLD,
+  VIDEO_MODEL_RATES,
+  estimateVideoCost,
+  isKnownModel,
+  tokenRatesFor,
+  type TokenRates,
+} from '../../src/lib/pricing.ts';
 
-  // Veo (per second of video generated)
-  'veo-3.1-fast-generate-001': { '720p': 0.10, '1080p': 0.12, '4K': 0.30, withAudio: 0.10 },
-  'veo-3.1-generate-001':      { '720p': 0.40, '1080p': 0.40, '4K': 0.60, withAudio: 0.40 },
+export {
+  AUDIO_MODEL_RATES,
+  IMAGE_MODEL_RATES,
+  TEXT_MODEL_RATES,
+  VIDEO_MODEL_RATES,
+  estimateImageCost,
+  estimateVideoCost,
+  isKnownModel,
+} from '../../src/lib/pricing.ts';
 
-  // Lyria 3 (flat per generation)
-  'lyria-3-pro-preview':          { perSong: 0.08 },
-  'lyria-3-clip-preview':         { per30sClip: 0.04 },
-
-  // TTS (per 1K input characters)
-  'gemini-2.5-flash-preview-tts': { per1kChars: 0.005 },
-
-  // Gemini text/chat models
-  'gemini-3.5-flash':             { input: 1.50,  output: 9.00  },
-  'gemini-3-flash-preview':       { input: 0.50,  output: 3.00,  audioInput: 1.00  },
-  'gemini-3.1-pro-preview':       { input: 2.00,  output: 12.00 },
-  'gemini-3.1-flash-lite-preview':{ input: 0.25,  output: 1.50,  audioInput: 0.50  },
-};
+export interface ModalityTokens {
+  modality?: string;
+  tokenCount?: number;
+}
 
 export interface UsageMetrics {
   promptTokenCount?: number;
   candidatesTokenCount?: number;
   totalTokenCount?: number;
-  imageCount?: number;    // number of images generated — used to select imageOutput rate
-  characterCount?: number;
+  /** Reasoning tokens — billed at the text-output rate, not included above. */
+  thoughtsTokenCount?: number;
+  /** Portion of promptTokenCount served from cache (billed ~10%). */
+  cachedContentTokenCount?: number;
+  promptTokensDetails?: ModalityTokens[];
+  candidatesTokensDetails?: ModalityTokens[];
+  /** Number of images produced — only used as a fallback when details are absent. */
+  imageCount?: number;
 }
 
 export interface GenerationParams {
@@ -46,58 +62,108 @@ export interface GenerationParams {
   audio?: boolean;
 }
 
+const perMillion = (tokens: number, rate: number) => (tokens / 1_000_000) * rate;
+
+function sumModality(details: ModalityTokens[] | undefined, modality: string): number {
+  if (!details) return 0;
+  return details
+    .filter((d) => (d.modality || '').toUpperCase() === modality)
+    .reduce((sum, d) => sum + (d.tokenCount || 0), 0);
+}
+
+function inputCost(usage: UsageMetrics, rates: TokenRates, inputRate: number): number {
+  const total = usage.promptTokenCount || 0;
+  const cached = Math.min(usage.cachedContentTokenCount || 0, total);
+  const audio = Math.min(sumModality(usage.promptTokensDetails, 'AUDIO'), total - cached);
+  const standard = Math.max(total - cached - audio, 0);
+
+  return (
+    perMillion(cached, rates.cachedInput ?? inputRate * 0.1) +
+    perMillion(audio, rates.audioInput ?? inputRate) +
+    perMillion(standard, inputRate)
+  );
+}
+
+function outputCost(usage: UsageMetrics, rates: TokenRates, outputRate: number): number {
+  const details = usage.candidatesTokensDetails;
+  const imageRate = rates.imageOutput ?? outputRate;
+
+  let imageTokens = sumModality(details, 'IMAGE');
+  let textTokens = sumModality(details, 'TEXT');
+
+  // Older/!detailed responses: fall back to the flat candidate count, attributing
+  // it to images only when the call actually produced images.
+  if (!details || details.length === 0) {
+    const candidates = usage.candidatesTokenCount || 0;
+    if (usage.imageCount && usage.imageCount > 0 && rates.imageOutput) {
+      imageTokens = candidates;
+      textTokens = 0;
+    } else {
+      imageTokens = 0;
+      textTokens = candidates;
+    }
+  }
+
+  // Reasoning is billed at the text-output rate.
+  const thoughts = usage.thoughtsTokenCount || 0;
+
+  return perMillion(imageTokens, imageRate) + perMillion(textTokens + thoughts, outputRate);
+}
+
 export function calculateCost(model: string, usage: UsageMetrics, params?: GenerationParams): number {
-  const pricing = MODEL_PRICING[model];
-  if (!pricing) {
-    console.log(`[Pricing] No pricing found for model: ${model}`);
+  if (!model) return 0;
+
+  // Video — no usage metadata, priced from the request.
+  if (VIDEO_MODEL_RATES[model]) {
+    return estimateVideoCost(model, {
+      durationSeconds: params?.duration,
+      resolution: params?.resolution,
+      audio: params?.audio,
+    });
+  }
+
+  // Music — flat per generation.
+  const flat = AUDIO_MODEL_RATES[model];
+  if (flat) return flat.perGeneration;
+
+  const rates = tokenRatesFor(model);
+  if (!rates) {
+    // Loud on purpose: an unpriced model silently bills $0 and disappears from
+    // every cost report, which is how spend goes unnoticed.
+    console.warn(`[Pricing] UNPRICED MODEL "${model}" — billing $0. Add it to src/lib/pricing.ts.`);
     return 0;
   }
 
-  // Flat per-image pricing (Imagen 4 family)
-  if (pricing.perImage !== undefined) {
-    const count = params?.numberOfImages || params?.sampleCount || 1;
-    const cost = pricing.perImage * count;
-    console.log(`[Pricing] ${model}: $${pricing.perImage} × ${count} images = $${cost.toFixed(4)}`);
-    return cost;
-  }
+  // Above 200K prompt tokens, some models bill every token at long-context rates.
+  const isLong = (usage.promptTokenCount || 0) > LONG_CONTEXT_THRESHOLD;
+  const inRate = isLong && rates.longContext ? rates.longContext.input : rates.input;
+  const outRate = isLong && rates.longContext ? rates.longContext.output : rates.output;
 
-  // Token-based pricing (Gemini text + image-generating models)
-  if (pricing.input !== undefined && usage.promptTokenCount !== undefined) {
-    const inputCost = (usage.promptTokenCount / 1_000_000) * pricing.input;
+  const total = inputCost(usage, rates, inRate) + outputCost(usage, rates, outRate);
 
-    // Use imageOutput rate when images were generated; fall back to text output rate
-    const outputRate = (usage.imageCount && usage.imageCount > 0 && pricing.imageOutput)
-      ? pricing.imageOutput
-      : (pricing.output || 0);
-    const outputCost = ((usage.candidatesTokenCount || 0) / 1_000_000) * outputRate;
+  const detail = (usage.candidatesTokensDetails || [])
+    .map((d) => `${d.modality}:${d.tokenCount}`)
+    .join(' ') || `candidates:${usage.candidatesTokenCount ?? 0}`;
+  console.log(
+    `[Pricing] ${model}: in=${usage.promptTokenCount ?? 0}` +
+    (usage.cachedContentTokenCount ? ` (cached ${usage.cachedContentTokenCount})` : '') +
+    ` out=[${detail}] thoughts=${usage.thoughtsTokenCount ?? 0}` +
+    (isLong ? ' LONG-CONTEXT' : '') +
+    ` → $${total.toFixed(6)}`,
+  );
 
-    const total = inputCost + outputCost;
-    console.log(`[Pricing] ${model}: in=${usage.promptTokenCount} out=${usage.candidatesTokenCount} images=${usage.imageCount ?? 0} rate=$${outputRate}/1M → $${total.toFixed(6)}`);
-    return total;
-  }
-
-  // Video pricing (per second × number of videos)
-  if (pricing['720p'] !== undefined && params?.duration) {
-    const baseCost = pricing[params.resolution || '720p'] || pricing['720p'];
-    const audioCost = params.audio ? (pricing.withAudio || 0) : 0;
-    return (baseCost + audioCost) * params.duration;
-  }
-
-  // Lyria flat pricing
-  if (pricing.perSong !== undefined) return pricing.perSong;
-  if (pricing.per30sClip !== undefined) return pricing.per30sClip;
-
-  // TTS character-based pricing
-  if (pricing.per1kChars !== undefined && usage.characterCount) {
-    return (usage.characterCount / 1000) * pricing.per1kChars;
-  }
-
-  return 0;
+  return total;
 }
 
 export function categorizeCost(model: string): 'text' | 'image' | 'video' | 'audio' {
   if (model.includes('veo')) return 'video';
   if (model.includes('lyria') || model.includes('tts')) return 'audio';
-  if (model.startsWith('imagen') || model.includes('image')) return 'image';
+  if (model.includes('image')) return 'image';
   return 'text';
 }
+
+/** Back-compat alias — older call sites imported this name. */
+export const MODEL_PRICING = new Proxy({} as Record<string, unknown>, {
+  get: (_t, key: string) => tokenRatesFor(key) ?? VIDEO_MODEL_RATES[key] ?? AUDIO_MODEL_RATES[key],
+  has: (_t, key: string) => isKnownModel(key),
+});

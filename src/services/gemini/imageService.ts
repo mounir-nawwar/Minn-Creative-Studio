@@ -45,43 +45,9 @@ export const generateImage = async (params: {
     ? `Project Context: ${projectContext}\n\nTask: Generate an image based on this prompt: ${prompt}`
     : prompt;
 
-  const isImagen4 = model.startsWith('imagen-4');
-
-  if (isImagen4) {
-    try {
-      const config: any = {
-        numberOfImages: sampleCount,
-        aspectRatio: aspectRatio as any,
-      };
-      if (seed !== undefined) config.seed = seed;
-      if (personGeneration) config.personGeneration = personGeneration;
-      if (enhancePrompt !== undefined) config.enhancePrompt = enhancePrompt;
-      if (addWatermark !== undefined) config.addWatermark = addWatermark;
-      if (safetySetting) config.safetySetting = safetySetting;
-
-      const response = await callBackend('generateImages', {
-        model: model,
-        prompt: fullPrompt,
-        config,
-        projectId,
-      }, signal);
-
-      if (!response?.generatedImages?.length) {
-        throw new Error('No images generated in response from API');
-      }
-
-      const images = response.generatedImages.map((img: any) => {
-        if (img.image.storageUrl) return img.image.storageUrl;
-        return `data:image/png;base64,${img.image.imageBytes}`;
-      });
-
-      return images.length === 1 ? images[0] : images;
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      console.error('Image generation error:', message);
-      throw new Error(`Image generation failed: ${message}`);
-    }
-  } else {
+  // The Imagen branch was removed with the imagen-* models (404 on this Vertex
+  // project); every image model now goes through generateContent.
+  {
     const parts: any[] = [];
 
     if (referenceImages && referenceImages.length > 0) {
@@ -230,28 +196,8 @@ export const upscaleImage = async (params: {
 
   const { data, mimeType } = await urlToBase64(imageUrl);
 
-  const isImagenUpscale = model.includes('upscale');
-
-  if (isImagenUpscale) {
-    try {
-      const response = await callBackend('upscaleImage', {
-        model: model,
-        image: { bytesBase64Encoded: data, mimeType },
-        config: {
-          upscaleFactor: scale === '4K' ? 4 : 2,
-        },
-        projectId,
-      }, signal);
-
-      if (response.storageUrl) return response.storageUrl;
-      if (response.imageBytes) return `data:image/png;base64,${response.imageBytes}`;
-      throw new Error("No upscaled image returned from API");
-    } catch (err) {
-      console.error('Upscale API Error:', err);
-      throw err;
-    }
-  }
-
+  // The dedicated Imagen upscale path was dropped along with the imagen-* models
+  // (404 on this Vertex project); everything now upscales via generateContent.
   try {
     const response = await callBackend('generateContent', {
       model: model,
@@ -406,16 +352,33 @@ export const generateVariations = async (params: {
 
   const { data, mimeType } = await urlToBase64(imageUrl);
 
+  // Previously called Imagen (now 404 on this project) AND never actually sent
+  // the source image, so "variations" ignored the input entirely. Each variation
+  // is now a separate generateContent call seeded differently, matching how
+  // generateImage() produces multiple images.
   try {
-    const response = await callBackend('generateImages', {
-      model: 'imagen-4.0-generate-001',
-      prompt: prompt || 'Generate variations of this image',
-      config: {
-        numberOfImages: count,
-      },
-    }, signal);
+    const images: string[] = [];
+    for (let i = 0; i < count; i++) {
+      const response = await callBackend('generateContent', {
+        model: 'gemini-3.1-flash-image',
+        contents: [{
+          role: 'user',
+          parts: [
+            { inlineData: { data, mimeType } },
+            { text: prompt || 'Generate a variation of this image, keeping the subject and style.' },
+          ],
+        }],
+        config: { responseModalities: ['IMAGE'], seed: Math.floor(Math.random() * 1_000_000) },
+      }, signal);
 
-    return response.generatedImages.map((img: any) => `data:image/png;base64,${img.image.imageBytes}`);
+      const part = response.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
+      if (part) {
+        images.push(part.inlineData.storageUrl ?? `data:image/png;base64,${part.inlineData.data}`);
+      }
+    }
+
+    if (images.length === 0) throw new Error('No variations returned from API');
+    return images;
   } catch (err) {
     console.error('Gemini API Error:', err);
     throw err;

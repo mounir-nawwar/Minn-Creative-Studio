@@ -58,6 +58,14 @@ export const TTS_VOICES = ['Kore', 'Puck', 'Charon', 'Fenrir', 'Aoede', 'Leda', 
 
 export const TEXT_MODELS: StudioModel[] = [
   {
+    id: 'gemini-3.6-flash',
+    label: 'Gemini 3.6 Flash',
+    mode: 'text',
+    description: 'Newest flash model — same input price as 3.5, cheaper output',
+    supports: { temperature: true, systemInstruction: true, referenceImages: true, grounding: true },
+    defaults: { maxOutputTokens: 8192 },
+  },
+  {
     id: 'gemini-3.5-flash',
     label: 'Gemini 3.5 Flash',
     mode: 'text',
@@ -82,7 +90,8 @@ export const TEXT_MODELS: StudioModel[] = [
     defaults: { maxOutputTokens: 8192 },
   },
   {
-    id: 'gemini-3.1-flash-lite-preview',
+    // NB: the `-preview` suffix 404s — the GA id is `gemini-3.1-flash-lite`
+    id: 'gemini-3.1-flash-lite',
     label: 'Gemini 3.1 Flash Lite',
     mode: 'text',
     description: 'Cheapest and quickest for simple tasks',
@@ -184,7 +193,8 @@ export function findModel(id: string): StudioModel | undefined {
 /** Sensible starting model per mode */
 export const DEFAULT_MODEL_FOR_MODE: Record<GenerationMode, string> = {
   text: 'gemini-3.5-flash',
-  image: 'imagen-4.0-generate-001',
+  // was imagen-4.0-generate-001, which 404s — Imagen isn't available on this project
+  image: 'gemini-3.1-flash-image',
   video: 'veo-3.1-fast-generate-001',
   audio: 'lyria-3-clip-preview',
 };

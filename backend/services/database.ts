@@ -672,18 +672,32 @@ export const usageLogs = {
       `);
       stmt.run(projectId, userId, type, cost, tokenCount || 0, JSON.stringify(metadata || {}));
 
-      // Update project usage summary
+      // Update project usage summary.
+      //
+      // Keys must match exactly what the UI reads (ProjectContextBar):
+      //   costKey  -> textCost | imageCost | videoCost | audioCost
+      //   countKey -> totalImages | totalVideos | totalAudio | totalTexts
+      // The per-type *cost* keys were previously never written, so the cost
+      // breakdown always rendered $0.0000 while the total was correct. Note
+      // audio is 'totalAudio' (no trailing s) — naive pluralisation produced
+      // 'totalAudios', which the UI never read.
+      const COUNT_KEYS = { image: 'totalImages', video: 'totalVideos', audio: 'totalAudio', text: 'totalTexts' } as const;
+      const COST_KEYS = { image: 'imageCost', video: 'videoCost', audio: 'audioCost', text: 'textCost' } as const;
+      const countKey = COUNT_KEYS[type];
+      const costKey = COST_KEYS[type];
+
       const updateProject = db.prepare(`
         UPDATE projects SET usage = json_set(
           COALESCE(usage, '{}'),
           '$.totalCost', COALESCE(json_extract(usage, '$.totalCost'), 0) + ?,
-          '$.total${type.charAt(0).toUpperCase() + type.slice(1)}s', COALESCE(json_extract(usage, '$.total${type.charAt(0).toUpperCase() + type.slice(1)}s'), 0) + 1,
+          '$.${costKey}', COALESCE(json_extract(usage, '$.${costKey}'), 0) + ?,
+          '$.${countKey}', COALESCE(json_extract(usage, '$.${countKey}'), 0) + 1,
           '$.totalTokens', COALESCE(json_extract(usage, '$.totalTokens'), 0) + ?,
           '$.lastUpdated', datetime('now')
         )
         WHERE id = ?
       `);
-      updateProject.run(cost, tokenCount || 0, projectId);
+      updateProject.run(cost, cost, tokenCount || 0, projectId);
     });
 
     logTx();
@@ -726,6 +740,8 @@ export async function trackProjectCost(
     audioCount?: number;
     tokenCount?: number;
     type: 'image' | 'video' | 'audio' | 'text';
+    /** Model id — recorded so spend can be audited per model after the fact */
+    model?: string;
     /** Origin of the spend — 'mcp' marks generations Claude ran through the connector */
     via?: string;
   }
@@ -745,10 +761,11 @@ export async function trackProjectCost(
     imageCount: metadata.imageCount,
     videoCount: metadata.videoCount,
     audioCount: metadata.audioCount,
+    ...(metadata.model ? { model: metadata.model } : {}),
     ...(metadata.via ? { via: metadata.via } : {}),
   });
 
-  console.log(`[Cost] $${cost.toFixed(4)} for ${metadata.type} · projectId=${projectId}`);
+  console.log(`[Cost] $${cost.toFixed(4)} for ${metadata.type}${metadata.model ? ` (${metadata.model})` : ''} · projectId=${projectId}`);
 }
 
 // Prompts operations

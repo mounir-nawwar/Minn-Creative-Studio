@@ -32,14 +32,16 @@ describe('geminiService', () => {
   });
 
   describe('generateImage', () => {
-    it('should call backend with Imagen model for imagen-4', async () => {
+    // The Imagen 4 path was removed (every imagen-* id 404s on this Vertex
+    // project), so all image generation now goes through generateContent.
+    it('should return inline base64 when no storage URL is present', async () => {
       mockFetch.mockResolvedValueOnce(createMockResponse({
-        generatedImages: [{ image: { imageBytes: 'testbytes', storageUrl: null } }],
+        candidates: [{ content: { parts: [{ inlineData: { data: 'testbytes' } }] } }],
       }));
 
       const result = await generateImage({
         prompt: 'Test prompt',
-        model: 'imagen-4.0-generate-001',
+        model: 'gemini-3.1-flash-image',
         aspectRatio: '1:1',
       });
 
@@ -48,12 +50,14 @@ describe('geminiService', () => {
 
     it('should return storage URL when available', async () => {
       mockFetch.mockResolvedValueOnce(createMockResponse({
-        generatedImages: [{ image: { storageUrl: 'https://storage.url/image.png' } }],
+        candidates: [{
+          content: { parts: [{ inlineData: { data: 'x', storageUrl: 'https://storage.url/image.png' } }] },
+        }],
       }));
 
       const result = await generateImage({
         prompt: 'Test prompt',
-        model: 'imagen-4.0-generate-001',
+        model: 'gemini-3.1-flash-image',
         aspectRatio: '1:1',
       });
 
@@ -62,18 +66,19 @@ describe('geminiService', () => {
 
     it('should handle project context in prompt', async () => {
       mockFetch.mockResolvedValueOnce(createMockResponse({
-        generatedImages: [{ image: { imageBytes: 'testbytes' } }],
+        candidates: [{ content: { parts: [{ inlineData: { data: 'testbytes' } }] } }],
       }));
 
       await generateImage({
         prompt: 'Test prompt',
-        model: 'imagen-4.0-generate-001',
+        model: 'gemini-3.1-flash-image',
         aspectRatio: '1:1',
         projectContext: 'Project: Test Project',
       });
 
       const callArgs = JSON.parse(mockFetch.mock.calls[0][1].body);
-      expect(callArgs.params.prompt).toContain('Project Context: Project: Test Project');
+      const sentText = callArgs.params.contents[0].parts.map((p: any) => p.text).join(' ');
+      expect(sentText).toContain('Project Context: Project: Test Project');
     });
 
     it('should throw on backend error', async () => {
@@ -88,7 +93,7 @@ describe('geminiService', () => {
 
       await expect(generateImage({
         prompt: 'Test prompt',
-        model: 'imagen-4.0-generate-001',
+        model: 'gemini-3.1-flash-image',
         aspectRatio: '1:1',
       })).rejects.toThrow('API quota exceeded');
     });

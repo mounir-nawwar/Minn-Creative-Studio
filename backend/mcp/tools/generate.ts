@@ -126,7 +126,7 @@ export function registerGenerationTools(server: McpServer, ctx: ToolContext): vo
       inputSchema: {
         projectId: projectIdSchema,
         prompt: z.string().min(1),
-        model: z.string().optional().describe("Image model id (default 'imagen-4.0-generate-001')"),
+        model: z.string().optional().describe("Image model id (default 'gemini-3.1-flash-image')"),
         aspectRatio: z.string().optional().describe("e.g. '1:1', '3:4', '16:9' (default '1:1')"),
         resolution: z.string().optional().describe("Gemini image models only: '1K', '2K', '4K'"),
         sampleCount: z.number().int().min(1).max(MAX_IMAGEN_SAMPLES).optional(),
@@ -134,54 +134,25 @@ export function registerGenerationTools(server: McpServer, ctx: ToolContext): vo
         referenceImages: z
           .array(z.object({ url: z.string() }))
           .max(MAX_REFERENCE_IMAGES)
-          .optional()
-          .describe('Gemini image models only — Imagen 4 is one-shot text-to-image'),
-        personGeneration: z.string().optional().describe("Imagen only: e.g. 'allow_adult'"),
-        temperature: z.number().min(0).max(2).optional().describe('Gemini image models only'),
+          .optional(),
+        temperature: z.number().min(0).max(2).optional(),
         includeProjectContext: z.boolean().optional().describe('Default true (no-op for playground)'),
       },
     },
     (args, extra) =>
       guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'generate_image', args, async () => {
         requireProject(args.projectId);
-        const modelId = args.model ?? 'imagen-4.0-generate-001';
+        // Imagen is unavailable on this Vertex project (every imagen-* id 404s),
+        // so all image generation goes through the Gemini image models.
+        const modelId = args.model ?? 'gemini-3.1-flash-image';
         requireModelOfMode(modelId, 'image');
         const aspectRatio = args.aspectRatio ?? '1:1';
-        const isImagen4 = modelId.startsWith('imagen-4');
 
         // Same prompt framing as the app (imageService)
         const context = args.includeProjectContext !== false ? projectContextFor(args.projectId) : '';
         const fullPrompt = context
           ? `Project Context: ${context}\n\nTask: Generate an image based on this prompt: ${args.prompt}`
           : args.prompt;
-
-        if (isImagen4) {
-          if (args.referenceImages?.length) {
-            return errorResult('Imagen 4 does not accept reference images — use a Gemini image model (e.g. gemini-3.1-flash-image) instead.');
-          }
-          const data = await runGeneration({
-            method: 'generateImages',
-            params: {
-              model: modelId,
-              prompt: fullPrompt,
-              config: {
-                numberOfImages: args.sampleCount ?? 1,
-                aspectRatio,
-                ...(args.seed !== undefined && { seed: args.seed }),
-                ...(args.personGeneration && { personGeneration: args.personGeneration }),
-              },
-              projectId: args.projectId,
-            },
-            userId: ctx.user.id,
-            via: 'mcp',
-          });
-          const images = (data.generatedImages ?? [])
-            .map((img: any) => img.image?.storageUrl)
-            .filter(Boolean)
-            .map((url: string) => ({ url, assetId: assetIdForUrl(url) }));
-          if (!images.length) return errorResult('No images generated (the prompt may have been filtered).');
-          return jsonResult({ model: modelId, aspectRatio, images }, `Generated ${images.length} image(s)`);
-        }
 
         // Gemini image models: one image per call, sequential (mirrors the app)
         const sampleCount = Math.min(args.sampleCount ?? 1, MAX_GEMINI_IMAGE_SAMPLES);

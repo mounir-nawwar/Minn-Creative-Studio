@@ -175,6 +175,57 @@ export async function vertexFetchGCS(gcsUri: string) {
   return { base64: Buffer.from(buf).toString('base64'), contentType: res.headers.get('content-type') || 'video/mp4' };
 }
 
+/**
+ * Lyria 3 music generation.
+ *
+ * Lyria 3 is NOT served by `:predict` in a regional endpoint — that 404s. It's
+ * exposed only through the global `/interactions` API, which returns the
+ * finished song synchronously (measured: ~14s for a clip, ~36s for Pro), so no
+ * long-running-operation polling is needed.
+ *
+ * Response shape:
+ *   { status: 'completed', outputs: [
+ *       { type: 'text',  text: '<lyrics>' },
+ *       { type: 'text',  text: 'Caption: ...' },
+ *       { type: 'audio', mime_type: 'audio/mpeg', data: '<base64 mp3>' } ] }
+ *
+ * Normalised here into the same `{ candidates: [...] }` shape the rest of the
+ * pipeline expects from vertexPredict.
+ */
+export async function vertexLyriaGenerate(params: any) {
+  const { model, contents } = params;
+  const parts = Array.isArray(contents) ? contents[0]?.parts : contents?.parts;
+
+  const input: any[] = [];
+  const promptText = parts?.find((p: any) => p.text)?.text;
+  if (promptText) input.push({ type: 'text', text: promptText });
+  for (const p of parts ?? []) {
+    if (p.inlineData) {
+      input.push({ type: 'image', mime_type: p.inlineData.mimeType, data: p.inlineData.data });
+    }
+  }
+
+  const url = `https://aiplatform.googleapis.com/v1beta1/projects/${VERTEX_PROJECT}/locations/global/interactions`;
+  const result = await vertexRest(url, 'POST', { model, input });
+
+  const outputs: any[] = result?.outputs ?? [];
+  const audio = outputs.find((o) => o.type === 'audio');
+  if (!audio?.data) {
+    throw new Error(`Lyria returned no audio (status=${result?.status ?? 'unknown'})`);
+  }
+  const texts = outputs.filter((o) => o.type === 'text').map((o) => o.text);
+  console.log(`[Lyria] ${model} → ${Math.round((audio.data.length * 0.75) / 1024)}KB ${audio.mime_type || 'audio/mpeg'}`);
+
+  return {
+    candidates: [{
+      content: { parts: [{ inlineData: { data: audio.data, mimeType: audio.mime_type || 'audio/mpeg' } }] },
+    }],
+    // Lyria also returns the lyrics and a description of what it composed.
+    lyriaLyrics: texts[0],
+    lyriaCaption: texts[1],
+  };
+}
+
 export async function vertexPredict(params: any) {
   const { model, contents, config = {} } = params;
   const parts = Array.isArray(contents) ? contents[0]?.parts : contents?.parts;

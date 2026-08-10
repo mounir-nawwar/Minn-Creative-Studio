@@ -1,6 +1,27 @@
 import '@testing-library/jest-dom';
 import { vi, beforeAll, afterAll } from 'vitest';
 
+// Node 22 exposes an experimental global `localStorage` that throws unless the
+// runtime was started with --localstorage-file. It shadows jsdom's working
+// implementation, so any module reading localStorage at import time
+// (src/lib/api.ts) blows up before a single test runs. Install a plain
+// in-memory store instead.
+if (typeof globalThis.localStorage?.getItem !== 'function') {
+  const store = new Map<string, string>();
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    writable: true,
+    value: {
+      getItem: (key: string) => (store.has(key) ? store.get(key)! : null),
+      setItem: (key: string, value: string) => { store.set(key, String(value)); },
+      removeItem: (key: string) => { store.delete(key); },
+      clear: () => { store.clear(); },
+      key: (i: number) => Array.from(store.keys())[i] ?? null,
+      get length() { return store.size; },
+    },
+  });
+}
+
 // Global test setup
 global.ResizeObserver = class ResizeObserver {
   observe() {}
