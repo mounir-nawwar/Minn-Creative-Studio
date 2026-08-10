@@ -46,8 +46,27 @@ export default function WorkflowsTab() {
     if (!window.confirm('Delete this workflow?')) return;
     try {
       await workflowsApi.delete(id);
-      if (currentWfId === id) { setActiveWorkflowId(null); setNodes([]); setEdges([]); }
+      if (currentWfId === id) {
+        setActiveWorkflowId(null);
+        setNodes([]);
+        setEdges([]);
+      }
       invalidateWorkflows();
+      const remaining = workflows.filter((w) => w.id !== id);
+      if (remaining.length > 0) {
+        loadWorkflow(remaining[0]);
+      } else if (currentProject) {
+        const created = await workflowsApi.create({
+          projectId: currentProject.id,
+          name: 'Main Workflow',
+          nodes: [],
+          edges: [],
+        });
+        setActiveWorkflowId(created.id);
+        setNodes([]);
+        setEdges([]);
+        invalidateWorkflows();
+      }
     } catch (err) {
       console.error('Error deleting workflow:', err);
     }

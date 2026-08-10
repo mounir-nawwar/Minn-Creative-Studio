@@ -163,9 +163,34 @@ const Toolbar = ({ user, onLogout }: ToolbarProps) => {
   useEffect(() => { confirmSaveRef.current = confirmSave; });
 
   const deleteWorkflow = async (id: string) => {
-    if (activeWorkflowId === id) setActiveWorkflowId(null);
-    await workflowsApi.delete(id);
-    invalidateWorkflows();
+    try {
+      await workflowsApi.delete(id);
+      if (activeWorkflowId === id) {
+        setActiveWorkflowId(null);
+        setNodes([]);
+        setEdges([]);
+        setWorkflowName('');
+      }
+      invalidateWorkflows();
+      const remaining = workflows.filter((w) => w.id !== id);
+      if (remaining.length > 0) {
+        loadWorkflow(remaining[0]);
+      } else if (currentProject) {
+        const created = await workflowsApi.create({
+          projectId: currentProject.id,
+          name: 'Main Workflow',
+          nodes: [],
+          edges: [],
+        });
+        setActiveWorkflowId(created.id);
+        setWorkflowName(created.name);
+        setNodes([]);
+        setEdges([]);
+        invalidateWorkflows();
+      }
+    } catch (err) {
+      console.error('Error deleting workflow:', err);
+    }
   };
 
   const loadWorkflow = (workflow: unknown) => {
