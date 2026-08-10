@@ -16,14 +16,16 @@ services:
       - ./storage:/app/storage
       # Mount .env file containing host secrets
       - ./.env:/app/.env:ro
-      # Mount Gcloud ADC Credentials
+      # Mount Service Account Key & Gcloud ADC Credentials
+      - /home/ubuntu/.config/gcloud/minn-key.json:/app/minn-key.json:ro
       - /home/ubuntu/.config/gcloud/application_default_credentials.json:/app/application_default_credentials.json:ro
     environment:
       - NODE_ENV=production
       - PORT=3000
       - DATABASE_PATH=/app/data/minn-studio.db
       - STORAGE_PATH=/app/storage
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/application_default_credentials.json
+      - GOOGLE_CLOUD_PROJECT=project-cd417e48-66bd-46d2-ad5
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/minn-key.json
     
     # Enforce precise resource limits to mimic small VM constraints
     deploy:
