@@ -15,12 +15,13 @@
  */
 
 import { runGeneration } from './generation.ts';
-import { calculateCost, MODEL_PRICING } from '../config/pricing.ts';
+import { calculateCost, estimateImageCost } from '../config/pricing.ts';
 import {
   DEFAULT_IMAGE_MODEL,
   DEFAULT_MUSIC_MODEL,
   DEFAULT_TEXT_MODEL,
   DEFAULT_VIDEO_MODEL,
+  resolveImageModel,
 } from '../../src/lib/models.ts';
 import { workflows } from './database.ts';
 import type { GraphNode, GraphEdge } from '../mcp/graph/validate.ts';
@@ -125,11 +126,11 @@ function estimateNodeCost(node: GraphNode): number {
   switch (node.type) {
     case 'imagen':
     case 'nanoBanana': {
-      const model = config.model ?? DEFAULT_IMAGE_MODEL;
+      const model = resolveImageModel(config.model);
       const samples = Math.max(1, Number(config.sampleCount ?? 1));
-      const perImage = MODEL_PRICING[model]?.perImage;
-      // token-billed gemini image models: ~$0.10/image observed in production
-      return (perImage ?? 0.1) * samples;
+      // Image output is billed by token, and the token count is fixed per
+      // resolution — so the estimate is exact for the requested size.
+      return (estimateImageCost(model, config.resolution) ?? 0) * samples;
     }
     case 'veo':
     case 'imageToVideo': {

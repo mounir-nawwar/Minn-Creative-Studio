@@ -11,8 +11,10 @@ import crypto from 'crypto';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Database file path - stored in data directory
-const DB_PATH = process.env.DATABASE_PATH || path.join(__dirname, '../../data/minn-studio.db');
+// Database file path - stored in data directory.
+// Exported so anything that needs to sit beside the database (backups) derives
+// the location from here rather than recomputing it and drifting.
+export const DB_PATH = process.env.DATABASE_PATH || path.join(__dirname, '../../data/minn-studio.db');
 
 // Ensure data directory exists
 import fs from 'fs';

@@ -263,7 +263,7 @@ export function useChatStudio() {
     const isTts = settings.model.includes('tts');
     const referenceImages = attachments.filter((a) => a.type === 'image').map((a) => ({ url: a.url }));
 
-    const url = await generateAudio({
+    const { url, lyrics } = await generateAudio({
       prompt: text,
       model: settings.model,
       voice: p.voice as string | undefined,
@@ -281,8 +281,11 @@ export function useChatStudio() {
     const summary = isTts
       ? `Generated speech · ${(p.voice as string) || 'Kore'}`
       : `Generated music · ${label}`;
+    // Lyria writes lyrics for the track — keep them in the transcript rather
+    // than discarding them.
+    const body = lyrics?.trim() ? `${summary}\n\n${lyrics.trim()}` : summary;
     const assistantMessage = await chatsApi.addMessage(
-      chatId, 'assistant', summary,
+      chatId, 'assistant', body,
       [{ url, type: 'audio' as const, model: settings.model }],
     );
     appendMessage(assistantMessage);

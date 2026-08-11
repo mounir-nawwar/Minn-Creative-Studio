@@ -9,7 +9,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { TEXT_MODELS, CHAT_IMAGE_MODELS, VIDEO_MODELS, AUDIO_MODELS, type StudioModel } from '../../../src/lib/models.ts';
-import { MODEL_PRICING } from '../../config/pricing.ts';
+import { ratesFor } from '../../config/pricing.ts';
 import { guard } from '../guard.ts';
 import type { ToolContext } from '../server.ts';
 import { jsonResult } from './util.ts';
@@ -36,7 +36,7 @@ export function registerModelTools(server: McpServer, ctx: ToolContext): void {
           mode: model.mode,
           description: model.description ?? null,
           priceHint: model.priceHint ?? null,
-          pricing: MODEL_PRICING[model.id] ?? null,
+          pricing: ratesFor(model.id),
           supports: model.supports,
           defaults: model.defaults,
         }));

@@ -8,6 +8,15 @@ const formatElapsed = (startTime: number): string => {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
 
+export interface AudioResult {
+  /** Storage URL when the project keeps assets, otherwise a data: URL. */
+  url: string;
+  /** Lyria only — the lyrics it wrote for the track. */
+  lyrics?: string;
+  /** Lyria only — its own description of the composition. */
+  caption?: string;
+}
+
 export const generateAudio = async (params: {
   prompt: string;
   model?: string;
@@ -79,19 +88,11 @@ export const generateAudio = async (params: {
             },
           },
         }),
-        ...(isLyria && {
-          ...(negativePrompt && { negative_prompt: negativePrompt }),
-          ...(duration && { duration }),
-          ...(seed !== undefined && { seed }),
-          ...(temperature !== undefined && { temperature }),
-          ...(topP !== undefined && { topP }),
-          ...(topK !== undefined && { topK }),
-          ...(guidance !== undefined && { guidance }),
-          ...(bpm !== undefined && { bpm }),
-          ...(density !== undefined && { density }),
-          ...(brightness !== undefined && { brightness }),
-          ...(scale && { scale }),
-        }),
+        // NOTE: Lyria 3 is served by the global /interactions API, whose only
+        // inputs are text and images — it accepts no sampling or musical
+        // parameters. Anything the caller wants the model to honour has to be
+        // expressed in the prompt itself (see describeMusicalDirection in
+        // LyriaNode), so no knobs are forwarded here.
         safetySettings: [
           { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
           { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
@@ -131,11 +132,20 @@ export const generateAudio = async (params: {
     if (!inlineData) throw new Error("No audio generated");
 
     onProgress?.(undefined);
-    if (inlineData.storageUrl) {
-      return inlineData.storageUrl;
-    }
 
-    return `data:audio/wav;base64,${inlineData.data}`;
+    // Lyria 3 returns MP3 (audio/mpeg); TTS returns WAV. Trust the reported
+    // type rather than assuming — a data: URL with the wrong mime can fail to
+    // play depending on the browser.
+    const url = inlineData.storageUrl
+      ?? `data:${inlineData.mimeType || 'audio/wav'};base64,${inlineData.data}`;
+
+    return {
+      url,
+      // Lyria composes lyrics and a description of what it wrote; both are
+      // returned alongside the audio and are worth showing to the user.
+      lyrics: typeof response.lyriaLyrics === 'string' ? response.lyriaLyrics : undefined,
+      caption: typeof response.lyriaCaption === 'string' ? response.lyriaCaption : undefined,
+    };
   } catch (err) {
     console.error('Gemini API Error:', err);
     throw err;

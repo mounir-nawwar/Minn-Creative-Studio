@@ -74,6 +74,8 @@ export interface WorkflowNodeData {
   config?: NodeConfig;
   output?: any;
   outputs?: any[];
+  /** Lyria returns the lyrics it wrote for the track alongside the audio. */
+  lyrics?: string;
   uploadEnabled?: boolean;
   error?: string | null;
   isRunning?: boolean;

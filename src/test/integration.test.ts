@@ -173,7 +173,7 @@ describe('Integration Tests: Generate → Upload → Store Flow', () => {
         projectId: 'test-project',
       });
 
-      expect(result).toBe('https://storage.googleapis.com/bucket/projects/test/assets/audio.wav');
+      expect(result.url).toBe('https://storage.googleapis.com/bucket/projects/test/assets/audio.wav');
     });
   });
 

@@ -203,7 +203,7 @@ describe('geminiService', () => {
         voice: 'Kore',
       });
 
-      expect(result).toBe('data:audio/wav;base64,audiobase64');
+      expect(result.url).toBe('data:audio/wav;base64,audiobase64');
     });
 
     it('should return storage URL when available', async () => {
@@ -220,7 +220,7 @@ describe('geminiService', () => {
         model: 'gemini-2.5-flash-preview-tts',
       });
 
-      expect(result).toBe('https://storage.url/audio.wav');
+      expect(result.url).toBe('https://storage.url/audio.wav');
     });
 
     it('should call progress callback', async () => {

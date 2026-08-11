@@ -162,8 +162,23 @@ export function categorizeCost(model: string): 'text' | 'image' | 'video' | 'aud
   return 'text';
 }
 
-/** Back-compat alias — older call sites imported this name. */
-export const MODEL_PRICING = new Proxy({} as Record<string, unknown>, {
-  get: (_t, key: string) => tokenRatesFor(key) ?? VIDEO_MODEL_RATES[key] ?? AUDIO_MODEL_RATES[key],
-  has: (_t, key: string) => isKnownModel(key),
-});
+/** Every rate shape a model can be billed under. */
+export type ModelRates =
+  | ({ kind: 'token' } & TokenRates)
+  | ({ kind: 'video' } & VideoRates)
+  | ({ kind: 'flat' } & FlatRates);
+
+/**
+ * The published rates for a model, tagged so callers can tell the shapes apart
+ * (token-billed vs per-second video vs flat-per-generation) instead of probing
+ * for fields that may not exist.
+ */
+export function ratesFor(model: string): ModelRates | null {
+  const token = tokenRatesFor(model);
+  if (token) return { kind: 'token', ...token };
+  const video = VIDEO_MODEL_RATES[model];
+  if (video) return { kind: 'video', ...video };
+  const flat = AUDIO_MODEL_RATES[model];
+  if (flat) return { kind: 'flat', ...flat };
+  return null;
+}

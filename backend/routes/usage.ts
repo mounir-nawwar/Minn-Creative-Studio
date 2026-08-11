@@ -9,7 +9,7 @@
 
 import express from 'express';
 import path from 'path';
-import { db } from '../services/database.ts';
+import { db, DB_PATH } from '../services/database.ts';
 import { authMiddleware } from '../services/auth.ts';
 
 const router = express.Router();
@@ -18,8 +18,6 @@ router.use(authMiddleware);
 
 /** Google's free-credit allowance the counter runs down. */
 const CREDIT_LIMIT_USD = Number(process.env.VERTEX_CREDIT_LIMIT_USD || 300);
-
-const DB_PATH = process.env.DATABASE_PATH || path.join(process.cwd(), 'data/minn-studio.db');
 
 interface Totals {
   totalCost: number;
@@ -89,7 +87,7 @@ router.post('/reset', async (_req, res) => {
 
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     const backupPath = path.join(path.dirname(DB_PATH), `minn-studio.pre-reset-${stamp}.db`);
-    await (db as any).backup(backupPath);
+    await db.backup(backupPath);
     console.log(`[Usage] pre-reset backup → ${backupPath}`);
 
     const reset = db.transaction(() => {

@@ -29,22 +29,57 @@ interface LyriaNodeData {
     language?: string;
     duration?: number;
     negativePrompt?: string;
-    seed?: number;
-    temperature?: number;
-    guidance?: number;
+    // seed / temperature / guidance / topP / topK are intentionally absent:
+    // Lyria 3 accepts no sampling parameters. Old saved configs may still carry
+    // them; they are simply ignored.
     bpm?: number;
     density?: number;
     brightness?: number;
     scale?: string;
-    topP?: number;
-    topK?: number;
     voice?: string;
   };
   output?: string;
+  /** Lyria writes lyrics for the track and returns them with the audio. */
+  lyrics?: string;
   isRunning?: boolean;
   error?: string;
   progress?: number;
   [key: string]: unknown;
+}
+
+/** 0..1 knob → the words a text-conditioned model can actually act on. */
+function bandOf(value: number, low: string, mid: string, high: string): string {
+  if (value <= 0.33) return low;
+  if (value >= 0.67) return high;
+  return mid;
+}
+
+/**
+ * Compose the node's musical controls into a prompt.
+ *
+ * Lyria 3's /interactions API accepts only text and images — no tempo, key,
+ * density or negative-prompt fields — so every control has to be described in
+ * words or it has no effect at all.
+ */
+export function describeMusicalDirection(o: {
+  genre: string; mood: string; instrumentation: string; bpm: number; scale: string;
+  vocalStyle: string; language: string; density: number; brightness: number;
+  negativePrompt?: string; durationSeconds?: number; userPrompt: string;
+}): string {
+  const arrangement = bandOf(o.density, 'sparse, minimal arrangement', 'balanced arrangement', 'dense, layered arrangement');
+  const tone = bandOf(o.brightness, 'dark, warm tone', 'natural tone', 'bright, airy tone');
+
+  const lines = [
+    `Genre: ${o.genre}. Mood: ${o.mood}. Instrumentation: ${o.instrumentation}.`,
+    `Tempo: ${o.bpm} BPM. Key: ${o.scale}.`,
+    `Vocal style: ${o.vocalStyle}. Language: ${o.language}.`,
+    `Production: ${arrangement}, ${tone}.`,
+    o.durationSeconds ? `Target length: about ${o.durationSeconds} seconds.` : '',
+    o.negativePrompt?.trim() ? `Avoid: ${o.negativePrompt.trim()}.` : '',
+    o.userPrompt?.trim() ?? '',
+  ];
+
+  return lines.filter(Boolean).join(' ').trim();
 }
 
 const LyriaNode = ({ id, data }: NodeProps<LyriaNodeData>) => {
@@ -58,15 +93,10 @@ const LyriaNode = ({ id, data }: NodeProps<LyriaNodeData>) => {
   const [language, setLanguage] = useState(data.config?.language || 'English');
   const [duration, setDuration] = useState(data.config?.duration || 60);
   const [negativePrompt, setNegativePrompt] = useState(data.config?.negativePrompt || '');
-  const [seed, setSeed] = useState<number | undefined>(data.config?.seed);
-  const [temperature, setTemperature] = useState(data.config?.temperature ?? 1.0);
-  const [guidance, setGuidance] = useState(data.config?.guidance ?? 4.0);
   const [bpm, setBpm] = useState(data.config?.bpm || 120);
   const [density, setDensity] = useState(data.config?.density ?? 0.5);
   const [brightness, setBrightness] = useState(data.config?.brightness ?? 0.5);
   const [scale, setScale] = useState(data.config?.scale || 'C Major');
-  const [topP, setTopP] = useState(data.config?.topP ?? 0.95);
-  const [topK, setTopK] = useState(data.config?.topK ?? 64);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showSoundDesign, setShowSoundDesign] = useState(false);
   
@@ -137,31 +167,27 @@ const LyriaNode = ({ id, data }: NodeProps<LyriaNodeData>) => {
     timerRef.current = setInterval(updateTimer, 1000);
 
     try {
-      let finalPrompt = userPrompt;
-      if (isLyria) {
-        finalPrompt = `Genre: ${genre}. Mood: ${mood}. Instrumentation: ${instrumentation}. Tempo: ${bpm} BPM. Key: ${scale}. Vocal Style: ${vocalStyle}. Language: ${language}. ${userPrompt}`.trim();
-      }
+      // Lyria 3 takes no musical parameters over the wire — everything has to
+      // be said in words, so the controls are composed into the prompt.
+      const finalPrompt = isLyria
+        ? describeMusicalDirection({
+            genre, mood, instrumentation, bpm, scale, vocalStyle, language,
+            density, brightness, negativePrompt,
+            durationSeconds: isPro ? duration : undefined,
+            userPrompt,
+          })
+        : userPrompt;
 
-      const audioUrl = await generateAudio({
+      const { url: audioUrl, lyrics } = await generateAudio({
         prompt: finalPrompt,
         model,
         projectId: uploadEnabled ? currentProject?.id : undefined,
         referenceImages: isLyria ? referenceImages.map(r => ({ url: r.url })) : undefined,
-        negativePrompt: isLyria ? negativePrompt : undefined,
-        duration: isPro ? duration : undefined,
-        seed: isLyria ? seed : undefined,
-        temperature: isLyria ? temperature : undefined,
-        guidance: isLyria ? guidance : undefined,
-        bpm: isLyria ? bpm : undefined,
-        density: isLyria ? density : undefined,
-        brightness: isLyria ? brightness : undefined,
-        topP: isLyria ? topP : undefined,
-        topK: isLyria ? topK : undefined,
         voice: isTTS ? data.config?.voice || 'Kore' : undefined,
       }, abortControllerRef.current?.signal);
 
       if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
-      updateNodeData(id, { output: audioUrl, isRunning: false, progress: undefined });
+      updateNodeData(id, { output: audioUrl, lyrics, isRunning: false, progress: undefined });
 
       if (audioUrl) {
         addAsset({
@@ -252,7 +278,6 @@ const LyriaNode = ({ id, data }: NodeProps<LyriaNodeData>) => {
                   className="space-y-3 overflow-hidden"
                 >
                   <ParameterSlider label="BPM" value={bpm} min={60} max={200} onChange={(v) => { setBpm(v); updateConfig('bpm', v); }} />
-                  <ParameterSlider label="Guidance" value={guidance} min={0} max={6} step={0.1} onChange={(v) => { setGuidance(v); updateConfig('guidance', v); }} />
                   <ParameterSlider label="Density" value={density} min={0} max={1} step={0.05} onChange={(v) => { setDensity(v); updateConfig('density', v); }} />
                   <ParameterSlider label="Brightness" value={brightness} min={0} max={1} step={0.05} onChange={(v) => { setBrightness(v); updateConfig('brightness', v); }} />
                   <NodeField label="Musical key">
@@ -284,17 +309,9 @@ const LyriaNode = ({ id, data }: NodeProps<LyriaNodeData>) => {
                   <NodeField label="Negative prompt">
                     <NodeInput value={negativePrompt} onChange={(e) => { setNegativePrompt(e.target.value); updateConfig('negativePrompt', e.target.value); }} placeholder="Instruments/styles to avoid…" />
                   </NodeField>
-                  <ParameterSlider label="Temperature" value={temperature} min={0} max={3} step={0.1} onChange={(v) => { setTemperature(v); updateConfig('temperature', v); }} />
-                  <ParameterSlider label="Top P" value={topP} min={0} max={1} step={0.05} onChange={(v) => { setTopP(v); updateConfig('topP', v); }} />
-                  <ParameterSlider label="Top K" value={topK} min={1} max={64} step={1} onChange={(v) => { setTopK(v); updateConfig('topK', v); }} />
-                  <NodeField label="Seed">
-                    <NodeInput
-                      type="number"
-                      value={seed ?? ''}
-                      onChange={(e) => { const v = e.target.value ? parseInt(e.target.value) : undefined; setSeed(v); updateConfig('seed', v); }}
-                      placeholder="Random"
-                    />
-                  </NodeField>
+                  {/* Sampling controls (temperature / top-p / top-k / seed /
+                      guidance) were removed: Lyria 3 exposes no such
+                      parameters, so they were silently doing nothing. */}
                   <ReferenceStrip
                     nodeId={id}
                     references={referenceImages.map((r) => ({ edgeId: r.edgeId, url: r.url, role: 'style' as const, strength: 0.5 }))}
@@ -338,7 +355,7 @@ const LyriaNode = ({ id, data }: NodeProps<LyriaNodeData>) => {
             <div className="flex items-center justify-between">
               <NodeLabel>Result audio</NodeLabel>
               <button
-                onClick={() => downloadFile(data.output, `generated-audio-${Date.now()}.wav`)}
+                onClick={() => downloadFile(data.output, `generated-audio-${Date.now()}.${isLyria ? 'mp3' : 'wav'}`)}
                 className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-white/[0.04] text-gray-400 ring-1 ring-white/10 transition-[transform,color,background-color] duration-150 hover:bg-[#0097A7] hover:text-white active:scale-[0.96]"
               >
                 <Download className="h-3.5 w-3.5" />
@@ -347,6 +364,15 @@ const LyriaNode = ({ id, data }: NodeProps<LyriaNodeData>) => {
             <ExpandableAssetWrapper onClick={() => setExpandedAsset(data.output, 'audio')} type="audio">
               <AudioPreview url={data.output} />
             </ExpandableAssetWrapper>
+
+            {data.lyrics?.trim() && (
+              <div className="space-y-1">
+                <NodeLabel>Lyrics</NodeLabel>
+                <p className="nowheel max-h-32 overflow-y-auto whitespace-pre-wrap rounded-lg bg-white/[0.03] p-2.5 text-[11px] leading-relaxed text-gray-300 ring-1 ring-inset ring-white/10">
+                  {data.lyrics}
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>
