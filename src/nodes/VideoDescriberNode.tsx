@@ -3,10 +3,12 @@ import BaseNode from './BaseNode';
 import { useStore } from '../store/useStore';
 import { useProjectStore } from '../store/useProjectStore';
 import { generateText } from '../services/geminiService';
-import { NodeField, NodeSelect, NodeTextArea, RunButton, NodeOutput } from './ui';
+import { resolveTextModel } from '../lib/models';
+import { NodeField, NodeTextArea, RunButton, NodeOutput } from './ui';
 
 const VideoDescriberNode = ({ id, data }: any) => {
-  const [model, setModel] = useState(data.config?.model || 'gemini-3-flash-preview');
+  // Single studio text model; older saved configs are coerced to it.
+  const model = resolveTextModel(data.config?.model);
   const [prompt, setPrompt] = useState(data.config?.prompt || 'Describe this video in detail, focusing on style, camera movement, and lighting.');
   const updateNodeData = useStore((state) => state.updateNodeData);
   const { currentProject } = useProjectStore();
@@ -29,13 +31,6 @@ const VideoDescriberNode = ({ id, data }: any) => {
   return (
     <BaseNode id={id} data={data} inputs={true} onRun={handleRun}>
       <div className="space-y-3">
-        <NodeField label="Model">
-          <NodeSelect value={model} onChange={(e) => { setModel(e.target.value); updateNodeData(id, { config: { ...data.config, model: e.target.value } }); }}>
-            <option value="gemini-3-flash-preview">Gemini 3 Flash</option>
-            <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro</option>
-          </NodeSelect>
-        </NodeField>
-
         <NodeField label="Prompt">
           <NodeTextArea className="h-16" value={prompt} onChange={(e) => { setPrompt(e.target.value); updateNodeData(id, { config: { ...data.config, prompt: e.target.value } }); }} />
         </NodeField>

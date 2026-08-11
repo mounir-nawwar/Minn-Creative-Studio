@@ -141,7 +141,7 @@ describe('geminiService', () => {
 
       const result = await generateText({
         prompt: 'Test prompt',
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-3.6-flash',
       });
 
       expect(result).toBe('Generated text response');
@@ -152,7 +152,7 @@ describe('geminiService', () => {
 
       await generateText({
         prompt: 'Test prompt',
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-3.6-flash',
         systemInstruction: 'You are a helpful assistant',
       });
 
@@ -165,7 +165,7 @@ describe('geminiService', () => {
 
       await generateText({
         prompt: 'Test prompt',
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-3.6-flash',
         projectContext: 'Project context info',
       });
 
@@ -178,7 +178,7 @@ describe('geminiService', () => {
 
       await generateText({
         prompt: 'Test',
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-3.6-flash',
         maxOutputTokens: 1000,
       });
 
@@ -326,7 +326,7 @@ describe('geminiService', () => {
 
       await expect(generateText({
         prompt: 'Test',
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-3.6-flash',
       })).rejects.toThrow('Server returned non-JSON response');
     });
 

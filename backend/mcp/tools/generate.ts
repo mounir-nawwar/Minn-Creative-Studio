@@ -12,7 +12,7 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { runGeneration } from '../../services/generation.ts';
 import { projects, assets } from '../../services/database.ts';
-import { AUDIO_MODELS, TTS_VOICES, findModel } from '../../../src/lib/models.ts';
+import { AUDIO_MODELS, DEFAULT_TEXT_MODEL, TTS_VOICES, findModel } from '../../../src/lib/models.ts';
 import { guard } from '../guard.ts';
 import type { ToolContext } from '../server.ts';
 import { imagePartFromUrl } from '../media.ts';
@@ -66,7 +66,7 @@ export function registerGenerationTools(server: McpServer, ctx: ToolContext): vo
       inputSchema: {
         projectId: projectIdSchema,
         prompt: z.string().min(1),
-        model: z.string().optional().describe("Text model id (default 'gemini-3-flash-preview')"),
+        model: z.string().optional().describe(`Text model id (default '${DEFAULT_TEXT_MODEL}')`),
         systemInstruction: z.string().optional(),
         imageUrls: z.array(z.string()).max(8).optional(),
         temperature: z.number().min(0).max(2).optional(),
@@ -78,7 +78,7 @@ export function registerGenerationTools(server: McpServer, ctx: ToolContext): vo
     (args, extra) =>
       guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'generate_text', args, async () => {
         requireProject(args.projectId);
-        const modelId = args.model ?? 'gemini-3-flash-preview';
+        const modelId = args.model ?? DEFAULT_TEXT_MODEL;
         requireModelOfMode(modelId, 'text');
 
         const parts: any[] = [{ text: args.prompt }];

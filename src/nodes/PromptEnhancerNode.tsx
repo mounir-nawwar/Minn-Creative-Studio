@@ -4,6 +4,7 @@ import { useStore } from '../store/useStore';
 import { useProjectStore } from '../store/useProjectStore';
 import { buildProjectContext } from '../lib/projectContext';
 import { generateText } from '../services/geminiService';
+import { DEFAULT_TEXT_MODEL } from '../lib/models';
 import { NodeField, NodeSelect, RunButton, NodeOutput } from './ui';
 
 const PromptEnhancerNode = ({ id, data }: any) => {
@@ -45,7 +46,7 @@ Return only the enhanced prompt, nothing else.`;
 
       const enhancedPrompt = await generateText({
         prompt,
-        model: 'gemini-3-flash-preview',
+        model: DEFAULT_TEXT_MODEL,
         systemInstruction,
         projectContext,
         projectId: currentProject?.id,

@@ -1,4 +1,5 @@
 import { callBackend, urlToBase64 } from './client';
+import { DEFAULT_TEXT_MODEL } from '../../lib/models';
 import type { Project } from '../../types/project.types';
 
 export const generateText = async (params: {
@@ -72,7 +73,7 @@ export const suggestNodeConfig = async (params: {
 
   try {
     const response = await callBackend('generateContent', {
-      model: "gemini-3-flash-preview",
+      model: DEFAULT_TEXT_MODEL,
       contents: [{ role: 'user', parts: [{ text: `As an AI creative assistant, suggest the best configuration for a ${nodeType} node based on this goal: "${userGoal}".
 
       ${projectContext ? `Project Context: ${projectContext}` : ''}
@@ -125,7 +126,7 @@ export const fillProjectData = async (description: string, signal?: AbortSignal)
 
   try {
     const response = await callBackend('generateContent', {
-      model: "gemini-3-flash-preview",
+      model: DEFAULT_TEXT_MODEL,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: {
         responseMimeType: "application/json",
@@ -212,7 +213,7 @@ export const mergeProjectData = async (transcript: string, existingProject: Part
 
   try {
     const response = await callBackend('generateContent', {
-      model: "gemini-3-flash-preview",
+      model: DEFAULT_TEXT_MODEL,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: {
         responseMimeType: "application/json",
@@ -246,7 +247,7 @@ export const generateAIInstructions = async (formData: any, signal?: AbortSignal
 
   try {
     const response = await callBackend('generateContent', {
-      model: "gemini-3-flash-preview",
+      model: DEFAULT_TEXT_MODEL,
       contents: [{ role: 'user', parts: [{ text: prompt }] }]
     }, signal);
 

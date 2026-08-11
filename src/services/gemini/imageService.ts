@@ -1,4 +1,5 @@
 import { callBackend, urlToBase64 } from './client';
+import { DEFAULT_TEXT_MODEL } from '../../lib/models';
 
 export const generateImage = async (params: {
   prompt: string;
@@ -152,7 +153,7 @@ export const generateMask = async (params: {
 
   try {
     const response = await callBackend('generateContent', {
-      model: "gemini-3-flash-preview",
+      model: DEFAULT_TEXT_MODEL,
       contents: {
         parts: [
           { text: `Identify the bounding boxes for "${prompt}" in the image. Return the coordinates as [ymin, xmin, ymax, xmax] in normalized coordinates (0-1000).` },

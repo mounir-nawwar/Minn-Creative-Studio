@@ -56,49 +56,39 @@ export const MAX_CHAT_SAMPLES = 4;
 
 export const TTS_VOICES = ['Kore', 'Puck', 'Charon', 'Fenrir', 'Aoede', 'Leda', 'Orus', 'Zephyr'];
 
+/**
+ * The studio's text model.
+ *
+ * This is the ONLY place a text model id is written down. Everything that runs
+ * a prompt — chat, prompt helpers, node describers, project-creation AI fill,
+ * the headless graph runner and the MCP tools — imports `DEFAULT_TEXT_MODEL` or
+ * `resolveTextModel()` from here, so switching models later is a one-line edit
+ * rather than a hunt through a dozen string literals.
+ */
+export const DEFAULT_TEXT_MODEL = 'gemini-3.6-flash';
+
 export const TEXT_MODELS: StudioModel[] = [
   {
-    id: 'gemini-3.6-flash',
+    id: DEFAULT_TEXT_MODEL,
     label: 'Gemini 3.6 Flash',
     mode: 'text',
-    description: 'Newest flash model — same input price as 3.5, cheaper output',
-    supports: { temperature: true, systemInstruction: true, referenceImages: true, grounding: true },
-    defaults: { maxOutputTokens: 8192 },
-  },
-  {
-    id: 'gemini-3.5-flash',
-    label: 'Gemini 3.5 Flash',
-    mode: 'text',
-    description: 'Latest stable flash model — frontier-level reasoning at speed',
-    supports: { temperature: true, systemInstruction: true, referenceImages: true, grounding: true },
-    defaults: { maxOutputTokens: 8192 },
-  },
-  {
-    id: 'gemini-3-flash-preview',
-    label: 'Gemini 3 Flash (Preview)',
-    mode: 'text',
-    description: 'Fast everyday writing and prompt work',
-    supports: { temperature: true, systemInstruction: true, referenceImages: true, grounding: true },
-    defaults: { maxOutputTokens: 8192 },
-  },
-  {
-    id: 'gemini-3.1-pro-preview',
-    label: 'Gemini 3.1 Pro',
-    mode: 'text',
-    description: 'Deepest reasoning for complex briefs',
-    supports: { temperature: true, systemInstruction: true, referenceImages: true, grounding: true },
-    defaults: { maxOutputTokens: 8192 },
-  },
-  {
-    // NB: the `-preview` suffix 404s — the GA id is `gemini-3.1-flash-lite`
-    id: 'gemini-3.1-flash-lite',
-    label: 'Gemini 3.1 Flash Lite',
-    mode: 'text',
-    description: 'Cheapest and quickest for simple tasks',
+    description: 'Frontier reasoning at speed — the studio standard for every text task',
     supports: { temperature: true, systemInstruction: true, referenceImages: true, grounding: true },
     defaults: { maxOutputTokens: 8192 },
   },
 ];
+
+/**
+ * Coerce a stored/incoming model id to one the studio actually offers.
+ *
+ * Saved workflows persist `config.model` on their nodes, so graphs built before
+ * a model change still carry retired ids (e.g. `gemini-3-flash-preview`).
+ * Resolving at the point of use upgrades them silently — no data migration, and
+ * no path that keeps quietly calling a model we no longer support.
+ */
+export function resolveTextModel(id?: string | null): string {
+  return TEXT_MODELS.some((m) => m.id === id) ? (id as string) : DEFAULT_TEXT_MODEL;
+}
 
 /** Image models adapted from the canvas registry into StudioModel shape */
 export const CHAT_IMAGE_MODELS: StudioModel[] = IMAGE_MODELS.map((m: ImageModel) => ({
@@ -192,7 +182,7 @@ export function findModel(id: string): StudioModel | undefined {
 
 /** Sensible starting model per mode */
 export const DEFAULT_MODEL_FOR_MODE: Record<GenerationMode, string> = {
-  text: 'gemini-3.5-flash',
+  text: DEFAULT_TEXT_MODEL,
   // was imagen-4.0-generate-001, which 404s — Imagen isn't available on this project
   image: 'gemini-3.1-flash-image',
   video: 'veo-3.1-fast-generate-001',

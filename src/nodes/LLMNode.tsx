@@ -4,10 +4,13 @@ import { useStore } from '../store/useStore';
 import { useProjectStore } from '../store/useProjectStore';
 import { buildProjectContext } from '../lib/projectContext';
 import { generateText } from '../services/geminiService';
-import { NodeField, NodeTextArea, NodeSelect, RunButton, NodeOutput } from './ui';
+import { resolveTextModel } from '../lib/models';
+import { NodeField, NodeTextArea, RunButton, NodeOutput } from './ui';
 
 const LLMNode = ({ id, data }: any) => {
-  const [model, setModel] = useState(data.config?.model || 'gemini-3-flash-preview');
+  // The studio runs one text model; a saved config from an older graph is
+  // coerced to it rather than silently calling a retired model.
+  const model = resolveTextModel(data.config?.model);
   const [systemInstruction, setSystemInstruction] = useState(data.config?.systemInstruction || 'You are a helpful creative assistant.');
   const updateNodeData = useStore((state) => state.updateNodeData);
   const { currentProject } = useProjectStore();
@@ -56,19 +59,6 @@ const LLMNode = ({ id, data }: any) => {
   return (
     <BaseNode id={id} data={data} inputs={true} onRun={handleRun}>
       <div className="space-y-3">
-        <NodeField label="Model">
-          <NodeSelect
-            value={model}
-            onChange={(e) => {
-              setModel(e.target.value);
-              updateNodeData(id, { config: { ...data.config, model: e.target.value } });
-            }}
-          >
-            <option value="gemini-3-flash-preview">Gemini 3 Flash</option>
-            <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro</option>
-          </NodeSelect>
-        </NodeField>
-
         <NodeField label="System instruction">
           <NodeTextArea
             className="h-16"

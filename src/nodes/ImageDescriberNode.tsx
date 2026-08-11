@@ -4,6 +4,7 @@ import { useStore } from '../store/useStore';
 import { useProjectStore } from '../store/useProjectStore';
 import { Upload } from 'lucide-react';
 import { generateText } from '../services/geminiService';
+import { DEFAULT_TEXT_MODEL } from '../lib/models';
 import { NodeLabel, NodeInput, RunButton, NodeOutput } from './ui';
 
 const ImageDescriberNode = ({ id, data }: any) => {
@@ -37,7 +38,7 @@ const ImageDescriberNode = ({ id, data }: any) => {
     try {
       const description = await generateText({
         prompt: 'Describe this image in detail for a creative generation prompt. Focus on lighting, composition, and mood.',
-        model: 'gemini-3-flash-preview',
+        model: DEFAULT_TEXT_MODEL,
         imageUrls: [finalImageUrl],
         projectId: currentProject?.id,
       });
