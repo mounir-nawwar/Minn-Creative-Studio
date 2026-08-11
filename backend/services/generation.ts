@@ -18,6 +18,9 @@ import { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
 import { GoogleGenAI } from '@google/genai';
 import { calculateCost } from '../config/pricing.ts';
+// Untagged video jobs are priced as the high-quality model so a missing id can
+// never under-bill.
+import { HQ_VIDEO_MODEL } from '../../src/lib/models.ts';
 import { uploadBase64, STORAGE_PATH, PUBLIC_URL_BASE } from './storage.ts';
 import { trackProjectCost, assets, generateId } from './database.ts';
 import { resolveImageUrls, processInlineData } from '../utils/media.ts';
@@ -82,7 +85,7 @@ function registerBackgroundLroTracker(opName: string, params: any, via: Generati
           const isVideoOp = !isAudioOp && (params._audioModel?.includes('veo') || !params.model?.includes('lyria'));
 
           if (effectiveProjectId && isVideoOp) {
-            const videoModel = params.model || 'veo-3.1-generate-001';
+            const videoModel = params.model || HQ_VIDEO_MODEL;
             const videoCount = result?.response?.generatedVideos?.length || params.config?.numberOfVideos || 1;
             const costPerVideo = calculateCost(videoModel, {}, {
               duration: params.config?.duration,
@@ -317,7 +320,7 @@ export async function runGeneration({ method, params: incomingParams, userId, si
     if (result?.done && effectiveProjectId && opName && markOperationTracked(opName)) {
       // Video cost tracking
       if (isVideoOp) {
-        const videoModel = model || 'veo-3.1-generate-001';
+        const videoModel = model || HQ_VIDEO_MODEL;
         const videoCount = result?.response?.generatedVideos?.length || config?.numberOfVideos || 1;
         const costPerVideo = calculateCost(videoModel, {}, {
           duration: config?.duration,

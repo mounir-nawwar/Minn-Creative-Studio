@@ -7,9 +7,10 @@ import ReferenceStrip from '../components/ReferenceStrip';
 import { Video, Loader2, AlertCircle } from 'lucide-react';
 import { generateVideo } from '../services/geminiService';
 import { NodeField, NodeSelect, NodeLabel } from './ui';
+import { VIDEO_MODELS, resolveVideoModel } from '../lib/models';
 
 const ImageToVideoNode = ({ id, data }: any) => {
-  const [model, setModel] = useState(data.config?.model || 'veo-3.1-fast-generate-001');
+  const [model, setModel] = useState(() => resolveVideoModel(data.config?.model));
   const [aspectRatio, setAspectRatio] = useState(data.config?.aspectRatio || '16:9');
   const [duration, setDuration] = useState(data.config?.duration || 8);
   const [referenceStrength, setReferenceStrength] = useState(data.config?.referenceStrength || 50);
@@ -118,8 +119,7 @@ const ImageToVideoNode = ({ id, data }: any) => {
       <div className="space-y-3">
         <NodeField label="Model">
           <NodeSelect value={model} onChange={(e) => { setModel(e.target.value); updateNodeData(id, { config: { ...data.config, model: e.target.value } }); }}>
-            <option value="veo-3.1-fast-generate-001">Veo 3.1 Fast</option>
-            <option value="veo-3.1-generate-001">Veo 3.1 (High Quality)</option>
+            {VIDEO_MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
           </NodeSelect>
         </NodeField>
 

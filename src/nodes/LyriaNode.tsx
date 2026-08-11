@@ -16,6 +16,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { NodeProps } from '../types/nodeProps';
 import { MUSICAL_KEYS } from './lyriaConstants';
 import { NodeField, NodeLabel, NodeInput, NodeSelect } from './ui';
+import { AUDIO_MODELS, MUSIC_PRO_MODEL, resolveAudioModel } from '../lib/models';
 
 interface LyriaNodeData {
   type: 'lyria';
@@ -47,7 +48,9 @@ interface LyriaNodeData {
 }
 
 const LyriaNode = ({ id, data }: NodeProps<LyriaNodeData>) => {
-  const [model, setModel] = useState(data.config?.model || 'lyria-3-pro-preview');
+  // This node leads with full-song generation; older configs are coerced to a
+  // model the studio still offers.
+  const [model, setModel] = useState(() => resolveAudioModel(data.config?.model, MUSIC_PRO_MODEL));
   const [genre, setGenre] = useState(data.config?.genre || 'Cinematic');
   const [mood, setMood] = useState(data.config?.mood || 'Epic');
   const [instrumentation, setInstrumentation] = useState(data.config?.instrumentation || 'Orchestra, Piano');
@@ -193,9 +196,9 @@ const LyriaNode = ({ id, data }: NodeProps<LyriaNodeData>) => {
       <div className="space-y-3">
         <NodeField label="Model">
           <NodeSelect value={model} onChange={(e) => { setModel(e.target.value); updateConfig('model', e.target.value); }}>
-            <option value="lyria-3-pro-preview">Lyria 3 Pro ($0.08/song)</option>
-            <option value="lyria-3-clip-preview">Lyria 3 Clip ($0.04/30s)</option>
-            <option value="gemini-2.5-flash-preview-tts">Text to speech</option>
+            {AUDIO_MODELS.map((m) => (
+              <option key={m.id} value={m.id}>{m.label}{m.priceHint ? ` (${m.priceHint})` : ''}</option>
+            ))}
           </NodeSelect>
         </NodeField>
 

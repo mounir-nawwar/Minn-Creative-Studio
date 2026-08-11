@@ -10,6 +10,7 @@ import { ExpandableAssetWrapper } from '../components/ExpandableAssetWrapper';
 import { toast } from '../store/useToastStore';
 import { NodeField, NodeLabel, NodeSelect, NodeToggle, RunButton } from './ui';
 import { estimateImageCost } from '../lib/pricing';
+import { CHAT_IMAGE_MODELS, resolveImageModel } from '../lib/models';
 
 // Imagen upscale entries removed — the imagen-* family 404s on this Vertex
 // project, so those options only ever errored. Gemini image models upscale
@@ -17,13 +18,11 @@ import { estimateImageCost } from '../lib/pricing';
 // Prices are derived from the shared rate table (src/lib/pricing.ts) rather than
 // hardcoded here, so they can't drift from what the backend actually bills.
 // upscaleImage() always requests imageSize:"4K", so quote the 4K tier.
-const UPSCALE_MODELS = [
-  { id: 'gemini-3.1-flash-image', label: 'Nano Banana 2' },
-  { id: 'gemini-3-pro-image', label: 'Nano Banana Pro' },
-].map((m) => ({ ...m, price: estimateImageCost(m.id, '4K') }));
+const UPSCALE_MODELS = CHAT_IMAGE_MODELS
+  .map((m) => ({ id: m.id, label: m.label, price: estimateImageCost(m.id, '4K') }));
 
 const ImageUpscalerNode = ({ id, data }: any) => {
-  const [model, setModel] = useState(data.config?.model || 'gemini-3.1-flash-image');
+  const [model, setModel] = useState(() => resolveImageModel(data.config?.model));
   const [scale, setScale] = useState(data.config?.scale || '2x');
   const [preserveStyle, setPreserveStyle] = useState(data.config?.preserveStyle ?? true);
   const updateNodeData = useStore((state) => state.updateNodeData);

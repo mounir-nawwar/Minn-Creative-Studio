@@ -37,18 +37,13 @@ describe('text model policy', () => {
 /**
  * Architecture guard.
  *
- * The TEXT model id used to be a bare string literal in ~15 files across the
- * frontend services, canvas nodes, graph runner and MCP tools, so changing
- * models meant hunting strings and retired ids lingered unnoticed. It now lives
- * in exactly one module (models.ts) and everything else imports it. This test
- * fails if a literal creeps back in anywhere else.
- *
- * Scope note: image/video/audio ids are still written inline in several node
- * components and backend defaults (VeoNode, LyriaNode, ImageToVideoNode,
- * audioService, mcp/tools/jobs.ts, graphRunner). Giving them the same treatment
- * is a separate piece of work; widen MODEL_LITERAL below once it is done.
+ * Model ids used to be bare string literals in ~20 files across the frontend
+ * services, canvas nodes, graph runner and MCP tools, so changing a model meant
+ * hunting strings and retired ids lingered unnoticed. Every id now lives in the
+ * registry (models.ts) or the rate table (pricing.ts) and everything else
+ * imports from them. This test fails if a literal creeps back in anywhere else.
  */
-describe('no stray text model ids', () => {
+describe('no stray model ids', () => {
   const ROOT = path.resolve(__dirname, '../..');
   const SCAN_DIRS = ['src', 'backend'];
 
@@ -59,9 +54,9 @@ describe('no stray text model ids', () => {
     path.join('src', 'nodes', 'imagenModels.ts'), // image model registry
   ];
 
-  /** Gemini text models only — `*-image` and `*tts*` ids are other modalities. */
-  const MODEL_LITERAL = /['"`](gemini-[0-9][\w.-]*)['"`]/g;
-  const isTextModel = (id: string) => !/-image['"`]?$/.test(id) && !id.includes('tts');
+  // Every family the studio calls. The imagen pattern requires a version dot
+  // (`imagen-4.0-…`) so it can't match node ids like `imagen-1` in fixtures.
+  const MODEL_LITERAL = /['"`](gemini-[0-9][\w.-]*|veo-[0-9][\w.-]*|lyria-[0-9][\w.-]*|imagen-[0-9]+\.[0-9][\w.-]*)['"`]/g;
 
   function walk(dir: string, out: string[] = []): string[] {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -76,7 +71,7 @@ describe('no stray text model ids', () => {
     return out;
   }
 
-  it('keeps text model ids out of every file except the registry', () => {
+  it('keeps model ids out of every file except the registries', () => {
     const offenders: string[] = [];
 
     for (const dir of SCAN_DIRS) {
@@ -86,11 +81,11 @@ describe('no stray text model ids', () => {
         if (/\.test\.tsx?$/.test(rel) || rel.includes(`__tests__`)) continue;
         if (ALLOWED.some((allowed) => rel === allowed)) continue;
 
-        const matches = (fs.readFileSync(file, 'utf8').match(MODEL_LITERAL) ?? []).filter(isTextModel);
+        const matches = fs.readFileSync(file, 'utf8').match(MODEL_LITERAL) ?? [];
         if (matches.length) offenders.push(`${rel}: ${[...new Set(matches)].join(', ')}`);
       }
     }
 
-    expect(offenders, `Import DEFAULT_TEXT_MODEL from src/lib/models.ts instead:\n${offenders.join('\n')}`).toEqual([]);
+    expect(offenders, `Import the id from src/lib/models.ts instead:\n${offenders.join('\n')}`).toEqual([]);
   });
 });

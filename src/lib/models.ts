@@ -8,6 +8,7 @@
  */
 import { IMAGE_MODELS } from '../nodes/imagenModels';
 import type { ImageModel } from '../nodes/imagenModels';
+import { AUDIO_MODEL_RATES } from './pricing';
 
 export type GenerationMode = 'text' | 'image' | 'video' | 'audio';
 
@@ -57,15 +58,24 @@ export const MAX_CHAT_SAMPLES = 4;
 export const TTS_VOICES = ['Kore', 'Puck', 'Charon', 'Fenrir', 'Aoede', 'Leda', 'Orus', 'Zephyr'];
 
 /**
- * The studio's text model.
+ * The models the studio runs.
  *
- * This is the ONLY place a text model id is written down. Everything that runs
- * a prompt — chat, prompt helpers, node describers, project-creation AI fill,
- * the headless graph runner and the MCP tools — imports `DEFAULT_TEXT_MODEL` or
- * `resolveTextModel()` from here, so switching models later is a one-line edit
- * rather than a hunt through a dozen string literals.
+ * This block is the ONLY place a model id is written down (image ids live in the
+ * canvas registry this module re-exports). Every consumer — chat, prompt
+ * helpers, canvas nodes, the headless graph runner and the MCP tools — imports
+ * one of these constants or a `resolve*Model()` helper, so switching a model is
+ * a one-line edit here instead of a hunt through string literals.
  */
 export const DEFAULT_TEXT_MODEL = 'gemini-3.6-flash';
+export const DEFAULT_IMAGE_MODEL = 'gemini-3.1-flash-image';
+export const DEFAULT_VIDEO_MODEL = 'veo-3.1-fast-generate-001';
+/** Highest-quality video — also the conservative assumption when pricing an untagged job. */
+export const HQ_VIDEO_MODEL = 'veo-3.1-generate-001';
+/** 30-second music clip (returns synchronously). */
+export const DEFAULT_MUSIC_MODEL = 'lyria-3-clip-preview';
+/** Full song — long-running, so it runs through the job tools, not inline. */
+export const MUSIC_PRO_MODEL = 'lyria-3-pro-preview';
+export const DEFAULT_TTS_MODEL = 'gemini-2.5-flash-preview-tts';
 
 export const TEXT_MODELS: StudioModel[] = [
   {
@@ -78,17 +88,6 @@ export const TEXT_MODELS: StudioModel[] = [
   },
 ];
 
-/**
- * Coerce a stored/incoming model id to one the studio actually offers.
- *
- * Saved workflows persist `config.model` on their nodes, so graphs built before
- * a model change still carry retired ids (e.g. `gemini-3-flash-preview`).
- * Resolving at the point of use upgrades them silently — no data migration, and
- * no path that keeps quietly calling a model we no longer support.
- */
-export function resolveTextModel(id?: string | null): string {
-  return TEXT_MODELS.some((m) => m.id === id) ? (id as string) : DEFAULT_TEXT_MODEL;
-}
 
 /** Image models adapted from the canvas registry into StudioModel shape */
 export const CHAT_IMAGE_MODELS: StudioModel[] = IMAGE_MODELS.map((m: ImageModel) => ({
@@ -110,7 +109,7 @@ export const CHAT_IMAGE_MODELS: StudioModel[] = IMAGE_MODELS.map((m: ImageModel)
 
 export const VIDEO_MODELS: StudioModel[] = [
   {
-    id: 'veo-3.1-fast-generate-001',
+    id: DEFAULT_VIDEO_MODEL,
     label: 'Veo 3.1 Fast',
     mode: 'video',
     description: 'Quicker, cheaper clips',
@@ -126,7 +125,7 @@ export const VIDEO_MODELS: StudioModel[] = [
     defaults: { aspectRatio: '16:9', resolution: '720p', duration: 8, audio: true },
   },
   {
-    id: 'veo-3.1-generate-001',
+    id: HQ_VIDEO_MODEL,
     label: 'Veo 3.1',
     mode: 'video',
     description: 'Highest quality video',
@@ -145,23 +144,26 @@ export const VIDEO_MODELS: StudioModel[] = [
 
 export const AUDIO_MODELS: StudioModel[] = [
   {
-    id: 'lyria-3-clip-preview',
+    id: DEFAULT_MUSIC_MODEL,
     label: 'Lyria 3 Clip',
     mode: 'audio',
+    // Price comes from the rate table so the picker can't drift from billing.
+    priceHint: `$${AUDIO_MODEL_RATES[DEFAULT_MUSIC_MODEL].perGeneration.toFixed(2)}/30s`,
     description: 'Short music clips, fast',
     supports: { negativePrompt: true, seed: true, bpm: true, density: true, brightness: true, musicScale: true },
     defaults: {},
   },
   {
-    id: 'lyria-3-pro-preview',
+    id: MUSIC_PRO_MODEL,
     label: 'Lyria 3 Pro',
     mode: 'audio',
+    priceHint: `$${AUDIO_MODEL_RATES[MUSIC_PRO_MODEL].perGeneration.toFixed(2)}/song`,
     description: 'Full music generation (takes a few minutes)',
     supports: { negativePrompt: true, seed: true, bpm: true, density: true, brightness: true, musicScale: true, duration: [30, 60, 90, 120] },
     defaults: {},
   },
   {
-    id: 'gemini-2.5-flash-preview-tts',
+    id: DEFAULT_TTS_MODEL,
     label: 'Speech (TTS)',
     mode: 'audio',
     description: 'Turn text into a spoken voice',
@@ -180,11 +182,28 @@ export function findModel(id: string): StudioModel | undefined {
   return ALL_MODELS.find((m) => m.id === id);
 }
 
+/**
+ * Coerce a stored/incoming model id to one the studio actually offers.
+ *
+ * Saved workflows persist `config.model` on their nodes, so graphs built before
+ * a model change still carry retired ids (e.g. `gemini-3-flash-preview`, or any
+ * `imagen-*` model). Resolving at the point of use upgrades them silently — no
+ * data migration, and no path that keeps quietly calling a model we dropped.
+ */
+function resolveModel(models: StudioModel[], id: string | null | undefined, fallback: string): string {
+  return models.some((m) => m.id === id) ? (id as string) : fallback;
+}
+
+export const resolveTextModel = (id?: string | null) => resolveModel(TEXT_MODELS, id, DEFAULT_TEXT_MODEL);
+export const resolveImageModel = (id?: string | null) => resolveModel(CHAT_IMAGE_MODELS, id, DEFAULT_IMAGE_MODEL);
+export const resolveVideoModel = (id?: string | null) => resolveModel(VIDEO_MODELS, id, DEFAULT_VIDEO_MODEL);
+export const resolveAudioModel = (id?: string | null, fallback = DEFAULT_MUSIC_MODEL) =>
+  resolveModel(AUDIO_MODELS, id, fallback);
+
 /** Sensible starting model per mode */
 export const DEFAULT_MODEL_FOR_MODE: Record<GenerationMode, string> = {
   text: DEFAULT_TEXT_MODEL,
-  // was imagen-4.0-generate-001, which 404s — Imagen isn't available on this project
-  image: 'gemini-3.1-flash-image',
-  video: 'veo-3.1-fast-generate-001',
-  audio: 'lyria-3-clip-preview',
+  image: DEFAULT_IMAGE_MODEL,
+  video: DEFAULT_VIDEO_MODEL,
+  audio: DEFAULT_MUSIC_MODEL,
 };

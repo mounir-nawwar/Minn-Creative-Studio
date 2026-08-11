@@ -1,4 +1,5 @@
 import { callBackend, urlToBase64 } from './client';
+import { DEFAULT_TTS_MODEL } from '../../lib/models';
 
 const formatElapsed = (startTime: number): string => {
   const elapsed = Math.floor((Date.now() - startTime) / 1000);
@@ -28,7 +29,7 @@ export const generateAudio = async (params: {
 }, signal?: AbortSignal) => {
   const {
     prompt,
-    model = "gemini-2.5-flash-preview-tts",
+    model = DEFAULT_TTS_MODEL,
     voice = 'Kore',
     projectId,
     referenceImages,

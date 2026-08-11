@@ -13,7 +13,13 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { runGeneration } from '../../services/generation.ts';
 import { projects } from '../../services/database.ts';
 import { uploadBase64 } from '../../services/storage.ts';
-import { VIDEO_MODELS, AUDIO_MODELS, findModel } from '../../../src/lib/models.ts';
+import {
+  VIDEO_MODELS,
+  AUDIO_MODELS,
+  DEFAULT_VIDEO_MODEL,
+  MUSIC_PRO_MODEL,
+  findModel,
+} from '../../../src/lib/models.ts';
 import { jobStore } from '../jobs.ts';
 import { guard } from '../guard.ts';
 import type { ToolContext } from '../server.ts';
@@ -42,7 +48,7 @@ export function registerJobTools(server: McpServer, ctx: ToolContext): void {
       inputSchema: {
         projectId: z.string().min(1).describe("Target project id, or 'playground'"),
         prompt: z.string().min(1),
-        model: z.string().optional().describe("Video model id (default 'veo-3.1-fast-generate-001')"),
+        model: z.string().optional().describe(`Video model id (default '${DEFAULT_VIDEO_MODEL}')`),
         aspectRatio: z.string().optional().describe("'16:9' (default) or '9:16'"),
         resolution: z.string().optional().describe("'720p' (default), '1080p', or '4K' on veo-3.1"),
         duration: z.number().int().optional().describe('Seconds: 4, 6, or 8'),
@@ -58,7 +64,7 @@ export function registerJobTools(server: McpServer, ctx: ToolContext): void {
     (args, extra) =>
       guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'start_video_job', args, async () => {
         if (!projects.findById(args.projectId)) return errorResult(`Project not found: ${args.projectId}`);
-        const modelId = args.model ?? 'veo-3.1-fast-generate-001';
+        const modelId = args.model ?? DEFAULT_VIDEO_MODEL;
         const model = findModel(modelId);
         if (!model || model.mode !== 'video') {
           return errorResult(`Unknown video model: ${modelId}. Valid: ${VIDEO_MODELS.map((m) => m.id).join(', ')}`);
@@ -150,7 +156,7 @@ export function registerJobTools(server: McpServer, ctx: ToolContext): void {
         if (jobStore.countRunning(ctx.user.id) >= MAX_RUNNING_JOBS_PER_USER) {
           return errorResult(`You already have ${MAX_RUNNING_JOBS_PER_USER} jobs running — check_job them first.`);
         }
-        const model = AUDIO_MODELS.find((m) => m.id.includes('pro'))?.id ?? 'lyria-3-pro-preview';
+        const model = MUSIC_PRO_MODEL;
 
         const data = await runGeneration({
           method: 'generateContent',

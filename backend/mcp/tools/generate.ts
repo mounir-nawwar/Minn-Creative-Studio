@@ -12,7 +12,15 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { runGeneration } from '../../services/generation.ts';
 import { projects, assets } from '../../services/database.ts';
-import { AUDIO_MODELS, DEFAULT_TEXT_MODEL, TTS_VOICES, findModel } from '../../../src/lib/models.ts';
+import {
+  AUDIO_MODELS,
+  DEFAULT_IMAGE_MODEL,
+  DEFAULT_MUSIC_MODEL,
+  DEFAULT_TEXT_MODEL,
+  DEFAULT_TTS_MODEL,
+  TTS_VOICES,
+  findModel,
+} from '../../../src/lib/models.ts';
 import { guard } from '../guard.ts';
 import type { ToolContext } from '../server.ts';
 import { imagePartFromUrl } from '../media.ts';
@@ -126,7 +134,7 @@ export function registerGenerationTools(server: McpServer, ctx: ToolContext): vo
       inputSchema: {
         projectId: projectIdSchema,
         prompt: z.string().min(1),
-        model: z.string().optional().describe("Image model id (default 'gemini-3.1-flash-image')"),
+        model: z.string().optional().describe(`Image model id (default '${DEFAULT_IMAGE_MODEL}')`),
         aspectRatio: z.string().optional().describe("e.g. '1:1', '3:4', '16:9' (default '1:1')"),
         resolution: z.string().optional().describe("Gemini image models only: '1K', '2K', '4K'"),
         sampleCount: z.number().int().min(1).max(MAX_IMAGEN_SAMPLES).optional(),
@@ -144,7 +152,7 @@ export function registerGenerationTools(server: McpServer, ctx: ToolContext): vo
         requireProject(args.projectId);
         // Imagen is unavailable on this Vertex project (every imagen-* id 404s),
         // so all image generation goes through the Gemini image models.
-        const modelId = args.model ?? 'gemini-3.1-flash-image';
+        const modelId = args.model ?? DEFAULT_IMAGE_MODEL;
         requireModelOfMode(modelId, 'image');
         const aspectRatio = args.aspectRatio ?? '1:1';
 
@@ -206,7 +214,7 @@ export function registerGenerationTools(server: McpServer, ctx: ToolContext): vo
     (args, extra) =>
       guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'generate_speech', args, async () => {
         requireProject(args.projectId);
-        const model = AUDIO_MODELS.find((m) => m.id.includes('tts'))?.id ?? 'gemini-2.5-flash-preview-tts';
+        const model = DEFAULT_TTS_MODEL;
         const data = await runGeneration({
           method: 'generateContent',
           params: {
@@ -249,7 +257,7 @@ export function registerGenerationTools(server: McpServer, ctx: ToolContext): vo
     (args, extra) =>
       guard({ userId: ctx.user.id, sessionId: extra.sessionId }, 'generate_music_clip', args, async () => {
         requireProject(args.projectId);
-        const model = AUDIO_MODELS.find((m) => m.id.includes('clip'))?.id ?? 'lyria-3-clip-preview';
+        const model = DEFAULT_MUSIC_MODEL;
         const data = await runGeneration({
           method: 'generateContent',
           params: {

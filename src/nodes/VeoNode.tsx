@@ -14,6 +14,7 @@ import { ExpandableAssetWrapper } from '../components/ExpandableAssetWrapper';
 import { toast } from '../store/useToastStore';
 import { NodeProps } from '../types/nodeProps';
 import { NodeField, NodeSelect, NodeInput, NodeLabel } from './ui';
+import { VIDEO_MODELS, resolveVideoModel } from '../lib/models';
 
 interface VeoNodeData {
   type: 'veo';
@@ -40,7 +41,7 @@ interface VeoNodeData {
 }
 
 const VeoNode = ({ id, data }: NodeProps<VeoNodeData>) => {
-  const [model, setModel] = useState(data.config?.model || 'veo-3.1-fast-generate-001');
+  const [model, setModel] = useState(() => resolveVideoModel(data.config?.model));
   const [aspectRatio, setAspectRatio] = useState(data.config?.aspectRatio || '16:9');
   const [resolution, setResolution] = useState(data.config?.resolution || '720p');
   const [duration, setDuration] = useState(data.config?.duration || 8);
@@ -246,8 +247,7 @@ const VeoNode = ({ id, data }: NodeProps<VeoNodeData>) => {
           <div className="col-span-2">
             <NodeField label="Model">
               <NodeSelect value={model} onChange={(e) => { setModel(e.target.value); updateNodeData(id, { config: { ...data.config, model: e.target.value } }); }}>
-                <option value="veo-3.1-fast-generate-001">Veo 3.1 Fast</option>
-                <option value="veo-3.1-generate-001">Veo 3.1 (High Quality)</option>
+                {VIDEO_MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
               </NodeSelect>
             </NodeField>
           </div>

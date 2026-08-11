@@ -17,6 +17,7 @@ import { NodeProps } from '../types/nodeProps';
 import { IMAGE_MODELS, getAspectRatioLabel } from './imagenModels';
 import ImagenAdvancedPanel from './ImagenAdvancedPanel';
 import { NodeField, NodeSelect, NodeLabel } from './ui';
+import { resolveImageModel } from '../lib/models';
 
 interface ImagenNodeData {
   type: 'imagen';
@@ -47,7 +48,7 @@ interface ImagenNodeData {
 }
 
 const ImagenNode = ({ id, data }: NodeProps<ImagenNodeData>) => {
-  const [model, setModel] = useState(data.config?.model || 'gemini-3.1-flash-image');
+  const [model, setModel] = useState(() => resolveImageModel(data.config?.model));
   const [aspectRatio, setAspectRatio] = useState(data.config?.aspectRatio || '1:1');
   const [resolution, setResolution] = useState(data.config?.resolution || '1K');
   const [sampleCount, setSampleCount] = useState(data.config?.sampleCount || 1);
