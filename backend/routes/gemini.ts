@@ -30,10 +30,21 @@ router.post('/', requireAuth, aiLimiter, async (req, res) => {
     return res.json({ success: true, data });
   } catch (err: any) {
     if (err instanceof GenerationHttpError) {
+      const retryAfter = err.payload.retryAfterSeconds;
+      if (typeof retryAfter === 'number') res.set('Retry-After', String(retryAfter));
       return res.status(err.status).json(err.payload);
     }
     console.error('Gemini proxy error:', err);
     if (err.name === 'AbortError') return res.status(504).json({ error: 'Upstream request timed out (504).' });
+    // An upstream rate limit must stay a rate limit. Collapsing it into a 500
+    // is what made the client treat it as retryable and hammer the quota.
+    if (err.status === 429 || err.code === 429) {
+      res.set('Retry-After', '60');
+      return res.status(429).json({
+        error: 'Google rejected the request as over quota. Try again in a minute.',
+        retryAfterSeconds: 60,
+      });
+    }
     return res.status(500).json({ error: err.message || 'Internal server error' });
   } finally {
     clearTimeout(timeoutId);

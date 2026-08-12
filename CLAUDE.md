@@ -119,8 +119,14 @@ data/  storage/        # runtime SQLite + media (gitignored)
 
 ## Gotchas
 
-- **Vertex regions:** video/Imagen/Lyria/TTS pin `us-central1`; text uses `global` (see `backend/services/vertex.ts`).
+- **Vertex regions:** Veo/TTS use the regional endpoint `VERTEX_REGION` (`GOOGLE_CLOUD_REGION`, default
+  `europe-west3`); text and image use `global`; Lyria uses the global `/interactions` API. All of it is
+  derived from one constant in `backend/services/vertex.ts` — don't hardcode a region anywhere else.
   Veo uses **direct v1 REST** (`vertexRest`) because the SDK is pinned to `v1beta` for video.
+  LRO polling parses the region out of the operation name, so jobs survive a region change.
+- **Image generation is capped at 2 requests/minute** by Vertex quota (trial accounts can't raise it).
+  `backend/services/quotaGate.ts` queues and paces them; a 429 must reach the client **as a 429** so it
+  isn't retried into an exhausted bucket. See the `[Quota]` logs.
 - **Long-running media:** Veo/Lyria-Pro return an operation the client **polls** (`getOperation`) then fetches
   (`fetchVideoFile`). Don't expect a synchronous result.
 - **Large payloads:** JSON body limit is 50mb (base64 media flows through JSON); the proxy times out at ~58s.

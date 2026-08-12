@@ -8,10 +8,33 @@ export const TIMEOUT_ERROR_MESSAGE = "Request timed out. Please try again with a
 export interface BackendError extends Error {
   status?: number;
   isClientError?: boolean;
+  /** Present on 429s — how long the server says to wait. */
+  retryAfterSeconds?: number;
+  /** Undefined means the request never got an answer (network failure). */
+  retryable?: boolean;
 }
 
 async function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Which failures are worth sending again.
+ *
+ * Status codes only. This used to substring-match the error text, which meant
+ * Google's two spellings of the same rate limit behaved differently: "Resource
+ * has been exhausted (e.g. check quota)" contained "quota" and stopped, while
+ * "Resource exhausted. Please try again later" did not and was retried three
+ * times — into a bucket of 2 requests per minute, guaranteeing failure and
+ * starving the next real request.
+ *
+ * 429 is never retried here: the server already waited for a slot on our behalf
+ * (see backend/services/quotaGate.ts), so if it still says no, the wait is
+ * longer than a retry loop should hide from the user.
+ */
+function isRetryableStatus(status: number): boolean {
+  if (status === 429) return false;             // rate limited — respect it
+  return status >= 500 && status < 600;         // transient server-side only
 }
 
 export async function callBackend(method: string, params: any, signal?: AbortSignal, retryCount = 0): Promise<any> {
@@ -30,6 +53,11 @@ export async function callBackend(method: string, params: any, signal?: AbortSig
         const error = new Error(data.error || 'Backend proxy call failed') as BackendError;
         error.status = response.status;
         error.isClientError = response.status >= 400 && response.status < 500;
+        if (typeof data.retryAfterSeconds === 'number') error.retryAfterSeconds = data.retryAfterSeconds;
+        // The server answered, so its status is the whole story. A 2xx that
+        // reports success:false is a considered refusal — sending it again
+        // will get the same refusal.
+        error.retryable = response.ok ? false : isRetryableStatus(response.status);
         throw error;
       }
       return data.data;
@@ -39,6 +67,7 @@ export async function callBackend(method: string, params: any, signal?: AbortSig
       const error = new Error(`Server returned non-JSON response (${response.status}). Check console for details.`) as BackendError;
       error.status = response.status;
       error.isClientError = response.status >= 400 && response.status < 500;
+      error.retryable = false; // a misconfigured response, not a transient fault
       throw error;
     }
   } catch (err: unknown) {
@@ -49,29 +78,19 @@ export async function callBackend(method: string, params: any, signal?: AbortSig
       err.message.includes('timeout')
     );
 
-    const isClientError = backendError.isClientError === true ||
-      (err instanceof Error && (
-        err.message.includes('blocked') ||
-        err.message.includes('Invalid') ||
-        err.message.includes('non-JSON response') ||
-        err.message.includes('No image generated') ||
-        err.message.includes('No audio generated') ||
-        err.message.includes('quota') ||
-        err.message.includes('exceeded') ||
-        err.message.includes('failed') ||
-        err.message.includes('authentication') ||
-        err.message.includes('unauthorized') ||
-        err.message.includes('forbidden')
-      ));
-
+    // No `retryable` means fetch itself threw — no answer came back, so it is
+    // worth another go.
     const isRetryable = !isTimeout &&
-      !isClientError &&
+      err instanceof Error &&
       retryCount < MAX_RETRIES &&
-      err instanceof Error;
+      (backendError.retryable ?? true);
 
     if (isRetryable) {
-      const delay = RETRY_DELAY_MS * Math.pow(2, retryCount);
-      console.warn(`[Retry ${retryCount + 1}/${MAX_RETRIES}] ${method} failed, retrying in ${delay}ms...`);
+      // Jitter so two tabs (or a sampleCount loop) don't line their retries up
+      // and arrive together — synchronised retries are what saturate a bucket.
+      const backoff = RETRY_DELAY_MS * Math.pow(2, retryCount);
+      const delay = Math.round(backoff * (0.5 + Math.random() * 0.5));
+      console.warn(`[Retry ${retryCount + 1}/${MAX_RETRIES}] ${method} failed (${backendError.status ?? 'network'}), retrying in ${delay}ms...`);
       await sleep(delay);
       return callBackend(method, params, signal, retryCount + 1);
     }

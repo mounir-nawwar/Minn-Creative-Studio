@@ -90,7 +90,7 @@ USER_RANA_PASSWORD=your_secure_password_2
 
 # Google Cloud Vertex AI
 GOOGLE_CLOUD_PROJECT=your_gcp_project_id
-GOOGLE_CLOUD_REGION=us-central1
+GOOGLE_CLOUD_REGION=europe-west3
 ```
 
 ### 3. Run Development Server

@@ -26,6 +26,21 @@ if (VERTEX_PROJECT) {
   console.warn('[Vertex] No project configured - Vertex AI features disabled');
 }
 
+/**
+ * The regional endpoint for models that are not served globally (Veo, TTS).
+ *
+ * europe-west3 (Frankfurt) — the team is in Beirut, so a European region means
+ * a shorter round-trip than the previous us-central1. Verified that both Veo
+ * 3.1 models are served here before switching. Override per-deployment with
+ * GOOGLE_CLOUD_REGION; text and image keep using the `global` endpoint.
+ */
+export const VERTEX_REGION = process.env.GOOGLE_CLOUD_REGION || 'europe-west3';
+
+/** Base URL for a regional Vertex publisher model. */
+function regionalModelUrl(model: string, verb: string, region = VERTEX_REGION): string {
+  return `https://${region}-aiplatform.googleapis.com/v1/projects/${VERTEX_PROJECT}/locations/${region}/publishers/google/models/${model}:${verb}`;
+}
+
 export const vertexAuth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] });
 
 // Direct Vertex AI v1 REST — bypasses @google/genai SDK which is hardcoded to v1beta for video
@@ -44,8 +59,8 @@ export async function vertexRest(url: string, method = 'GET', body?: any) {
 const vertexClients: Record<string, GoogleGenAI> = {};
 
 export function getVertexClient(model = ''): GoogleGenAI {
-  const needsUsCentral = /^(veo-|imagen-)/.test(model) || model.includes('tts') || model.includes('lyra') || model.includes('audio');
-  const location = needsUsCentral ? 'us-central1' : 'global';
+  const needsRegionalEndpoint = /^(veo-|imagen-)/.test(model) || model.includes('tts') || model.includes('lyra') || model.includes('audio');
+  const location = needsRegionalEndpoint ? VERTEX_REGION : 'global';
   if (!vertexClients[location]) {
     vertexClients[location] = new GoogleGenAI({ vertexai: true, project: VERTEX_PROJECT, location });
   }
@@ -124,8 +139,7 @@ export async function vertexGenerateVideos(params: any) {
     referenceImages.length > 0 && `${referenceImages.length} reference(s)`,
   ].filter(Boolean);
   console.log('[Veo] Sending parameters:', JSON.stringify(parameters), '| inputs:', inputs.join(', ') || 'none');
-  const url = `https://us-central1-aiplatform.googleapis.com/v1/projects/${VERTEX_PROJECT}/locations/us-central1/publishers/google/models/${model}:predictLongRunning`;
-  const op = await vertexRest(url, 'POST', { instances: [instance], parameters });
+  const op = await vertexRest(regionalModelUrl(model, 'predictLongRunning'), 'POST', { instances: [instance], parameters });
   // Return in SDK-compatible shape so geminiService.ts polling loop works unchanged
   return { name: op.name, done: false };
 }
@@ -136,8 +150,11 @@ export async function vertexGetOperation(operation: any) {
   const modelMatch = name?.match(/publishers\/google\/models\/([^/]+)\/operations\//);
   const model = modelMatch?.[1];
   if (!model) throw new Error(`Cannot extract model from operation name: ${name}`);
-  const url = `https://us-central1-aiplatform.googleapis.com/v1/projects/${VERTEX_PROJECT}/locations/us-central1/publishers/google/models/${model}:fetchPredictOperation`;
-  const op = await vertexRest(url, 'POST', { operationName: name });
+  // Poll where the job was started, not where we would start one now — the
+  // operation name carries its own location, so jobs in flight across a region
+  // change (or started by another deployment) keep resolving correctly.
+  const region = name.match(/locations\/([^/]+)\//)?.[1] || VERTEX_REGION;
+  const op = await vertexRest(regionalModelUrl(model, 'fetchPredictOperation', region), 'POST', { operationName: name });
   if (!op.done) return { name: op.name ?? name, done: false };
   console.log('[Veo] Operation done. Full op keys:', Object.keys(op));
   console.log('[Veo] Raw response:', JSON.stringify(op.response ?? op, null, 2));
@@ -249,62 +266,3 @@ export async function vertexLyriaGenerate(params: any) {
   };
 }
 
-export async function vertexPredict(params: any) {
-  const { model, contents, config = {} } = params;
-  const parts = Array.isArray(contents) ? contents[0]?.parts : contents?.parts;
-  if (!parts) throw new Error('No parts found in contents');
-
-  const instance: any = {};
-  const reference_images: any[] = [];
-
-  for (const part of parts) {
-    if (part.text) instance.prompt = part.text;
-    if (part.inlineData) {
-      reference_images.push({ bytesBase64Encoded: part.inlineData.data, mimeType: part.inlineData.mimeType });
-    }
-  }
-  if (reference_images.length > 0) instance.reference_images = reference_images;
-  if (config.negative_prompt) instance.negative_prompt = config.negative_prompt;
-  if (config.seed !== undefined) instance.seed = config.seed;
-  if (config.duration) instance.duration = config.duration;
-  if (config.guidance !== undefined) instance.guidance = config.guidance;
-  if (config.bpm !== undefined) instance.bpm = config.bpm;
-  if (config.density !== undefined) instance.density = config.density;
-  if (config.brightness !== undefined) instance.brightness = config.brightness;
-  if (config.scale) instance.scale = config.scale;
-
-  const parameters: any = {
-    sampleCount: config.sampleCount || 1,
-    candidateCount: config.sampleCount || 1,
-    temperature: config.temperature,
-    topP: config.topP,
-    topK: config.topK,
-  };
-
-  const url = `https://us-central1-aiplatform.googleapis.com/v1/projects/${VERTEX_PROJECT}/locations/us-central1/publishers/google/models/${model}:predict`;
-  const response = await vertexRest(url, 'POST', { instances: [instance], parameters });
-
-  const predictions = response.predictions || [];
-  const candidates = predictions.map((p: any) => {
-    const part: any = {};
-    const audioData = p.bytesBase64Encoded || p.audio?.bytesBase64Encoded;
-    if (audioData) {
-      let data = audioData;
-      let mimeType = p.mimeType || p.audio?.mimeType || 'audio/wav';
-      if (mimeType.includes('audio/l16') || model.includes('lyria')) {
-        const buf = Buffer.from(data, 'base64');
-        const rateMatch = mimeType.match(/rate=(\d+)/);
-        const sampleRate = rateMatch ? parseInt(rateMatch[1]) : 24000;
-        const wavBuf = addWavHeader(buf, sampleRate);
-        data = wavBuf.toString('base64');
-        mimeType = 'audio/wav';
-      }
-      part.inlineData = { data, mimeType };
-    } else if (p.text) {
-      part.text = p.text;
-    }
-    return { content: { parts: [part] } };
-  });
-
-  return { candidates };
-}

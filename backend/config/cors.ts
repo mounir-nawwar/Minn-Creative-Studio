@@ -34,6 +34,11 @@ export const apiLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+/**
+ * Coarse per-IP abuse guard for the AI proxy — it protects this server, not the
+ * Vertex quota. Upstream per-model limits (image generation is 2/min) are paced
+ * by backend/services/quotaGate.ts, which queues rather than rejecting.
+ */
 export const aiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 30,

@@ -25,6 +25,7 @@ import { uploadBase64, STORAGE_PATH, PUBLIC_URL_BASE } from './storage.ts';
 import { trackProjectCost, assets, generateId } from './database.ts';
 import { processInlineData } from '../utils/media.ts';
 import { resolveMediaUrl, type MediaBytes } from '../utils/mediaRefs.ts';
+import { imageGenerationGate, QuotaWaitTooLong } from './quotaGate.ts';
 import {
   VERTEX_PROJECT,
   vertexAuth,
@@ -34,7 +35,6 @@ import {
   vertexGetOperation,
   vertexFetchGCS,
   vertexLyriaGenerate,
-  vertexPredict,
   vertexRest,
 } from './vertex.ts';
 import * as fs from 'fs';
@@ -163,6 +163,54 @@ export interface RunGenerationArgs {
   userId: string;
   signal?: AbortSignal;
   via?: GenerationVia;
+}
+
+/** The 2/min quota applies to generateContent calls that ask for an image back. */
+function isImageGeneration(params: any): boolean {
+  const modalities = params?.config?.responseModalities;
+  return Array.isArray(modalities) && modalities.includes('IMAGE');
+}
+
+/** True for an upstream rate-limit rejection, whatever wording Google used. */
+function isUpstreamRateLimit(err: any): boolean {
+  return err?.status === 429 || err?.code === 429;
+}
+
+/**
+ * Run a Vertex call under its quota gate.
+ *
+ * Waits for a slot rather than firing into an exhausted bucket, and converts
+ * both outcomes — no slot available, or a 429 that got through anyway — into a
+ * GenerationHttpError(429) carrying the seconds to wait. Callers must never see
+ * a rate limit dressed up as a 500; that is what made the client retry it.
+ */
+async function callWithImageQuota<T>(signal: AbortSignal | undefined, call: () => Promise<T>): Promise<T> {
+  try {
+    await imageGenerationGate.acquire(signal);
+  } catch (err) {
+    if (err instanceof QuotaWaitTooLong) {
+      throw new GenerationHttpError(429, {
+        success: false,
+        error: `Image generation is limited to ${process.env.VERTEX_IMAGE_RPM || 2} per minute on this Google Cloud project. Try again in ${err.retryAfterSeconds}s.`,
+        retryAfterSeconds: err.retryAfterSeconds,
+      });
+    }
+    throw err;
+  }
+
+  try {
+    return await call();
+  } catch (err) {
+    if (isUpstreamRateLimit(err)) {
+      imageGenerationGate.penalize();
+      throw new GenerationHttpError(429, {
+        success: false,
+        error: 'Google rejected the request as over quota (2 image generations per minute). Try again in a minute.',
+        retryAfterSeconds: 60,
+      });
+    }
+    throw err;
+  }
 }
 
 /**
@@ -298,6 +346,8 @@ export async function runGeneration({ method, params: incomingParams, userId, si
           await trackProjectCost(projectId, cost, { type: 'audio', audioCount: 1, model: sdkParams.model, via });
         }
       }
+    } else if (isImageGeneration(sdkParams)) {
+      response = await callWithImageQuota(signal, () => ai(sdkParams.model).models.generateContent(sdkParams));
     } else {
       response = await ai(sdkParams.model).models.generateContent(sdkParams);
     }

@@ -102,22 +102,31 @@ export const generateImage = async (params: {
       const images: string[] = [];
 
       for (let i = 0; i < numImages; i++) {
-        const response = await callBackend('generateContent', {
-          model: model,
-          contents: [...historyTurns, { role: 'user', parts }],
-          config: {
-            ...config,
-            ...(seed !== undefined && numImages > 1 ? { seed: seed + i } : {}),
-          },
-          projectId,
-        }, signal);
+        try {
+          const response = await callBackend('generateContent', {
+            model: model,
+            contents: [...historyTurns, { role: 'user', parts }],
+            config: {
+              ...config,
+              ...(seed !== undefined && numImages > 1 ? { seed: seed + i } : {}),
+            },
+            projectId,
+          }, signal);
 
-        const imageParts = response.candidates?.[0]?.content?.parts?.filter((p: any) => p.inlineData) || [];
-        if (imageParts.length > 0) {
-          const imgUrl = imageParts[0].inlineData.storageUrl
-            ? imageParts[0].inlineData.storageUrl
-            : `data:image/png;base64,${imageParts[0].inlineData.data}`;
-          images.push(imgUrl);
+          const imageParts = response.candidates?.[0]?.content?.parts?.filter((p: any) => p.inlineData) || [];
+          if (imageParts.length > 0) {
+            const imgUrl = imageParts[0].inlineData.storageUrl
+              ? imageParts[0].inlineData.storageUrl
+              : `data:image/png;base64,${imageParts[0].inlineData.data}`;
+            images.push(imgUrl);
+          }
+        } catch (err) {
+          // Asking for more images than the per-minute quota allows is normal
+          // here (it is 2/min). Keep what we already produced rather than
+          // discarding it because the batch could not be finished.
+          if (images.length === 0) throw err;
+          console.warn(`Image ${i + 1}/${numImages} failed, returning the ${images.length} already generated:`, err);
+          break;
         }
       }
 
