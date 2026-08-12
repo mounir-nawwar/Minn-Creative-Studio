@@ -40,6 +40,12 @@ router.post('/', requireAuth, aiLimiter, async (req, res) => {
 
   try {
     const { method, params } = req.body;
+    // Inbound payload size. Referenced assets are resolved server-side, so this
+    // stays in the low kB even with images attached — a jump to megabytes means
+    // something started inlining base64 again.
+    const bytes = Number(req.headers['content-length']) || 0;
+    console.log(`[Proxy] ${method} ${params?.model ?? ''} payload=${bytes < 1024 ? `${bytes}B` : `${Math.round(bytes / 1024)}KB`}`);
+
     const data = await runGeneration({ method, params, userId, signal: controller.signal, via: 'app' });
     return res.json({ success: true, data });
   } catch (err: any) {
