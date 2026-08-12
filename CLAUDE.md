@@ -124,7 +124,14 @@ data/  storage/        # runtime SQLite + media (gitignored)
 - **Long-running media:** Veo/Lyria-Pro return an operation the client **polls** (`getOperation`) then fetches
   (`fetchVideoFile`). Don't expect a synchronous result.
 - **Large payloads:** JSON body limit is 50mb (base64 media flows through JSON); the proxy times out at ~58s.
-- **GCS images are CORS-blocked** — load them via `POST /api/proxy-image` (`urlToBase64` / `downloadFile`).
+- **Never re-upload an asset the server already has.** Generation requests carry a *reference*
+  (`{ _imageUrl: url }`), and `backend/utils/mediaRefs.ts` resolves it — off disk for `/storage`
+  Library assets, over the network (behind an SSRF guard) for external URLs. Only `blob:`/`data:`
+  media, which exists solely in the browser tab, is inlined by the caller: see `isLocalOnlyUrl` /
+  `imageRefPart` / `imageRefBytes` in `src/services/gemini/client.ts`. Don't reintroduce
+  `urlToBase64` on a stored URL — a guard test fails if you do.
+- **CORS-blocked external images** — load them for *display/download* via `POST /api/proxy-image`
+  (`downloadFile` in `src/lib/utils.ts`). Generation does not need it; the server resolves refs itself.
 - **Two markdown runbooks at root:** `MIGRATION_GUIDE.md` (Firebase→SQLite history) and `SETUP_NOTES.local.md`
   (private — how to switch the Vertex Google account when the $300 credit runs out).
 - Windows dev host; production is an Oracle VPS behind Cloudflare, kept alive by pm2 (`minn-studio`).

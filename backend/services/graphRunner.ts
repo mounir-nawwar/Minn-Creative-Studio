@@ -27,7 +27,7 @@ import { workflows } from './database.ts';
 import type { GraphNode, GraphEdge } from '../mcp/graph/validate.ts';
 import { findCycle } from '../mcp/graph/validate.ts';
 import { projectContextFor } from '../mcp/projectContext.ts';
-import { imagePartFromUrl, imageBytesFromUrl } from '../mcp/media.ts';
+import { imagePartFromUrl, imageBytesFromUrl } from '../utils/mediaRefs.ts';
 
 const BLOCK_NONE_SAFETY = [
   { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },

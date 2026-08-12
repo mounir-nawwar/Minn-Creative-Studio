@@ -23,7 +23,7 @@ import {
 import { jobStore } from '../jobs.ts';
 import { guard } from '../guard.ts';
 import type { ToolContext } from '../server.ts';
-import { imageBytesFromUrl } from '../media.ts';
+import { imageBytesFromUrl } from '../../utils/mediaRefs.ts';
 import { projectContextFor } from '../projectContext.ts';
 import { jsonResult, errorResult } from './util.ts';
 

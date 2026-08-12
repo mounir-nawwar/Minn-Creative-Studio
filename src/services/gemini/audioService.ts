@@ -1,4 +1,4 @@
-import { callBackend, urlToBase64 } from './client';
+import { callBackend, imageRefPart } from './client';
 import { DEFAULT_TTS_MODEL } from '../../lib/models';
 
 const formatElapsed = (startTime: number): string => {
@@ -60,14 +60,7 @@ export const generateAudio = async (params: {
   const parts: any[] = [];
 
   if (isLyria && referenceImages && referenceImages.length > 0) {
-    for (const ref of referenceImages) {
-      if (ref.url.startsWith('http')) {
-        parts.push({ _imageUrl: ref.url });
-      } else {
-        const { data, mimeType } = await urlToBase64(ref.url);
-        parts.push({ inlineData: { data, mimeType } });
-      }
-    }
+    parts.push(...await Promise.all(referenceImages.map((ref) => imageRefPart(ref.url))));
   }
 
   parts.push({ text: prompt });

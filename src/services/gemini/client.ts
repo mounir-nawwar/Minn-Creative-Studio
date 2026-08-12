@@ -84,47 +84,53 @@ export async function callBackend(method: string, params: any, signal?: AbortSig
   }
 }
 
-export async function urlToBase64(url: string): Promise<{ data: string; mimeType: string }> {
-  // Check for expired or revoked browser blob URLs
-  if (url.startsWith('blob:')) {
-    try {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`Blob fetch failed: ${res.status}`);
-      const blob = await res.blob();
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const base64 = (reader.result as string).split(',')[1];
-          resolve({ data: base64, mimeType: blob.type });
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-    } catch (err) {
-      console.warn('[urlToBase64] Expired or invalid blob URL:', url);
-      throw new Error('Local preview image session expired. Please re-select or re-upload the image in the node.');
-    }
-  }
+/**
+ * True when the bytes exist only in this browser tab, so the backend has no way
+ * to obtain them and they must be uploaded.
+ *
+ * Everything else — a `/storage` Library asset, or any http(s) url — the server
+ * can resolve itself, and sending it a reference instead of the bytes avoids
+ * uploading a file back to the machine that already stores it.
+ */
+export function isLocalOnlyUrl(url: string): boolean {
+  return url.startsWith('blob:') || url.startsWith('data:');
+}
 
-  // Google Cloud Storage (Vertex GCS) URLs can't be fetched directly from the browser due to CORS — proxy through backend
-  if (url.includes('storage.googleapis.com')) {
-    const res = await fetch(`${API_BASE}/proxy-image`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeader() },
-      body: JSON.stringify({ url }),
+/**
+ * Base64 for media the server cannot reach. Only ever call this on a
+ * local-only url — see isLocalOnlyUrl.
+ */
+export async function urlToBase64(url: string): Promise<{ data: string; mimeType: string }> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+    const blob = await res.blob();
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64 = (reader.result as string).split(',')[1];
+        resolve({ data: base64, mimeType: blob.type });
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
     });
-    if (!res.ok) throw new Error(`Image proxy failed: ${res.status}`);
-    return res.json();
+  } catch {
+    // A blob: url dies with the page that created it, which is the usual cause.
+    console.warn('[urlToBase64] Unreadable local url:', url.slice(0, 64));
+    throw new Error('Local preview image session expired. Please re-select or re-upload the image in the node.');
   }
-  const res = await fetch(url);
-  const blob = await res.blob();
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64 = (reader.result as string).split(',')[1];
-      resolve({ data: base64, mimeType: blob.type });
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
+}
+
+/** A generateContent part: inline bytes for local media, a reference otherwise. */
+export async function imageRefPart(url: string): Promise<Record<string, unknown>> {
+  if (!isLocalOnlyUrl(url)) return { _imageUrl: url };
+  const { data, mimeType } = await urlToBase64(url);
+  return { inlineData: { data, mimeType } };
+}
+
+/** The image shape the video APIs take: inline bytes for local media, a reference otherwise. */
+export async function imageRefBytes(url: string): Promise<Record<string, unknown>> {
+  if (!isLocalOnlyUrl(url)) return { _imageUrl: url };
+  const { data, mimeType } = await urlToBase64(url);
+  return { imageBytes: data, mimeType };
 }

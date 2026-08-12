@@ -1,4 +1,4 @@
-import { callBackend, urlToBase64 } from './client';
+import { callBackend, imageRefBytes } from './client';
 
 const formatElapsed = (startTime: number): string => {
   const elapsed = Math.floor((Date.now() - startTime) / 1000);
@@ -59,25 +59,22 @@ export const generateVideo = async (params: {
   let startFrameData;
   if (startFrameUrl) {
     onProgress?.(formatElapsed(startTime));
-    const { data, mimeType } = await urlToBase64(startFrameUrl);
-    startFrameData = { imageBytes: data, mimeType };
+    startFrameData = await imageRefBytes(startFrameUrl);
   }
 
   if (endFrameUrl) {
     onProgress?.(formatElapsed(startTime));
-    const { data, mimeType } = await urlToBase64(endFrameUrl);
-    videoConfig.lastFrame = { imageBytes: data, mimeType };
+    videoConfig.lastFrame = await imageRefBytes(endFrameUrl);
   }
 
   if (referenceImages && referenceImages.length > 0) {
     onProgress?.(formatElapsed(startTime));
-    videoConfig.referenceImages = await Promise.all(referenceImages.map(async (ref: any) => {
-      const { data, mimeType } = await urlToBase64(ref.url);
-      return {
-        image: { imageBytes: data, mimeType },
-        referenceType: 'ASSET',
-      };
-    }));
+    videoConfig.referenceImages = await Promise.all(referenceImages.map(async (ref: any) => ({
+      image: await imageRefBytes(ref.url),
+      // Veo takes ASSET or STYLE; the canvas offers five roles, and everything
+      // that isn't 'style' describes something that should appear in the shot.
+      referenceType: ref.role === 'style' ? 'STYLE' : 'ASSET',
+    })));
   }
 
   try {

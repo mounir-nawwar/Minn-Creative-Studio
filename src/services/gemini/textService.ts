@@ -1,4 +1,4 @@
-import { callBackend, urlToBase64 } from './client';
+import { callBackend, imageRefPart } from './client';
 import { DEFAULT_TEXT_MODEL } from '../../lib/models';
 import type { Project } from '../../types/project.types';
 
@@ -26,17 +26,10 @@ export const generateText = async (params: {
     ? `${systemInstruction ? `${systemInstruction}\n\n` : ''}Project Context:\n${projectContext}`
     : systemInstruction;
 
-  const parts: any[] = [{ text: prompt }];
-
-  for (const url of imageUrls) {
-    const { data, mimeType } = await urlToBase64(url);
-    parts.push({ inlineData: { data, mimeType } });
-  }
-
-  for (const url of videoUrls) {
-    const { data, mimeType } = await urlToBase64(url);
-    parts.push({ inlineData: { data, mimeType } });
-  }
+  const parts: any[] = [
+    { text: prompt },
+    ...await Promise.all([...imageUrls, ...videoUrls].map((url) => imageRefPart(url))),
+  ];
 
   const historyTurns = history.map((h) => ({
     role: h.role === 'assistant' ? 'model' : 'user',

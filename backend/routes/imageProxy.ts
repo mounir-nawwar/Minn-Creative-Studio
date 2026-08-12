@@ -1,6 +1,6 @@
 import express from 'express';
 import { requireAuth } from '../middleware/auth.ts';
-import { isValidImageUrl } from '../utils/imageValidation.ts';
+import { assertFetchableUrl } from '../utils/mediaRefs.ts';
 
 const router = express.Router();
 
@@ -38,9 +38,13 @@ router.post('/', requireAuth, async (req, res) => {
   const { url } = req.body;
   if (!url) return res.status(400).json({ error: 'url required' });
 
-  const validation = isValidImageUrl(url);
-  if (!validation.valid) {
-    return res.status(400).json({ error: validation.error });
+  // Shares the one SSRF guard with the generation path. It resolves DNS before
+  // judging, so a hostname pointing at a private address is caught too — the
+  // hostname-pattern check this replaced let those straight through.
+  try {
+    await assertFetchableUrl(url);
+  } catch (err) {
+    return res.status(400).json({ error: err instanceof Error ? err.message : 'Invalid URL' });
   }
 
   // Check in-memory cache hit

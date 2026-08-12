@@ -1,4 +1,4 @@
-import { callBackend, urlToBase64 } from './client';
+import { callBackend, imageRefPart } from './client';
 import { DEFAULT_IMAGE_MODEL, DEFAULT_TEXT_MODEL } from '../../lib/models';
 
 export const generateImage = async (params: {
@@ -52,32 +52,23 @@ export const generateImage = async (params: {
     const parts: any[] = [];
 
     if (referenceImages && referenceImages.length > 0) {
-      for (const ref of referenceImages) {
-        if (ref.url.startsWith('http')) {
-          parts.push({ _imageUrl: ref.url });
-        } else {
-          const { data, mimeType } = await urlToBase64(ref.url);
-          parts.push({ inlineData: { data, mimeType } });
-        }
-      }
+      parts.push(...await Promise.all(referenceImages.map((ref) => imageRefPart(ref.url))));
     }
 
     parts.push({ text: fullPrompt });
 
     // Build conversation history once (including any images those turns
     // carried) so the model can see and edit its own prior output rather
-    // than starting fresh every message.
-    const historyTurns: any[] = [];
-    for (const h of history) {
-      const hParts: any[] = [{ text: h.content }];
-      if (h.imageUrls?.length) {
-        for (const url of h.imageUrls) {
-          const { data, mimeType: histMimeType } = await urlToBase64(url);
-          hParts.push({ inlineData: { data, mimeType: histMimeType } });
-        }
-      }
-      historyTurns.push({ role: h.role === 'assistant' ? 'model' : 'user', parts: hParts });
-    }
+    // than starting fresh every message. Stored images travel as references —
+    // re-uploading every prior turn on each message is what made long image
+    // chats slow to send.
+    const historyTurns = await Promise.all(history.map(async (h) => ({
+      role: h.role === 'assistant' ? 'model' : 'user',
+      parts: [
+        { text: h.content },
+        ...await Promise.all((h.imageUrls ?? []).map((url) => imageRefPart(url))),
+      ],
+    })));
 
     try {
       const imageConfig: any = {
@@ -149,15 +140,13 @@ export const generateMask = async (params: {
 }, signal?: AbortSignal) => {
   const { prompt, imageUrl } = params;
 
-  const { data, mimeType } = await urlToBase64(imageUrl);
-
   try {
     const response = await callBackend('generateContent', {
       model: DEFAULT_TEXT_MODEL,
       contents: {
         parts: [
           { text: `Identify the bounding boxes for "${prompt}" in the image. Return the coordinates as [ymin, xmin, ymax, xmax] in normalized coordinates (0-1000).` },
-          { inlineData: { data, mimeType } }
+          await imageRefPart(imageUrl),
         ]
       },
       config: {
@@ -195,8 +184,6 @@ export const upscaleImage = async (params: {
 }, signal?: AbortSignal) => {
   const { imageUrl, scale, preserveStyle, projectId, model = DEFAULT_IMAGE_MODEL } = params;
 
-  const { data, mimeType } = await urlToBase64(imageUrl);
-
   // The dedicated Imagen upscale path was dropped along with the imagen-* models
   // (404 on this Vertex project); everything now upscales via generateContent.
   try {
@@ -205,7 +192,7 @@ export const upscaleImage = async (params: {
       contents: {
         parts: [
           { text: `Upscale this image to ${scale}. Preserve style: ${preserveStyle}` },
-          { inlineData: { data, mimeType } }
+          await imageRefPart(imageUrl),
         ]
       },
       config: {
@@ -238,15 +225,13 @@ export const relightImage = async (params: {
 }, signal?: AbortSignal) => {
   const { imageUrl, lightDirection, lightColor, intensity, style, projectId } = params;
 
-  const { data, mimeType } = await urlToBase64(imageUrl);
-
   try {
     const response = await callBackend('generateContent', {
       model: DEFAULT_IMAGE_MODEL,
       contents: {
         parts: [
           { text: `Relight this image with light from ${lightDirection}. Light color: ${lightColor}. Intensity: ${intensity}. Style: ${style}.` },
-          { inlineData: { data, mimeType } }
+          await imageRefPart(imageUrl),
         ]
       },
       config: { responseModalities: ['IMAGE'] },
@@ -275,17 +260,14 @@ export const inpaintImage = async (params: {
 }, signal?: AbortSignal) => {
   const { imageUrl, maskUrl, prompt, mode, projectId } = params;
 
-  const { data: imageData, mimeType: imageMimeType } = await urlToBase64(imageUrl);
-  const { data: maskData, mimeType: maskMimeType } = await urlToBase64(maskUrl);
-
   try {
     const response = await callBackend('generateContent', {
       model: DEFAULT_IMAGE_MODEL,
       contents: {
         parts: [
           { text: `Inpaint this image based on the provided mask and prompt: "${prompt}". Mode: ${mode === 'mask' ? 'Fill the masked area' : 'Fill the unmasked area'}.` },
-          { inlineData: { data: imageData, mimeType: imageMimeType } },
-          { inlineData: { data: maskData, mimeType: maskMimeType } }
+          await imageRefPart(imageUrl),
+          await imageRefPart(maskUrl),
         ]
       },
       config: { responseModalities: ['IMAGE'] },
@@ -314,17 +296,14 @@ export const transferStyle = async (params: {
 }, signal?: AbortSignal) => {
   const { contentUrl, styleUrl, strength, preserveStructure, projectId } = params;
 
-  const { data: contentData, mimeType: contentMimeType } = await urlToBase64(contentUrl);
-  const { data: styleData, mimeType: styleMimeType } = await urlToBase64(styleUrl);
-
   try {
     const response = await callBackend('generateContent', {
       model: DEFAULT_IMAGE_MODEL,
       contents: {
         parts: [
           { text: `Transfer the style from the style image to the content image. Strength: ${strength}. Preserve structure: ${preserveStructure}.` },
-          { inlineData: { data: contentData, mimeType: contentMimeType } },
-          { inlineData: { data: styleData, mimeType: styleMimeType } }
+          await imageRefPart(contentUrl),
+          await imageRefPart(styleUrl),
         ]
       },
       config: { responseModalities: ['IMAGE'] },
@@ -351,12 +330,12 @@ export const generateVariations = async (params: {
 }, signal?: AbortSignal) => {
   const { imageUrl, prompt, count = 4 } = params;
 
-  const { data, mimeType } = await urlToBase64(imageUrl);
-
   // Previously called Imagen (now 404 on this project) AND never actually sent
   // the source image, so "variations" ignored the input entirely. Each variation
   // is now a separate generateContent call seeded differently, matching how
   // generateImage() produces multiple images.
+  const sourcePart = await imageRefPart(imageUrl);
+
   try {
     const images: string[] = [];
     for (let i = 0; i < count; i++) {
@@ -365,7 +344,7 @@ export const generateVariations = async (params: {
         contents: [{
           role: 'user',
           parts: [
-            { inlineData: { data, mimeType } },
+            sourcePart,
             { text: prompt || 'Generate a variation of this image, keeping the subject and style.' },
           ],
         }],

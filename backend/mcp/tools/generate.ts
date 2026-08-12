@@ -23,7 +23,7 @@ import {
 } from '../../../src/lib/models.ts';
 import { guard } from '../guard.ts';
 import type { ToolContext } from '../server.ts';
-import { imagePartFromUrl } from '../media.ts';
+import { imagePartFromUrl } from '../../utils/mediaRefs.ts';
 import { projectContextFor } from '../projectContext.ts';
 import { jsonResult, errorResult } from './util.ts';
 

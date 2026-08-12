@@ -90,6 +90,23 @@ export async function vertexGenerateVideos(params: any) {
   if (config.lastFrame?.imageBytes) {
     instance.lastFrame = { bytesBase64Encoded: config.lastFrame.imageBytes, mimeType: config.lastFrame.mimeType || 'image/jpeg' };
   }
+  // Reference images were being built by every caller and then dropped here.
+  // Shape per the SDK's own Vertex converter (videoGenerationReferenceImageToVertex):
+  // instances[0].referenceImages[] = { image: { bytesBase64Encoded, mimeType }, referenceType }.
+  // Veo accepts only ASSET and STYLE, while the canvas offers five roles — 'style'
+  // maps to STYLE and every other role describes something that should appear, i.e. ASSET.
+  const referenceImages = (config.referenceImages || [])
+    .filter((ref: any) => ref?.image?.imageBytes)
+    .map((ref: any) => ({
+      image: {
+        bytesBase64Encoded: ref.image.imageBytes,
+        mimeType: ref.image.mimeType || 'image/jpeg',
+      },
+      referenceType: String(ref.referenceType || ref.role || 'asset').toUpperCase() === 'STYLE' ? 'STYLE' : 'ASSET',
+    }));
+  if (referenceImages.length > 0) {
+    instance.referenceImages = referenceImages;
+  }
   const parameters: any = {
     aspectRatio: config.aspectRatio || '16:9',
     sampleCount: Math.min(Math.max(config.sampleCount || 1, 1), 4),
@@ -100,7 +117,13 @@ export async function vertexGenerateVideos(params: any) {
   if (config.seed !== undefined) parameters.seed = config.seed;
   if (config.personGeneration) parameters.personGeneration = config.personGeneration;
   if (config.audio !== undefined) parameters.enableNativeAudio = config.audio;
-  console.log('[Veo] Sending parameters:', JSON.stringify(parameters));
+  // Log the instance by shape, never by content — it holds megabytes of base64.
+  const inputs = [
+    instance.image && 'startFrame',
+    instance.lastFrame && 'lastFrame',
+    referenceImages.length > 0 && `${referenceImages.length} reference(s)`,
+  ].filter(Boolean);
+  console.log('[Veo] Sending parameters:', JSON.stringify(parameters), '| inputs:', inputs.join(', ') || 'none');
   const url = `https://us-central1-aiplatform.googleapis.com/v1/projects/${VERTEX_PROJECT}/locations/us-central1/publishers/google/models/${model}:predictLongRunning`;
   const op = await vertexRest(url, 'POST', { instances: [instance], parameters });
   // Return in SDK-compatible shape so geminiService.ts polling loop works unchanged

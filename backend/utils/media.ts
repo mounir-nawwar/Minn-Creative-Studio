@@ -1,44 +1,12 @@
 /**
  * Media Utilities for Minn Creative Studio
- * Handles image resolution and inline data processing
+ * Handles inline data processing for generated media.
+ *
+ * Resolving a media *reference* (a `/storage` or http url) into bytes lives in
+ * ./mediaRefs.ts — this file only deals with data already in hand.
  */
 
 import { addWavHeader } from './audio.ts';
-
-/**
- * Resolve image URLs to inline base64 data for Vertex AI
- * Fetches images from URLs and converts to base64 inline data
- */
-export async function resolveImageUrls(contents: any): Promise<any> {
-  const resolveParts = (parts: any[]) =>
-    Promise.all(parts.map(async (part: any) => {
-      if (!part._imageUrl) return part;
-      try {
-        const r = await fetch(part._imageUrl);
-        if (!r.ok) throw new Error(`Image fetch failed: ${r.status}`);
-        const buf = await r.arrayBuffer();
-        return {
-          inlineData: {
-            data: Buffer.from(buf).toString('base64'),
-            mimeType: r.headers.get('content-type') || 'image/jpeg'
-          }
-        };
-      } catch (err) {
-        console.error('Failed to resolve image URL:', part._imageUrl, err);
-        return part; // Return original part on failure
-      }
-    }));
-
-  if (Array.isArray(contents)) {
-    return Promise.all(contents.map(async (c: any) =>
-      c?.parts ? { ...c, parts: await resolveParts(c.parts) } : c
-    ));
-  }
-  if (contents?.parts) {
-    return { ...contents, parts: await resolveParts(contents.parts) };
-  }
-  return contents;
-}
 
 /**
  * Process inline data parts - handles audio conversion for WAV header

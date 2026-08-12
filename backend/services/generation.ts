@@ -23,7 +23,8 @@ import { calculateCost } from '../config/pricing.ts';
 import { HQ_VIDEO_MODEL } from '../../src/lib/models.ts';
 import { uploadBase64, STORAGE_PATH, PUBLIC_URL_BASE } from './storage.ts';
 import { trackProjectCost, assets, generateId } from './database.ts';
-import { resolveImageUrls, processInlineData } from '../utils/media.ts';
+import { processInlineData } from '../utils/media.ts';
+import { resolveMediaUrl, type MediaBytes } from '../utils/mediaRefs.ts';
 import {
   VERTEX_PROJECT,
   vertexAuth,
@@ -58,10 +59,24 @@ function markOperationTracked(opName: string): boolean {
 }
 
 /**
+ * Everything the background tracker needs to price a finished operation.
+ *
+ * Deliberately narrow: the tracker holds this in a closure for up to ten
+ * minutes, so it must not capture the request's image bytes.
+ */
+interface LroPricingContext {
+  projectId?: string;
+  _projectId?: string;
+  _audioModel?: string;
+  model?: string;
+  config?: { numberOfVideos?: number; duration?: number; resolution?: string; audio?: boolean };
+}
+
+/**
  * Server-side background worker: polls active Veo/Lyria LRO operations to completion.
  * Guarantees that cost tracking and asset records complete even if the browser tab closes mid-generation.
  */
-function registerBackgroundLroTracker(opName: string, params: any, via: GenerationVia = 'app') {
+function registerBackgroundLroTracker(opName: string, params: LroPricingContext, via: GenerationVia = 'app') {
   if (!opName || trackedOperations.has(opName)) return;
 
   const POLL_INTERVAL = 5000;
@@ -151,6 +166,84 @@ export interface RunGenerationArgs {
 }
 
 /**
+ * Resolve `{ _imageUrl }` references to bytes, just before the Vertex call.
+ *
+ * Callers send a *reference* whenever the server can obtain the file itself —
+ * a Library asset is read off disk rather than uploaded back to the machine
+ * already storing it. Only genuinely local media (`data:` / `blob:`) is
+ * inlined by the caller, because nobody else can see it.
+ *
+ * An unresolvable reference throws. The previous implementation swallowed the
+ * error and passed the unresolved marker through, so Vertex received a part
+ * with no image in it and the request quietly produced the wrong thing.
+ */
+async function resolveRef(url: string): Promise<MediaBytes> {
+  try {
+    return await resolveMediaUrl(url);
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    throw new GenerationHttpError(422, { success: false, error: `Unresolvable media reference: ${detail}` });
+  }
+}
+
+/** `{ _imageUrl }` → `{ imageBytes, mimeType }` for the video APIs; anything else passes through. */
+async function resolveImageField(field: any): Promise<any> {
+  if (!field?._imageUrl) return field;
+  const { data, mimeType } = await resolveRef(field._imageUrl);
+  return { imageBytes: data, mimeType };
+}
+
+/** `{ _imageUrl }` → `{ inlineData }` for generateContent parts. */
+async function resolveParts(parts: any[]): Promise<any[]> {
+  return Promise.all(parts.map(async (part: any) => {
+    if (!part?._imageUrl) return part;
+    const { data, mimeType } = await resolveRef(part._imageUrl);
+    return { inlineData: { data, mimeType } };
+  }));
+}
+
+async function resolveMediaRefs(method: GenerationMethod, params: any): Promise<any> {
+  if (method === 'generateContent') {
+    const { contents } = params;
+    if (!contents) return params;
+    if (Array.isArray(contents)) {
+      return {
+        ...params,
+        contents: await Promise.all(contents.map(async (c: any) =>
+          c?.parts ? { ...c, parts: await resolveParts(c.parts) } : c
+        )),
+      };
+    }
+    if (contents.parts) {
+      return { ...params, contents: { ...contents, parts: await resolveParts(contents.parts) } };
+    }
+    return params;
+  }
+
+  if (method === 'generateVideos') {
+    const config = params.config;
+    return {
+      ...params,
+      image: await resolveImageField(params.image),
+      ...(config && {
+        config: {
+          ...config,
+          ...(config.lastFrame && { lastFrame: await resolveImageField(config.lastFrame) }),
+          ...(Array.isArray(config.referenceImages) && {
+            referenceImages: await Promise.all(config.referenceImages.map(async (ref: any) => ({
+              ...ref,
+              image: await resolveImageField(ref.image),
+            }))),
+          }),
+        },
+      }),
+    };
+  }
+
+  return params;
+}
+
+/**
  * Upload generated inline data to local storage
  */
 async function uploadInlineDataToStorage(
@@ -188,7 +281,7 @@ export async function runGeneration({ method, params: incomingParams, userId, si
   const ai = (model: string) => USE_VERTEX_AI ? getVertexClient(model) : devAi!;
 
   if (method === 'generateContent') {
-    if (params?.contents) params = { ...params, contents: await resolveImageUrls(params.contents) };
+    params = await resolveMediaRefs(method, params);
     if (USE_VERTEX_AI) params = sanitizeForVertex(params);
     const { projectId, ...sdkParams } = params;
 
@@ -293,13 +386,25 @@ export async function runGeneration({ method, params: incomingParams, userId, si
 
   // Video: @google/genai SDK hardcodes v1beta — use v1 REST directly via vertexGenerateVideos
   if (method === 'generateVideos') {
+    params = await resolveMediaRefs(method, params);
     const result = USE_VERTEX_AI
       ? await vertexGenerateVideos(params)
       : await devAi!.models.generateVideos(params);
     
     const opName = typeof result === 'string' ? result : (result?.name || result?.operation?.name);
     if (opName) {
-      registerBackgroundLroTracker(opName, params, via);
+      // Pass only the pricing fields — `params` now carries resolved image
+      // bytes, and the tracker keeps its argument alive for up to ten minutes.
+      const { projectId, _projectId, _audioModel, model, config } = params;
+      registerBackgroundLroTracker(opName, {
+        projectId, _projectId, _audioModel, model,
+        config: config && {
+          numberOfVideos: config.numberOfVideos,
+          duration: config.duration,
+          resolution: config.resolution,
+          audio: config.audio,
+        },
+      }, via);
     }
 
     // Cost is tracked in getOperation when done — avoids double-counting the LRO
