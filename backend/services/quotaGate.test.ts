@@ -40,7 +40,7 @@ describe('QuotaGate', () => {
     await vi.advanceTimersByTimeAsync(5_000);
     expect(granted).toBe(false);      // still inside the window
 
-    await vi.advanceTimersByTimeAsync(8_000);
+    await vi.advanceTimersByTimeAsync(20_000);
     await third;
     expect(granted).toBe(true);
   });
@@ -79,7 +79,7 @@ describe('QuotaGate', () => {
     await expect(g.acquire()).rejects.toBeInstanceOf(QuotaWaitTooLong);
 
     // Once the window passes, the gate must still work.
-    await vi.advanceTimersByTimeAsync(13_000);
+    await vi.advanceTimersByTimeAsync(20_000);
     await expect(g.acquire()).resolves.toBeUndefined();
   });
 
@@ -88,7 +88,7 @@ describe('QuotaGate', () => {
     g.penalize();
     await expect(g.acquire()).rejects.toBeInstanceOf(QuotaWaitTooLong);
 
-    await vi.advanceTimersByTimeAsync(13_000);
+    await vi.advanceTimersByTimeAsync(20_000);
     await expect(g.acquire()).resolves.toBeUndefined();
   });
 
@@ -96,7 +96,7 @@ describe('QuotaGate', () => {
     const g = gate({ limit: 1, maxWaitMs: 0 });
     await g.acquire();
     await expect(g.acquire()).rejects.toBeInstanceOf(QuotaWaitTooLong);
-    await vi.advanceTimersByTimeAsync(13_000);
+    await vi.advanceTimersByTimeAsync(20_000);
     await expect(g.acquire()).resolves.toBeUndefined();
   });
 

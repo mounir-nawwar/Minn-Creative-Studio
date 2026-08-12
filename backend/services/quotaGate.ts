@@ -34,10 +34,16 @@ export interface QuotaGateOptions {
 }
 
 /**
- * Our window is a hair wider than Google's so a slot we believe is free is not
- * still counted upstream (clock skew, request-time vs receive-time).
+ * We hold a slot slightly longer than Google does, because our clock and theirs
+ * disagree about when a request happened: we stamp it as we start the call,
+ * they stamp it when their gateway receives it, and TLS + auth sit in between.
+ *
+ * Measured 2026-08-12: with a 2s margin the gate released a queued request at
+ * oldest+62s and Google still answered 429, costing one wasted call. Widened to
+ * 8s. The cost of being late is a few seconds of latency; the cost of being
+ * early is a rejected request, so the asymmetry favours waiting.
  */
-const WINDOW_MARGIN_MS = 2000;
+const WINDOW_MARGIN_MS = 8000;
 
 export class QuotaGate {
   private readonly name: string;
@@ -102,12 +108,14 @@ export class QuotaGate {
    * alone. A slot therefore opens as soon as the *oldest* request ages out, not
    * a fresh window from now.
    */
-  penalize() {
+  penalize(): number {
     const now = Date.now();
     this.prune(now);
     while (this.grants.length < this.limit) this.grants.push(now);
     const nextSlotMs = Math.max(0, this.grants[0] + this.windowMs + WINDOW_MARGIN_MS - now);
-    console.warn(`[Quota] ${this.name}: upstream 429 — next slot in ${Math.ceil(nextSlotMs / 1000)}s`);
+    const seconds = Math.ceil(nextSlotMs / 1000);
+    console.warn(`[Quota] ${this.name}: upstream 429 — next slot in ${seconds}s`);
+    return seconds;
   }
 }
 

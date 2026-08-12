@@ -68,7 +68,19 @@ export async function vertexRest(url: string, method = 'GET', body?: any) {
     // route as a shapeless Error, gets reported as 500, and the browser retries
     // it into the exhausted quota — the SDK path sets `status`, so this one must
     // too or the two paths behave differently for the same failure.
-    throw Object.assign(new Error(text), { status: res.status });
+    //
+    // Unlike the SDK (whose ApiError keeps only message + status) we still have
+    // the response here, so capture Retry-After if Google sent one. Observed so
+    // far: it does not — the 429 body carries no retry timing either — hence the
+    // log, so we notice if that ever changes.
+    const retryAfter = Number(res.headers.get('retry-after'));
+    if (res.status === 429) {
+      console.warn(`[Vertex] 429 from ${new URL(url).hostname} — Retry-After: ${res.headers.get('retry-after') ?? 'not sent'}`);
+    }
+    throw Object.assign(new Error(text), {
+      status: res.status,
+      ...(Number.isFinite(retryAfter) && retryAfter > 0 && { retryAfterSeconds: retryAfter }),
+    });
   }
   return JSON.parse(text);
 }

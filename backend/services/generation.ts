@@ -202,11 +202,16 @@ async function callWithImageQuota<T>(signal: AbortSignal | undefined, call: () =
     return await call();
   } catch (err) {
     if (isUpstreamRateLimit(err)) {
-      imageGenerationGate.penalize();
+      // Google's 429 carries no retry timing (no Retry-After, no RetryInfo in
+      // the body), and the SDK drops response headers anyway — so prefer any
+      // header we did capture, else the gate's own estimate, which knows when
+      // our oldest in-window request was.
+      const gateEstimate = imageGenerationGate.penalize();
+      const retryAfterSeconds = Number(err?.retryAfterSeconds) || gateEstimate;
       throw new GenerationHttpError(429, {
         success: false,
-        error: 'Google rejected the request as over quota (2 image generations per minute). Try again in a minute.',
-        retryAfterSeconds: 60,
+        error: `Google rejected the request as over quota (2 image generations per minute). Try again in ${retryAfterSeconds}s.`,
+        retryAfterSeconds,
       });
     }
     throw err;
