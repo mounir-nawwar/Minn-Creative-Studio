@@ -27,14 +27,25 @@ if (VERTEX_PROJECT) {
 }
 
 /**
- * The regional endpoint for models that are not served globally (Veo, TTS).
+ * Regional endpoint for models not served globally (currently TTS).
  *
- * europe-west3 (Frankfurt) — the team is in Beirut, so a European region means
- * a shorter round-trip than the previous us-central1. Verified that both Veo
- * 3.1 models are served here before switching. Override per-deployment with
- * GOOGLE_CLOUD_REGION; text and image keep using the `global` endpoint.
+ * europe-west3 (Frankfurt) — the team is in Beirut, so a European region is a
+ * shorter round-trip than the previous us-central1. Text and image use the
+ * `global` endpoint and are unaffected.
  */
 export const VERTEX_REGION = process.env.GOOGLE_CLOUD_REGION || 'europe-west3';
+
+/**
+ * Veo has its own region, and it is deliberately NOT the one above.
+ *
+ * Veo 3.x rollout is effectively us-central1-only; Frankfurt carries Veo 2.
+ * A `:predictLongRunning` probe answers 400 for veo-3.1 in europe-west3, but
+ * that only proves the request shape was validated — it is not evidence the
+ * project can run the model there. Moving video on that basis would risk
+ * breaking it for a latency gain that barely matters on a job taking minutes.
+ * Override with VEO_REGION if Google's availability changes.
+ */
+export const VEO_REGION = process.env.VEO_REGION || 'us-central1';
 
 /** Base URL for a regional Vertex publisher model. */
 function regionalModelUrl(model: string, verb: string, region = VERTEX_REGION): string {
@@ -52,15 +63,22 @@ export async function vertexRest(url: string, method = 'GET', body?: any) {
     body: body ? JSON.stringify(body) : undefined,
   });
   const text = await res.text();
-  if (!res.ok) throw new Error(text);
+  if (!res.ok) {
+    // Carry the HTTP status. Without it a Veo/Lyria rate limit reaches the
+    // route as a shapeless Error, gets reported as 500, and the browser retries
+    // it into the exhausted quota — the SDK path sets `status`, so this one must
+    // too or the two paths behave differently for the same failure.
+    throw Object.assign(new Error(text), { status: res.status });
+  }
   return JSON.parse(text);
 }
 
 const vertexClients: Record<string, GoogleGenAI> = {};
 
 export function getVertexClient(model = ''): GoogleGenAI {
-  const needsRegionalEndpoint = /^(veo-|imagen-)/.test(model) || model.includes('tts') || model.includes('lyra') || model.includes('audio');
-  const location = needsRegionalEndpoint ? VERTEX_REGION : 'global';
+  const isVideo = /^veo-/.test(model);
+  const needsRegionalEndpoint = isVideo || /^imagen-/.test(model) || model.includes('tts') || model.includes('lyra') || model.includes('audio');
+  const location = isVideo ? VEO_REGION : needsRegionalEndpoint ? VERTEX_REGION : 'global';
   if (!vertexClients[location]) {
     vertexClients[location] = new GoogleGenAI({ vertexai: true, project: VERTEX_PROJECT, location });
   }
@@ -139,7 +157,7 @@ export async function vertexGenerateVideos(params: any) {
     referenceImages.length > 0 && `${referenceImages.length} reference(s)`,
   ].filter(Boolean);
   console.log('[Veo] Sending parameters:', JSON.stringify(parameters), '| inputs:', inputs.join(', ') || 'none');
-  const op = await vertexRest(regionalModelUrl(model, 'predictLongRunning'), 'POST', { instances: [instance], parameters });
+  const op = await vertexRest(regionalModelUrl(model, 'predictLongRunning', VEO_REGION), 'POST', { instances: [instance], parameters });
   // Return in SDK-compatible shape so geminiService.ts polling loop works unchanged
   return { name: op.name, done: false };
 }

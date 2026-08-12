@@ -11,7 +11,7 @@
 import { describe, test, expect, vi, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
-import { isLocalOnlyUrl, imageRefPart, imageRefBytes } from './client';
+import { isLocalOnlyUrl, imageRefPart, imageRefBytes, callBackend, MAX_RETRIES } from './client';
 
 const STORAGE_URL = '/storage/projects/p1/shot.png';
 const EXTERNAL_URL = 'https://example.com/cat.png';
@@ -67,6 +67,58 @@ describe('imageRefBytes', () => {
     const image = await imageRefBytes('blob:http://localhost:3000/abc') as any;
     expect(image.mimeType).toBe('image/jpeg');
     expect(image.imageBytes).toBeTruthy();
+  });
+});
+
+describe('retry policy', () => {
+  const jsonResponse = (status: number, body: unknown) => ({
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: (n: string) => (n === 'content-type' ? 'application/json' : null) },
+    json: async () => body,
+  } as unknown as Response);
+
+  test('a rate limit is NEVER retried', async () => {
+    // Retrying into an exhausted quota cannot succeed and consumes the slot the
+    // next real request needs. One attempt, then report it.
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(429, { error: 'Resource exhausted. Please try again later.', retryAfterSeconds: 62 }),
+    );
+
+    await expect(callBackend('generateContent', {})).rejects.toThrow(/Resource exhausted/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  test('the seconds to wait survive to the caller', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(429, { error: 'over quota', retryAfterSeconds: 62 }),
+    );
+    const err = await callBackend('generateContent', {}).catch((e) => e);
+    expect(err.status).toBe(429);
+    expect(err.retryAfterSeconds).toBe(62);
+  });
+
+  test('a 2xx reporting success:false is not retried — the server answered', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, { success: false, error: 'Prompt was blocked' }),
+    );
+    await expect(callBackend('generateContent', {})).rejects.toThrow(/blocked/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  test('a genuine 5xx still retries', async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        jsonResponse(500, { error: 'Internal server error' }),
+      );
+      const pending = callBackend('generateContent', {}).catch((e) => e);
+      await vi.advanceTimersByTimeAsync(60_000);
+      await pending;
+      expect(fetchMock).toHaveBeenCalledTimes(MAX_RETRIES + 1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

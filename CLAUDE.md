@@ -119,9 +119,10 @@ data/  storage/        # runtime SQLite + media (gitignored)
 
 ## Gotchas
 
-- **Vertex regions:** Veo/TTS use the regional endpoint `VERTEX_REGION` (`GOOGLE_CLOUD_REGION`, default
-  `europe-west3`); text and image use `global`; Lyria uses the global `/interactions` API. All of it is
-  derived from one constant in `backend/services/vertex.ts` — don't hardcode a region anywhere else.
+- **Vertex regions:** TTS uses `VERTEX_REGION` (`GOOGLE_CLOUD_REGION`, default `europe-west3`); **Veo uses
+  its own `VEO_REGION`, default `us-central1`** — Veo 3.x is effectively us-central1-only, so video must not
+  follow the general region. Text and image use `global`; Lyria uses the global `/interactions` API. All of
+  it derives from those two constants in `backend/services/vertex.ts` — don't hardcode a region anywhere else.
   Veo uses **direct v1 REST** (`vertexRest`) because the SDK is pinned to `v1beta` for video.
   LRO polling parses the region out of the operation name, so jobs survive a region change.
 - **Image generation is capped at 2 requests/minute** by Vertex quota (trial accounts can't raise it).
