@@ -45,7 +45,10 @@ export async function resolveImageUrls(contents: any): Promise<any> {
  */
 export function processInlineData(data: string, mimeType: string): { buffer: Buffer; mimeType: string; extension: string } {
   let buf: Buffer = Buffer.from(data, 'base64');
-  let ext = mimeType?.split('/')[1]?.split(';')[0] || 'bin';
+  // Delegate rather than deriving the extension here: the naive subtype split
+  // this used to do produced ".mpeg" for audio/mpeg, so a Lyria track was
+  // stored as .mp3 but recorded under a .mpeg filename.
+  let ext = getExtensionFromMimeType(mimeType);
 
   // Handle raw PCM audio - add WAV header
   if (mimeType?.includes('audio/l16')) {
@@ -67,7 +70,11 @@ export function base64ToBuffer(base64: string, mimeType?: string): Buffer {
 }
 
 /**
- * Get extension from mime type
+ * File extension for a mime type — the single place this mapping lives.
+ *
+ * The subtype is not always the extension (audio/mpeg is .mp3, image/jpeg is
+ * .jpg), so the table wins and the subtype is only a last resort. Parameters
+ * (`audio/l16;rate=24000`) are stripped before lookup so they can't defeat it.
  */
 export function getExtensionFromMimeType(mimeType: string): string {
   const extensions: Record<string, string> = {
@@ -78,12 +85,15 @@ export function getExtensionFromMimeType(mimeType: string): string {
     'image/webp': 'webp',
     'video/mp4': 'mp4',
     'video/webm': 'webm',
+    'video/quicktime': 'mov',
     'audio/mpeg': 'mp3',
     'audio/mp3': 'mp3',
     'audio/wav': 'wav',
+    'audio/x-wav': 'wav',
     'audio/webm': 'webm',
     'application/pdf': 'pdf',
     'application/json': 'json',
   };
-  return extensions[mimeType] || mimeType?.split('/')[1]?.split(';')[0] || 'bin';
+  const base = mimeType?.split(';')[0]?.trim().toLowerCase();
+  return extensions[base] || base?.split('/')[1] || 'bin';
 }
