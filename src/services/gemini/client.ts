@@ -28,9 +28,11 @@ async function sleep(ms: number): Promise<void> {
  * times — into a bucket of 2 requests per minute, guaranteeing failure and
  * starving the next real request.
  *
- * 429 is never retried here: the server already waited for a slot on our behalf
- * (see backend/services/quotaGate.ts), so if it still says no, the wait is
- * longer than a retry loop should hide from the user.
+ * 429 is never retried here. The server holds the request while a slot is
+ * within reach (see backend/services/quotaGate.ts), so a 429 that reaches us
+ * means the wait is longer than a retry loop should hide from the user — and
+ * blind retries into a 2/min bucket cannot succeed anyway, they only consume
+ * the slot the next real request needs. The response carries retryAfterSeconds.
  */
 function isRetryableStatus(status: number): boolean {
   if (status === 429) return false;             // rate limited — respect it
