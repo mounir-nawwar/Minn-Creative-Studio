@@ -455,10 +455,25 @@ export interface UsageSummary {
   creditLimit: number;
   remaining: number;
   usedFraction: number;
+  /** What the app priced itself, all time — excludes anything run outside it. */
+  trackedCost: number;
+  /** The Google Cloud console reading the counter is anchored to, if set. */
+  baseline: { amountUsd: number; at: string } | null;
+  /** Tracked spend recorded after that reading. */
+  trackedSinceBaseline: number;
+  /** Spend Google billed that the app never saw, as of the reading. */
+  untrackedAtBaseline: number;
 }
 
 export const usageApi = {
   summary: (): Promise<UsageSummary> => apiRequest('/usage/summary'),
+
+  /**
+   * Anchor the counter to the figure Google Cloud reports. Pass null to clear it
+   * and go back to counting only what the app itself priced.
+   */
+  setBaseline: (amountUsd: number | null): Promise<UsageSummary> =>
+    apiRequest('/usage/baseline', { method: 'POST', body: JSON.stringify({ amountUsd }) }),
 
   /** Zeroes cost history everywhere. The server backs the DB up first. */
   reset: (): Promise<UsageSummary & { clearedCost: number; backupPath: string }> =>

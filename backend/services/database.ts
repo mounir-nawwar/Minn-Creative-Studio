@@ -142,6 +142,15 @@ function initializeSchema(): void {
     )
   `);
 
+  // Small key/value store for app-level settings (JSON values).
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
   // Prompts table
   db.exec(`
     CREATE TABLE IF NOT EXISTS prompts (
@@ -243,6 +252,30 @@ export async function verifyPasswordAsync(password: string, storedHash: string):
 export function generateId(): string {
   return crypto.randomBytes(16).toString('hex');
 }
+
+/** App-level key/value settings. Values are stored as JSON. */
+export const settings = {
+  get<T>(key: string): T | null {
+    const row = db.prepare('SELECT value FROM app_settings WHERE key = ?').get(key) as { value: string } | undefined;
+    if (!row) return null;
+    try {
+      return JSON.parse(row.value) as T;
+    } catch {
+      return null;
+    }
+  },
+
+  set<T>(key: string, value: T): void {
+    db.prepare(`
+      INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP
+    `).run(key, JSON.stringify(value));
+  },
+
+  delete(key: string): void {
+    db.prepare('DELETE FROM app_settings WHERE key = ?').run(key);
+  },
+};
 
 // User operations
 export const users = {

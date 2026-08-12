@@ -3,7 +3,7 @@ import * as Avatar from '@radix-ui/react-avatar';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { LogOut, ChevronDown, RotateCcw, Loader2 } from 'lucide-react';
+import { LogOut, ChevronDown, RotateCcw, RefreshCw, Loader2 } from 'lucide-react';
 import type { User } from '../lib/api';
 import { usageApi } from '../lib/api';
 import { useUsageSummaryQuery } from '../hooks/queries/useUsageSummaryQuery';
@@ -41,8 +41,27 @@ function AvatarBadge({ user, size = 'h-8 w-8' }: { user: User | null; size?: str
 export default function ProfileMenu({ user, onLogout, variant = 'avatar' }: ProfileMenuProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [syncOpen, setSyncOpen] = useState(false);
+  const [syncValue, setSyncValue] = useState('');
   const queryClient = useQueryClient();
   const { data: usage } = useUsageSummaryQuery();
+
+  const syncBaseline = useMutation({
+    mutationFn: (amountUsd: number | null) => usageApi.setBaseline(amountUsd),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.usage });
+      setSyncOpen(false);
+      toast.success(
+        result.baseline ? 'Synced with Google Cloud' : 'Sync cleared',
+        result.baseline
+          ? `Counting from ${money(result.baseline.amountUsd)}`
+          : 'Showing only spend this app tracked',
+      );
+    },
+    onError: (err: unknown) => {
+      toast.error('Sync failed', err instanceof Error ? err.message : 'Could not set the baseline');
+    },
+  });
 
   const resetUsage = useMutation({
     mutationFn: () => usageApi.reset(),
@@ -136,14 +155,42 @@ export default function ProfileMenu({ user, onLogout, variant = 'avatar' }: Prof
               </div>
               <p className="mt-1.5 text-[10px] text-gray-600">{usedPct}% of credit used · all projects</p>
 
-              <button
-                type="button"
-                onClick={() => { setMenuOpen(false); setConfirmOpen(true); }}
-                className="mt-2.5 inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg text-[12px] font-medium text-gray-400 ring-1 ring-white/10 transition-[transform,color,background-color,box-shadow] duration-150 hover:bg-white/5 hover:text-white hover:ring-white/20 active:scale-[0.96]"
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-                Reset usage
-              </button>
+              {/* The app can only price what runs through it; Google bills for
+                  everything on the project. Showing both makes the gap visible
+                  instead of quietly wrong. */}
+              {usage?.baseline ? (
+                <p className="mt-1 text-[10px] leading-relaxed text-gray-600">
+                  Synced to {money(usage.baseline.amountUsd)} from Google Cloud
+                  {usage.trackedSinceBaseline > 0 && <> · {money(usage.trackedSinceBaseline)} tracked since</>}
+                </p>
+              ) : (
+                <p className="mt-1 text-[10px] leading-relaxed text-gray-600">
+                  App-tracked only — may read low if anything ran outside the studio
+                </p>
+              )}
+
+              <div className="mt-2.5 flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setSyncValue(usage?.baseline ? String(usage.baseline.amountUsd) : '');
+                    setSyncOpen(true);
+                  }}
+                  className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg text-[12px] font-medium text-gray-400 ring-1 ring-white/10 transition-[transform,color,background-color,box-shadow] duration-150 hover:bg-white/5 hover:text-white hover:ring-white/20 active:scale-[0.96]"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Sync
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setMenuOpen(false); setConfirmOpen(true); }}
+                  className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg text-[12px] font-medium text-gray-400 ring-1 ring-white/10 transition-[transform,color,background-color,box-shadow] duration-150 hover:bg-white/5 hover:text-white hover:ring-white/20 active:scale-[0.96]"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Reset
+                </button>
+              </div>
             </div>
 
             <DropdownMenu.Separator className="my-1 h-px bg-white/10" />
@@ -158,6 +205,79 @@ export default function ProfileMenu({ user, onLogout, variant = 'avatar' }: Prof
           </DropdownMenu.Content>
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
+
+      {/* Anchor the counter to billing. Kept outside the menu so it survives the
+          dropdown unmounting, and as a dialog so Radix's menu typeahead can't
+          swallow keystrokes meant for the input. */}
+      <AlertDialog.Root open={syncOpen} onOpenChange={setSyncOpen}>
+        <AlertDialog.Portal>
+          <AlertDialog.Overlay className="fixed inset-0 z-[300] bg-black/70 backdrop-blur-sm data-[state=open]:[animation:overlayIn_160ms_ease-out]" />
+          <AlertDialog.Content className="fixed left-1/2 top-1/2 z-[300] w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-[#0b0b0b] p-5 ring-1 ring-white/10 shadow-[0_24px_80px_rgba(0,0,0,0.7)] focus:outline-none data-[state=open]:[animation:dialogIn_180ms_ease-out]">
+            <AlertDialog.Title className="text-base font-semibold text-white">Sync with Google Cloud</AlertDialog.Title>
+            <AlertDialog.Description className="mt-2 text-sm leading-relaxed text-gray-400">
+              This studio can only price what runs through it. Anything billed outside — a script, a
+              direct API call — never reaches the counter, so it drifts low over time.
+              <span className="mt-2 block text-xs text-gray-500">
+                Enter the <span className="text-gray-300">credits used</span> figure from the Google Cloud
+                billing page. The counter starts there and adds everything tracked from now on.
+                App-tracked so far: {money(usage?.trackedCost ?? 0)}.
+              </span>
+            </AlertDialog.Description>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const amount = Number(syncValue);
+                if (Number.isFinite(amount) && amount >= 0) syncBaseline.mutate(amount);
+              }}
+            >
+              <div className="mt-4 flex items-center gap-2 rounded-lg bg-white/[0.04] px-3 ring-1 ring-white/10 focus-within:ring-[#0097A7]/60">
+                <span className="text-sm text-gray-500">$</span>
+                <input
+                  autoFocus
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={syncValue}
+                  onChange={(e) => setSyncValue(e.target.value)}
+                  placeholder="12.00"
+                  className="h-10 w-full bg-transparent text-sm text-white placeholder:text-gray-600 focus:outline-none"
+                />
+                <span className="shrink-0 text-xs text-gray-600">of {money(limit)}</span>
+              </div>
+
+              <div className="mt-5 flex justify-end gap-2">
+                {usage?.baseline && (
+                  <button
+                    type="button"
+                    onClick={() => syncBaseline.mutate(null)}
+                    disabled={syncBaseline.isPending}
+                    className="mr-auto inline-flex h-9 items-center rounded-lg px-3 text-sm font-medium text-gray-500 transition-[transform,color] duration-150 hover:text-gray-300 active:scale-[0.96] disabled:opacity-50"
+                  >
+                    Clear sync
+                  </button>
+                )}
+                <AlertDialog.Cancel asChild>
+                  <button
+                    type="button"
+                    className="inline-flex h-9 items-center rounded-lg px-3.5 text-sm font-medium text-gray-300 ring-1 ring-white/10 transition-[transform,color,background-color] duration-150 hover:bg-white/5 hover:text-white active:scale-[0.96]"
+                  >
+                    Cancel
+                  </button>
+                </AlertDialog.Cancel>
+                <button
+                  type="submit"
+                  disabled={syncBaseline.isPending || syncValue.trim() === ''}
+                  className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#0097A7] px-4 text-sm font-medium text-white transition-[transform,background-color] duration-150 hover:bg-[#00a9bb] active:scale-[0.96] disabled:opacity-50"
+                >
+                  {syncBaseline.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  Sync
+                </button>
+              </div>
+            </form>
+          </AlertDialog.Content>
+        </AlertDialog.Portal>
+      </AlertDialog.Root>
 
       {/* Kept outside the menu so it survives the dropdown unmounting */}
       <AlertDialog.Root open={confirmOpen} onOpenChange={setConfirmOpen}>
