@@ -146,9 +146,16 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
 export const imageGenerationGate = new QuotaGate({
   name: 'image generation',
   limit: Number(process.env.VERTEX_IMAGE_RPM || 2),
-  // Held time and generation time share one request deadline (90s, set by
-  // Cloudflare abandoning the origin at ~100s). 30s of queueing still leaves a
-  // comfortable 60s for a job that normally takes 15-30s, so a request that
-  // waits is not then cut off just before it would have succeeded.
-  maxWaitMs: Number(process.env.VERTEX_IMAGE_MAX_WAIT_MS || 30_000),
+  /**
+   * Zero by default: never add latency to a request.
+   *
+   * Queueing sounded better than failing, but a heavy generation (several
+   * reference images at 2K) can already run past Cloudflare's ~100s origin
+   * limit on its own. Adding up to 30s of hold in front of that turned
+   * would-be-slow requests into gateway timeouts. The gate still earns its
+   * keep — it rejects locally instead of spending a call on a bucket we know
+   * is full — it just does so immediately. Raise VERTEX_IMAGE_MAX_WAIT_MS only
+   * if generations are consistently fast enough to absorb the wait.
+   */
+  maxWaitMs: Number(process.env.VERTEX_IMAGE_MAX_WAIT_MS || 0),
 });
