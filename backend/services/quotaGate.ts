@@ -55,7 +55,7 @@ export class QuotaGate {
   /** Serialises reservations so concurrent callers can't claim the same slot. */
   private tail: Promise<unknown> = Promise.resolve();
 
-  constructor({ name, limit, windowMs = 60_000, maxWaitMs = 45_000 }: QuotaGateOptions) {
+  constructor({ name, limit, windowMs = 60_000, maxWaitMs = 30_000 }: QuotaGateOptions) {
     this.name = name;
     this.limit = Math.max(1, limit);
     this.windowMs = windowMs;
@@ -146,5 +146,9 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
 export const imageGenerationGate = new QuotaGate({
   name: 'image generation',
   limit: Number(process.env.VERTEX_IMAGE_RPM || 2),
-  maxWaitMs: Number(process.env.VERTEX_IMAGE_MAX_WAIT_MS || 45_000),
+  // Held time and generation time share one request deadline (90s, set by
+  // Cloudflare abandoning the origin at ~100s). 30s of queueing still leaves a
+  // comfortable 60s for a job that normally takes 15-30s, so a request that
+  // waits is not then cut off just before it would have succeeded.
+  maxWaitMs: Number(process.env.VERTEX_IMAGE_MAX_WAIT_MS || 30_000),
 });

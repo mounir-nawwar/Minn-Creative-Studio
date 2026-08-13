@@ -66,10 +66,18 @@ export async function callBackend(method: string, params: any, signal?: AbortSig
     } else {
       const text = await response.text();
       console.error('Non-JSON response from backend:', text.substring(0, 500));
-      const error = new Error(`Server returned non-JSON response (${response.status}). Check console for details.`) as BackendError;
+      // 502/504 here is the CDN's own error page, not ours: the request outlived
+      // the edge timeout. Say that plainly instead of "non-JSON response", which
+      // reads like a bug rather than "it took too long".
+      const isGatewayTimeout = response.status === 504 || response.status === 502;
+      const error = new Error(
+        isGatewayTimeout
+          ? 'The generation took too long and the connection timed out. It may still have completed — check the Library before retrying.'
+          : `Server returned non-JSON response (${response.status}). Check console for details.`,
+      ) as BackendError;
       error.status = response.status;
       error.isClientError = response.status >= 400 && response.status < 500;
-      error.retryable = false; // a misconfigured response, not a transient fault
+      error.retryable = false; // retrying a long generation just doubles the bill
       throw error;
     }
   } catch (err: unknown) {

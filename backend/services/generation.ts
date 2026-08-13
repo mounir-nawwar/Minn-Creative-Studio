@@ -165,6 +165,19 @@ export interface RunGenerationArgs {
   via?: GenerationVia;
 }
 
+/**
+ * Attach the caller's abort signal to an SDK request.
+ *
+ * Note the SDK's own caveat: aborting is client-side only, so Google keeps
+ * working and still bills for it. The deadline is there to stop us holding an
+ * HTTP connection past the point the client can still receive an answer — not
+ * to save money. That is why the budget is sized to let work finish normally.
+ */
+function withAbortSignal(sdkParams: any, signal?: AbortSignal): any {
+  if (!signal) return sdkParams;
+  return { ...sdkParams, config: { ...(sdkParams.config ?? {}), abortSignal: signal } };
+}
+
 /** The 2/min quota applies to generateContent calls that ask for an image back. */
 function isImageGeneration(params: any): boolean {
   const modalities = params?.config?.responseModalities;
@@ -351,10 +364,14 @@ export async function runGeneration({ method, params: incomingParams, userId, si
           await trackProjectCost(projectId, cost, { type: 'audio', audioCount: 1, model: sdkParams.model, via });
         }
       }
-    } else if (isImageGeneration(sdkParams)) {
-      response = await callWithImageQuota(signal, () => ai(sdkParams.model).models.generateContent(sdkParams));
     } else {
-      response = await ai(sdkParams.model).models.generateContent(sdkParams);
+      // The request deadline has to reach the SDK or it does nothing: the route
+      // would abort, the call would keep running, and the response would arrive
+      // long after Cloudflare had already served the caller an HTML 504.
+      const withDeadline = withAbortSignal(sdkParams, signal);
+      response = isImageGeneration(sdkParams)
+        ? await callWithImageQuota(signal, () => ai(sdkParams.model).models.generateContent(withDeadline))
+        : await ai(sdkParams.model).models.generateContent(withDeadline);
     }
 
     const candidates = (response as any).candidates ?? [];

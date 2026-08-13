@@ -4,7 +4,7 @@
  * All actual Vertex logic (cost tracking, storage upload, asset rows, LRO
  * handling) lives in backend/services/generation.ts so the MCP connector can
  * share the exact same execution path. This route only adds: auth, the AI
- * rate limiter, the ~58s abort timeout, and HTTP response shaping.
+ * rate limiter, the request deadline, and HTTP response shaping.
  */
 
 import express from 'express';
@@ -13,6 +13,20 @@ import { aiLimiter } from '../config/cors.ts';
 import { runGeneration, GenerationHttpError } from '../services/generation.ts';
 
 const router = express.Router();
+
+/**
+ * How long a generation may take before we give up and answer.
+ *
+ * The binding limit is Cloudflare, which abandons an origin request at ~100s
+ * and serves its own HTML error page — the client then gets markup where it
+ * expected JSON. nginx allows 120s, so Cloudflare is what we must stay under.
+ *
+ * 90s leaves room for the quota gate to hold a request (up to 30s) and the
+ * generation itself (15-30s typically) without either being cut short. Aborting
+ * mid-generation is worse than waiting: Google bills for the work regardless,
+ * and the quota slot is spent either way.
+ */
+const REQUEST_DEADLINE_MS = Number(process.env.GENERATION_DEADLINE_MS || 90_000);
 
 /**
  * Readable text out of a Vertex failure. `vertexRest` throws with the raw
@@ -36,7 +50,7 @@ router.post('/', requireAuth, aiLimiter, async (req, res) => {
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 58000);
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_DEADLINE_MS);
 
   try {
     const { method, params } = req.body;
