@@ -15,18 +15,16 @@ import { runGeneration, GenerationHttpError } from '../services/generation.ts';
 const router = express.Router();
 
 /**
- * How long a generation may take before we give up and answer.
+ * Backstop so a wedged request cannot hold a connection forever.
  *
- * The binding limit is Cloudflare, which abandons an origin request at ~100s
- * and serves its own HTML error page — the client then gets markup where it
- * expected JSON. nginx allows 120s, so Cloudflare is what we must stay under.
- *
- * 90s leaves room for the quota gate to hold a request (up to 30s) and the
- * generation itself (15-30s typically) without either being cut short. Aborting
- * mid-generation is worse than waiting: Google bills for the work regardless,
- * and the quota slot is spent either way.
+ * Deliberately far longer than any real generation. It is NOT a quality-of-
+ * service deadline: a shorter one killed generations that were about to
+ * succeed, and because the abort never reaches Google, that meant paying for an
+ * image and then discarding it. Cloudflare gives up on the origin at ~100s
+ * regardless, so a tighter timer here buys nothing the browser can use — while
+ * letting the work finish means the asset still lands in the Library.
  */
-const REQUEST_DEADLINE_MS = Number(process.env.GENERATION_DEADLINE_MS || 90_000);
+const REQUEST_DEADLINE_MS = Number(process.env.GENERATION_DEADLINE_MS || 600_000);
 
 /**
  * Readable text out of a Vertex failure. `vertexRest` throws with the raw

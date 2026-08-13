@@ -165,19 +165,6 @@ export interface RunGenerationArgs {
   via?: GenerationVia;
 }
 
-/**
- * Attach the caller's abort signal to an SDK request.
- *
- * Note the SDK's own caveat: aborting is client-side only, so Google keeps
- * working and still bills for it. The deadline is there to stop us holding an
- * HTTP connection past the point the client can still receive an answer — not
- * to save money. That is why the budget is sized to let work finish normally.
- */
-function withAbortSignal(sdkParams: any, signal?: AbortSignal): any {
-  if (!signal) return sdkParams;
-  return { ...sdkParams, config: { ...(sdkParams.config ?? {}), abortSignal: signal } };
-}
-
 /** The 2/min quota applies to generateContent calls that ask for an image back. */
 function isImageGeneration(params: any): boolean {
   const modalities = params?.config?.responseModalities;
@@ -365,13 +352,16 @@ export async function runGeneration({ method, params: incomingParams, userId, si
         }
       }
     } else {
-      // The request deadline has to reach the SDK or it does nothing: the route
-      // would abort, the call would keep running, and the response would arrive
-      // long after Cloudflare had already served the caller an HTML 504.
-      const withDeadline = withAbortSignal(sdkParams, signal);
+      // Deliberately NOT cancelled by the request deadline.
+      //
+      // Aborting here is pure loss: the SDK's abort is client-side only, so
+      // Google finishes the work and bills for it either way — but we would
+      // never reach the upload below, so the image is never saved. Letting it
+      // run means a generation that outlives the browser's patience still lands
+      // in the Library. The gate wait above is abortable; the generation is not.
       response = isImageGeneration(sdkParams)
-        ? await callWithImageQuota(signal, () => ai(sdkParams.model).models.generateContent(withDeadline))
-        : await ai(sdkParams.model).models.generateContent(withDeadline);
+        ? await callWithImageQuota(signal, () => ai(sdkParams.model).models.generateContent(sdkParams))
+        : await ai(sdkParams.model).models.generateContent(sdkParams);
     }
 
     const candidates = (response as any).candidates ?? [];
